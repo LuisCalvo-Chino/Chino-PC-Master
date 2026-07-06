@@ -1289,6 +1289,55 @@
     function initUserFlow(api, showMessage, hash, role) {
         let resolved = null;
         let design = defaultDesign();
+        let angelesList = [];
+        let designLoadedAt = 0;
+        const DESIGN_CACHE_TTL_MS = 3 * 60 * 1000;
+
+        function weekKeyToDisplayLabel(wk) {
+            const m = String(wk || "").match(/^W(\d+)$/i);
+            return m ? `Semana ${Number(m[1])}` : "";
+        }
+
+        function formatReplySummaryTitle(it) {
+            const base = it.title || "Respuesta";
+            if (it.week) {
+                const weekLabel = weekKeyToDisplayLabel(it.week);
+                if (weekLabel) return `${weekLabel} - ${base}`;
+            }
+            return base;
+        }
+
+        function syncUserSaveButtonState() {
+            const sel = document.getElementById("usr-angel-select");
+            const btn = document.getElementById("usr-save-msg");
+            if (!btn || !sel) return;
+            btn.disabled = !resolved || sel.value === "";
+        }
+
+        function applyAngelesListToSelect(list) {
+            const sel = document.getElementById("usr-angel-select");
+            const lbl = document.getElementById("usr-angelado-lbl");
+            if (!sel) return;
+            const rows = Array.isArray(list) ? list : [];
+            const placeholder =
+                '<option value="" disabled selected>Selecciona un Ángel</option>';
+            sel.innerHTML =
+                placeholder +
+                rows
+                    .map(
+                        (r, i) =>
+                            `<option value="${i}" data-email="${esc(r.email_angelado)}">${esc(r.nombre_angel)}</option>`
+                    )
+                    .join("");
+            const upd = () => {
+                const ix = Number(sel.value);
+                const row = Number.isFinite(ix) && ix >= 0 ? rows[ix] : null;
+                if (lbl) lbl.textContent = row ? row.nombre_angelado : "—";
+                syncUserSaveButtonState();
+            };
+            sel.onchange = upd;
+            upd();
+        }
 
         function updateUserHeadOffset() {
             const head = document.getElementById("angels-user-head");
@@ -1389,13 +1438,23 @@
             setUserPreviewPanelOpen(next);
         }
 
-        async function refreshUserDesignFromServer() {
+        async function refreshUserDesignFromServer(opts) {
             if (!resolved) return;
+            const force = Boolean(opts && opts.force);
+            if (
+                !force &&
+                designLoadedAt &&
+                Date.now() - designLoadedAt < DESIGN_CACHE_TTL_MS
+            ) {
+                updateUserPreview();
+                return;
+            }
             try {
                 const cfg = await api.postSender(resolved.sender_exec_url, resolved.secret, {
                     action: "get_config"
                 });
                 design = normalizeDesign((cfg.data && cfg.data.design) || cfg.design || {});
+                designLoadedAt = Date.now();
                 updateUserPreview();
             } catch (e) {
                 /* silencioso */
@@ -1407,24 +1466,49 @@
             const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
                 action: "user_list_angeles"
             });
-            const list = res.data?.angeles || res.angeles || [];
-            const sel = document.getElementById("usr-angel-select");
-            const lbl = document.getElementById("usr-angelado-lbl");
-            if (!sel) return;
-            sel.innerHTML = list
-                .map(
-                    (r, i) =>
-                        `<option value="${i}" data-email="${esc(r.email_angelado)}">${esc(r.nombre_angel)}</option>`
-                )
-                .join("");
-            const upd = () => {
-                const opt = sel.options[sel.selectedIndex];
-                const ix = Number(sel.value);
-                const row = list[ix];
-                if (lbl) lbl.textContent = row ? row.nombre_angelado : "—";
-            };
-            sel.onchange = upd;
-            upd();
+            angelesList = res.data?.angeles || res.angeles || [];
+            applyAngelesListToSelect(angelesList);
+        }
+
+        async function loadUserSessionInitial() {
+            if (!resolved) return false;
+            try {
+                const boot = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "user_bootstrap"
+                });
+                const data = boot.data || boot;
+                if (data.design) {
+                    design = normalizeDesign(data.design);
+                    designLoadedAt = Date.now();
+                }
+                if (data.angeles) {
+                    angelesList = data.angeles;
+                    applyAngelesListToSelect(angelesList);
+                }
+                updateUserPreview();
+                syncUserSaveButtonState();
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function loadUserSessionFallback() {
+            if (!resolved) return;
+            const [cfg, angelsRes] = await Promise.all([
+                api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "get_config"
+                }),
+                api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "user_list_angeles"
+                })
+            ]);
+            design = normalizeDesign((cfg.data && cfg.data.design) || cfg.design || {});
+            designLoadedAt = Date.now();
+            angelesList = angelsRes.data?.angeles || angelsRes.angeles || [];
+            applyAngelesListToSelect(angelesList);
+            updateUserPreview();
+            syncUserSaveButtonState();
         }
 
         async function refreshUserStatus() {
@@ -1459,7 +1543,7 @@
                         const stUpper = String(r.status || "").toUpperCase();
                         if (stUpper === "SENT" || stUpper === "ENVIADO") stHtml = "✅ Enviado";
                         else if (stUpper === "PENDING" || stUpper === "LISTO")
-                            stHtml = "📧 Pendiente";
+                            stHtml = "📧 Envío pendiente";
                         else if (stUpper === "ERROR") stHtml = "❌ Error";
                         else stHtml = "⚠️ Por redactar";
                         return `<tr><td>${esc(r.angel)}</td><td>${stHtml}</td></tr>`;
@@ -1478,9 +1562,9 @@
             if (!acc) return;
             acc.innerHTML = items
                 .map(
-                    (it, i) =>
-                        `<details class="angels-acc-item" ${i === 0 ? "open" : ""}><summary>${esc(
-                            it.title || "Respuesta"
+                    (it) =>
+                        `<details class="angels-acc-item"><summary>${esc(
+                            formatReplySummaryTitle(it)
                         )}</summary><div class="angels-acc-body">${it.html || esc(it.text || "")}</div></details>`
                 )
                 .join("") || "<p>Sin respuestas esta semana.</p>";
@@ -1563,7 +1647,7 @@
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState !== "visible" || !resolved) return;
             const writeOpen = document.querySelector('[data-upanel="write"]')?.classList.contains("is-active");
-            if (writeOpen) refreshUserDesignFromServer();
+            if (writeOpen) refreshUserDesignFromServer({ force: true });
         });
 
         const ed = document.getElementById("usr-editor");
@@ -1707,16 +1791,33 @@
                 showMessage("Espera la carga del proyecto.", "error");
                 return;
             }
-            await refreshUserDesignFromServer();
             const sel = document.getElementById("usr-angel-select");
-            const ix = Number(sel?.value);
-            const resList = await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                action: "user_list_angeles"
-            });
-            const list = resList.data?.angeles || resList.angeles || [];
+            if (!sel || sel.value === "") {
+                showMessage("Selecciona un Ángel antes de enviar.", "error");
+                return;
+            }
+            if (greetEl && !String(greetEl.value || "").trim()) {
+                if (
+                    !window.confirm(
+                        "No escribiste un saludo personalizado. Se enviará con el saludo por defecto «Hola Angelado». ¿Continuar?"
+                    )
+                ) {
+                    return;
+                }
+            }
+            await refreshUserDesignFromServer({ force: true });
+            const ix = Number(sel.value);
+            let list = angelesList;
+            if (!list.length) {
+                const resList = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "user_list_angeles"
+                });
+                list = resList.data?.angeles || resList.angeles || [];
+                angelesList = list;
+            }
             const row = list[ix];
             if (!row) {
-                showMessage("Selecciona un ángel.", "error");
+                showMessage("Selecciona un Ángel antes de enviar.", "error");
                 return;
             }
             const html = buildEmailDocument(userDesignForPreview(), ed?.innerHTML || "");
@@ -1742,12 +1843,11 @@
         return (async () => {
             try {
                 resolved = await resolveProject(api, hash, role);
-                const cfg = await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                    action: "get_config"
-                });
-                design = normalizeDesign((cfg.data && cfg.data.design) || cfg.design || {});
-                await refreshUserAngels();
-                await refreshUserStatus();
+                syncUserSaveButtonState();
+                const bootOk = await loadUserSessionInitial();
+                if (!bootOk) {
+                    await loadUserSessionFallback();
+                }
                 updateUserPreview();
             } catch (e) {
                 showMessage(e.message || "No se pudo cargar el proyecto", "error");

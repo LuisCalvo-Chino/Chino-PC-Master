@@ -3564,6 +3564,48 @@ main {
     display: inline-block;
 }
 
+.angels-input--greeting-short {
+    width: 100%;
+    max-width: 100%;
+}
+
+.angels-status-legend {
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.85rem;
+    border-radius: 12px;
+}
+
+.angels-status-legend__title {
+    margin: 0 0 0.5rem 0;
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #80deea;
+}
+
+.angels-status-legend__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+    color: rgba(224, 230, 255, 0.88);
+}
+
+.angels-status-legend__badge {
+    font-weight: 600;
+    color: #e8eaf6;
+}
+
+.angels-btn:disabled,
+.angels-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .angels-textarea {
     width: 100%;
     min-height: 5rem;

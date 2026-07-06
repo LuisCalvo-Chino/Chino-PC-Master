@@ -517,18 +517,21 @@
                 <div class="angels-split angels-split--user angels-split--preview-tall">
                     <div class="angels-editor-col">
                         <label>Ángel
-                            <select id="usr-angel-select" class="angels-input"></select>
+                            <select id="usr-angel-select" class="angels-input" required>
+                                <option value="" disabled selected>Selecciona un Ángel</option>
+                            </select>
                         </label>
                         <p><strong>Angelado:</strong> <span id="usr-angelado-lbl">—</span></p>
-                        <label class="angels-design-label">Saludo</label>
-                        <textarea
+                        <label class="angels-design-label" for="usr-greeting">Saludo</label>
+                        <input
+                            type="text"
                             id="usr-greeting"
-                            class="angels-input angels-textarea"
-                            rows="2"
-                            maxlength="600"
+                            class="angels-input angels-input--greeting-short"
+                            maxlength="120"
                             spellcheck="true"
+                            autocomplete="off"
                             placeholder="Ej. Hola, un abrazo para ti."
-                        ></textarea>
+                        />
                         <p class="angels-hint">Acá puedes colocar el saludo para tu Angelado. Recuerda que siempre podrás verificar el estado de tu mensaje en el menú de Vista Previa.</p>
                         <div class="angels-rt-toolbar">
                             <button type="button" class="angels-icon-btn" data-cmd="bold" title="Negrita"><b>B</b></button>
@@ -553,7 +556,7 @@
                         </div>
                         <div id="usr-editor" class="angels-rich" contenteditable="true" aria-label="Cuerpo del mensaje"></div>
                         <p class="angels-disclaimer">Tu Ángel Secreto — mensaje anónimo; no incluyas datos que te identifiquen si deseas mantener el anonimato.</p>
-                        <button type="button" class="angels-btn angels-btn--primary" id="usr-save-msg">Enviar a cola</button>
+                        <button type="button" class="angels-btn angels-btn--primary" id="usr-save-msg" disabled>Enviar a cola</button>
                     </div>
                     <div class="angels-preview-col">
                         <button type="button" class="angels-preview-toggle" id="usr-preview-toggle">Vista previa</button>
@@ -578,6 +581,15 @@
                     <label>Semana: 
                         <select id="usr-status-week" class="angels-input"></select>
                     </label>
+                </div>
+                <div class="angels-status-legend angels-glass" role="note" aria-label="Significado de los estados">
+                    <p class="angels-status-legend__title">Estados del mensaje</p>
+                    <ul class="angels-status-legend__list">
+                        <li><span class="angels-status-legend__badge">⚠️ Por redactar</span> — Aún no hay mensaje en cola para ese Ángel en la semana seleccionada.</li>
+                        <li><span class="angels-status-legend__badge">📧 Envío pendiente</span> — El mensaje ya está guardado y espera el envío programado (cola / horario del evento).</li>
+                        <li><span class="angels-status-legend__badge">✅ Enviado</span> — El correo ya fue enviado al Angelado.</li>
+                        <li><span class="angels-status-legend__badge">❌ Error</span> — Hubo un fallo al enviar; contacta al organizador.</li>
+                    </ul>
                 </div>
                 <div class="angels-table-wrap">
                     <table class="angels-table" id="usr-status-table">

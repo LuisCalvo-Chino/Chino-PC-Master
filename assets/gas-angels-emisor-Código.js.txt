@@ -37,6 +37,7 @@ function doPost(e) {
     if (action === "user_save_message") return jsonOut_(handleUserSaveMessage_(data));
     if (action === "user_list_buddies") return jsonOut_(handleUserListBuddies_());
     if (action === "user_week_status") return jsonOut_(handleUserWeekStatus_(data));
+    if (action === "user_bootstrap") return jsonOut_(handleUserBootstrap_());
     if (action === "fetch_inbox_replies") return jsonOut_(handleFetchInboxReplies_());
     return jsonOut_({
       status: "ERROR",
@@ -288,6 +289,40 @@ function computeWeekKey_() {
   const n = 1 + Math.floor((nowThu - startThu) / 7);
   if (n < 1) return "W0";
   return "W" + n;
+}
+
+/** Semana Wn para una fecha concreta (p. ej. fecha de un correo en Respuestas). */
+function computeWeekKeyForDate_(date) {
+  initSheets_();
+  const tz = Session.getScriptTimeZone();
+  const startIso = String(getProp_("FECHA_INICIO_ISO") || "").trim();
+  if (!startIso) return "W0";
+  const start = parseStartIsoToLocalParts_(startIso, tz);
+  if (!start) return "W0";
+  const dt = date instanceof Date ? date : new Date(date);
+  if (isNaN(dt.getTime())) return "W0";
+  const y = Number(Utilities.formatDate(dt, tz, "yyyy"));
+  const mo = Number(Utilities.formatDate(dt, tz, "MM"));
+  const d = Number(Utilities.formatDate(dt, tz, "dd"));
+  const startThu = thursdayDayIndexForCalendar_(start.y, start.mo, start.d);
+  const msgThu = thursdayDayIndexForCalendar_(y, mo, d);
+  const n = 1 + Math.floor((msgThu - startThu) / 7);
+  if (n < 1) return "W0";
+  return "W" + n;
+}
+
+function handleUserBootstrap_() {
+  const cfg = handleGetConfig_();
+  const angeles = readAngelesRows_();
+  const wk = computeWeekKey_();
+  return {
+    status: "SUCCESS",
+    data: {
+      design: (cfg.data && cfg.data.design) || cfg.design || defaultDesign_(),
+      angeles: angeles,
+      current_week: wk
+    }
+  };
 }
 
 function handleGetSenderInfo_() {
@@ -612,7 +647,9 @@ function handleFetchInboxReplies_() {
         }
       });
       const title = "Respuesta de " + angeladoName + " a " + angelName;
+      const week = computeWeekKeyForDate_(m.getDate());
       items.push({
+        week: week,
         title: title,
         text: m.getPlainBody(),
         html: m.getBody()
