@@ -2,6 +2,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const BACKEND_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbylYwlJaLInQ7dtEdhC40IOTGD8G3GqTL0yN343s5I5MOLSeTTdQAgN44A7ktEUPK3oHw/exec";
     const AUTH_STORAGE_KEY = "cpm_session";
+    /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
+    const ASSET_V = String(
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "29"
+    );
     const PUBLIC_PAGES = new Set([
         "home",
         "soluciones",
@@ -633,7 +637,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let pageReady = null;
         try {
             const htmlName = htmlFileForPage(pageName);
-            const response = await fetch(`${htmlName}.html`);
+            const response = await fetch(`${htmlName}.html?v=${encodeURIComponent(ASSET_V)}`, {
+                cache: "no-store"
+            });
             if (!response.ok) throw new Error("Pagina no encontrada");
             const content = await response.text();
             mainContent.innerHTML = content;
@@ -920,6 +926,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Cargar API + app de rifa dinámicamente
     function loadRifaScript(rifaCtx) {
         const ctx = rifaCtx || { mode: "hub" };
+        const RIFA_API_SRC = `assets/rifa-api.js?v=${ASSET_V}`;
+        const RIFA_APP_SRC = `assets/rifa.js?v=${ASSET_V}`;
         return new Promise((resolve) => {
             function runInit() {
                 (async () => {
@@ -950,8 +958,11 @@ document.addEventListener("DOMContentLoaded", () => {
             function appendScript(id, src, onload) {
                 const existing = document.getElementById(id);
                 if (existing) {
-                    if (typeof onload === "function") onload();
-                    return;
+                    if (existing.getAttribute("src") === src) {
+                        if (typeof onload === "function") onload();
+                        return;
+                    }
+                    existing.remove();
                 }
                 const s = document.createElement("script");
                 s.id = id;
@@ -969,16 +980,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.body.appendChild(s);
             }
 
-            if (typeof window.initRifaApp === "function" && window.CPMRifaApi) {
+            function scriptSrcOk(id, src) {
+                const el = document.getElementById(id);
+                return Boolean(el && el.getAttribute("src") === src);
+            }
+
+            const scriptsFresh =
+                scriptSrcOk("rifa-api-script", RIFA_API_SRC) &&
+                scriptSrcOk("rifa-script", RIFA_APP_SRC) &&
+                typeof window.initRifaApp === "function" &&
+                Boolean(window.CPMRifaApi);
+
+            if (scriptsFresh) {
                 runInit();
                 return;
             }
 
-            const oldApp = document.getElementById("rifa-script");
-            if (oldApp) oldApp.remove();
+            // Forzar recarga si la versión ?v= cambió (evita HTML/JS viejo en Pages)
+            ["rifa-api-script", "rifa-script"].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            });
+            window.initRifaApp = undefined;
 
-            appendScript("rifa-api-script", "assets/rifa-api.js?v=1", () => {
-                appendScript("rifa-script", "assets/rifa.js?v=28", runInit);
+            appendScript("rifa-api-script", RIFA_API_SRC, () => {
+                appendScript("rifa-script", RIFA_APP_SRC, runInit);
             });
         });
     }
