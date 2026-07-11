@@ -1,0 +1,664 @@
+/**
+ * Chino PC Master — Apps Script Rifa (multi-proyecto).
+ * Un solo Web App + un Spreadsheet:
+ *   - Hoja «Proyectos»: registro (una fila por rifa)
+ *   - Una hoja por rifa (sheet_name): números 00–99
+ *
+ * Script Properties (obligatorias):
+ *   SPREADSHEET_ID  — ID de la hoja de cálculo principal
+ *   MASTER_ADMIN_PIN — Llave maestra del hub (#rifa)
+ *
+ * Copia este archivo completo a Código.js en script.google.com,
+ * configura las propiedades, despliega como Aplicación web (Cualquiera)
+ * y pega la URL /exec en index.html como window.CPM_RIFA_GAS_URL.
+ */
+
+var PROYECTOS_HEADERS_ = [
+  "project_id",
+  "sheet_name",
+  "nombre_display",
+  "hash_admin",
+  "created_at",
+  "cantidad_premios",
+  "premio_1",
+  "premio_2",
+  "premio_3",
+  "modalidad",
+  "fecha_sorteo",
+  "whatsapp",
+  "sinpe",
+  "precio",
+  "banner_json",
+  "activo"
+];
+
+var NUMEROS_HEADERS_ = ["numero", "estado", "nombre", "telefono", "contacto"];
+
+var SHEET_NAME_RE_ = /^[A-Za-z0-9_-]{2,20}$/;
+var MODALIDADES_ = { Chances: 1, "Loteria Nacional": 1, RNG: 1 };
+
+function doGet() {
+  return jsonOut_({ status: "SUCCESS", data: { service: "rifa_multi", version: 1 } });
+}
+
+function doPost(e) {
+  try {
+    var data = parseBody_(e);
+    var action = String(data.action || "").trim();
+    if (!action) {
+      return jsonOut_({ status: "ERROR", message: "Acción vacía." });
+    }
+
+    if (action === "ping") {
+      return jsonOut_({ status: "SUCCESS", data: { pong: true } });
+    }
+
+    if (action.indexOf("super_") === 0) {
+      assertMaster_(data.masterPin);
+      if (action === "super_list_projects") return jsonOut_(handleListProjects_());
+      if (action === "super_create_project") return jsonOut_(handleCreateProject_(data));
+      if (action === "super_get_project") return jsonOut_(handleGetProject_(data));
+      if (action === "super_update_project") return jsonOut_(handleUpdateProject_(data));
+      if (action === "super_delete_project") return jsonOut_(handleDeleteProject_(data));
+      return jsonOut_({ status: "ERROR", message: "Acción super no reconocida («" + action + "»)." });
+    }
+
+    if (action === "resolve_by_hash" || action === "get_project_data") {
+      return jsonOut_(handleResolveByHash_(data));
+    }
+    if (action === "update_numbers") return jsonOut_(handleUpdateNumbers_(data));
+    if (action === "update_config") return jsonOut_(handleUpdateConfig_(data));
+    if (action === "update_banner") return jsonOut_(handleUpdateBanner_(data));
+
+    return jsonOut_({
+      status: "ERROR",
+      message:
+        "Acción no reconocida («" +
+        action +
+        "»). Publica de nuevo el Web App si añadiste acciones nuevas."
+    });
+  } catch (err) {
+    return jsonOut_({ status: "ERROR", message: String(err && err.message ? err.message : err) });
+  }
+}
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function parseBody_(e) {
+  if (!e) return {};
+  var raw = "";
+  var ctype = e.postData && e.postData.type ? String(e.postData.type).toLowerCase() : "";
+  var isForm = ctype.indexOf("application/x-www-form-urlencoded") !== -1;
+  if (isForm && e.parameter && e.parameter.payload != null && String(e.parameter.payload).trim() !== "") {
+    raw = String(e.parameter.payload).trim();
+  } else if (e.postData && e.postData.contents) {
+    raw = String(e.postData.contents).trim();
+  }
+  if (!raw && e.parameter && e.parameter.payload != null) {
+    raw = String(e.parameter.payload).trim();
+  }
+  if (!raw) return {};
+  var c0 = raw.charAt(0);
+  if (c0 !== "{" && c0 !== "[") {
+    var m = raw.match(/(?:^|&)payload=([^&]*)/);
+    if (m && m[1]) {
+      try {
+        raw = decodeURIComponent(String(m[1]).replace(/\+/g, " ")).trim();
+      } catch (x) {
+        return {};
+      }
+    }
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (x) {
+    return {};
+  }
+}
+
+function getProp_(k) {
+  return PropertiesService.getScriptProperties().getProperty(k);
+}
+
+function assertMaster_(pin) {
+  var expected = String(getProp_("MASTER_ADMIN_PIN") || "").trim();
+  if (!expected || String(pin || "").trim() !== expected) {
+    throw new Error("Llave maestra incorrecta o no configurada.");
+  }
+}
+
+function getSs_() {
+  var id = String(getProp_("SPREADSHEET_ID") || "").trim();
+  if (!id) throw new Error("Falta Script Property SPREADSHEET_ID.");
+  return SpreadsheetApp.openById(id);
+}
+
+function ensureProyectosSheet_() {
+  var ss = getSs_();
+  var sh = ss.getSheetByName("Proyectos");
+  if (!sh) {
+    sh = ss.insertSheet("Proyectos");
+    sh.getRange(1, 1, 1, PROYECTOS_HEADERS_.length).setValues([PROYECTOS_HEADERS_]);
+    sh.setFrozenRows(1);
+  } else {
+    var lastCol = Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length);
+    var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    if (!headers[0] || String(headers[0]).trim() === "") {
+      sh.getRange(1, 1, 1, PROYECTOS_HEADERS_.length).setValues([PROYECTOS_HEADERS_]);
+    }
+  }
+  return sh;
+}
+
+function colIndex_(headers, name) {
+  var n = String(name).toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || "").trim().toLowerCase() === n) return i;
+  }
+  return -1;
+}
+
+function rowToProject_(headers, row) {
+  function cell(key) {
+    var i = colIndex_(headers, key);
+    return i >= 0 ? row[i] : "";
+  }
+  var activoRaw = cell("activo");
+  var activo =
+    activoRaw === true ||
+    String(activoRaw).toUpperCase() === "TRUE" ||
+    String(activoRaw) === "1" ||
+    String(activoRaw) === "";
+  var bannerRaw = String(cell("banner_json") || "").trim();
+  var banner = null;
+  if (bannerRaw) {
+    try {
+      banner = JSON.parse(bannerRaw);
+    } catch (e) {
+      banner = null;
+    }
+  }
+  return {
+    project_id: String(cell("project_id") || "").trim(),
+    sheet_name: String(cell("sheet_name") || "").trim(),
+    nombre_display: String(cell("nombre_display") || "").trim(),
+    hash_admin: String(cell("hash_admin") || "").trim(),
+    created_at: String(cell("created_at") || "").trim(),
+    cantidad_premios: Number(cell("cantidad_premios")) || 1,
+    premio_1: String(cell("premio_1") || "").trim(),
+    premio_2: String(cell("premio_2") || "").trim(),
+    premio_3: String(cell("premio_3") || "").trim(),
+    modalidad: String(cell("modalidad") || "").trim(),
+    fecha_sorteo: formatFechaIso_(cell("fecha_sorteo")),
+    whatsapp: String(cell("whatsapp") || "").trim(),
+    sinpe: String(cell("sinpe") || "").trim(),
+    precio: String(cell("precio") || "").trim(),
+    banner: banner,
+    banner_json: bannerRaw,
+    activo: activo
+  };
+}
+
+function formatFechaIso_(v) {
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || "America/Costa_Rica", "yyyy-MM-dd");
+  }
+  var s = String(v || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return s;
+}
+
+function listAllProjects_(includeInactive) {
+  var sh = ensureProyectosSheet_();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  var lastCol = Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length);
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  // getRange(row, column, numRows, numColumns): filas de datos = lastRow - 1
+  var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    var p = rowToProject_(headers, values[i]);
+    p._row = i + 2;
+    if (!p.project_id && !p.sheet_name) continue;
+    if (!includeInactive && !p.activo) continue;
+    out.push(p);
+  }
+  return out;
+}
+
+function findProjectById_(projectId) {
+  var id = String(projectId || "").trim();
+  var all = listAllProjects_(true);
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].project_id === id) return all[i];
+  }
+  return null;
+}
+
+function findProjectByHash_(hash) {
+  var h = String(hash || "").trim();
+  if (!h) return null;
+  var all = listAllProjects_(true);
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].hash_admin === h && all[i].activo) return all[i];
+  }
+  return null;
+}
+
+function randomHash_(len) {
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  var out = "";
+  for (var i = 0; i < (len || 20); i++) {
+    out += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return out;
+}
+
+function uniqueHash_() {
+  for (var attempt = 0; attempt < 12; attempt++) {
+    var h = randomHash_(20);
+    if (!findProjectByHash_(h)) return h;
+  }
+  throw new Error("No se pudo generar hash único.");
+}
+
+function defaultBannerJson_() {
+  return JSON.stringify({
+    bg: { color1: "#EEEEEE", color2: "#EEEEEE", gradient: false, orient: "to bottom" },
+    font: "Inter, sans-serif",
+    head: { mode: "text", title: "", logoUrl: "" },
+    textColors: {
+      titulo: "#222222",
+      premio1: "#222222",
+      premio2: "#444444",
+      premio3: "#444444",
+      costo: "#222222",
+      modalidadFecha: "#444444",
+      whatsapp: "#222222",
+      sinpe: "#222222"
+    },
+    numberColors: {
+      disponibleText: "#222222",
+      disponibleBg: "#FFFFFF",
+      tomadoText: "#777777",
+      tomadoBg: "#DDDDDD"
+    },
+    icons: {
+      whatsapp: { enabled: true, url: "" },
+      sinpe: { enabled: true, url: "" },
+      tomado: { enabled: false, url: "" }
+    }
+  });
+}
+
+function validateSheetName_(name) {
+  var n = String(name || "").trim();
+  if (!SHEET_NAME_RE_.test(n)) {
+    throw new Error("Nombre de hoja inválido. Usa 2–20 caracteres: letras, números, _ o - (sin espacios).");
+  }
+  if (n.toLowerCase() === "proyectos") {
+    throw new Error("El nombre «Proyectos» está reservado.");
+  }
+  return n;
+}
+
+function validateModalidadFecha_(modalidad, fechaIso) {
+  var mod = String(modalidad || "").trim();
+  if (!MODALIDADES_[mod]) {
+    throw new Error("Modalidad inválida. Usa Chances, Loteria Nacional o RNG.");
+  }
+  var f = String(fechaIso || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) {
+    throw new Error("Fecha de sorteo inválida (usa YYYY-MM-DD).");
+  }
+  var parts = f.split("-");
+  var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (isNaN(d.getTime())) throw new Error("Fecha de sorteo inválida.");
+  var day = d.getDay(); // 0=Dom … 5=Vie … 2=Mar
+  if (mod === "Chances" && day !== 2 && day !== 5) {
+    throw new Error("Chances solo permite martes o viernes.");
+  }
+  if (mod === "Loteria Nacional" && day !== 0) {
+    throw new Error("Lotería Nacional solo permite domingos.");
+  }
+  return { modalidad: mod, fecha_sorteo: f };
+}
+
+function deleteSheetByName_(ss, sheetName) {
+  var sh = ss.getSheetByName(sheetName);
+  if (sh) ss.deleteSheet(sh);
+}
+
+function initNumerosSheet_(ss, sheetName) {
+  var existing = ss.getSheetByName(sheetName);
+  if (existing) {
+    throw new Error("Ya existe una hoja llamada «" + sheetName + "».");
+  }
+  var sh = ss.insertSheet(sheetName);
+  sh.getRange(1, 1, 1, NUMEROS_HEADERS_.length).setValues([NUMEROS_HEADERS_]);
+  // Columna A como texto para conservar 00–09 (Apps Script: numRows/numColumns)
+  sh.getRange(2, 1, 100, 1).setNumberFormat("@");
+  var rows = [];
+  for (var i = 0; i < 100; i++) {
+    var num = (i < 10 ? "0" : "") + String(i);
+    rows.push([num, "Disponible", "", "", ""]);
+  }
+  sh.getRange(2, 1, 100, 5).setValues(rows);
+  sh.setFrozenRows(1);
+  return sh;
+}
+
+function readNumbers_(sheetName) {
+  var ss = getSs_();
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) throw new Error("No se encontró la hoja «" + sheetName + "».");
+  var values = sh.getRange(2, 1, 100, 5).getValues();
+  var numeros = [];
+  for (var i = 0; i < values.length; i++) {
+    var num = pad2_(values[i][0]);
+    if (!num) num = (i < 10 ? "0" : "") + String(i);
+    numeros.push({
+      numero: num,
+      estado: String(values[i][1] || "Disponible").trim() || "Disponible",
+      nombre: String(values[i][2] || "").trim(),
+      telefono: String(values[i][3] || "").trim(),
+      contacto: String(values[i][4] || "").trim()
+    });
+  }
+  return numeros;
+}
+
+function pad2_(v) {
+  if (v === 0 || v === "0") return "00";
+  if (typeof v === "number" && !isNaN(v)) {
+    var n = Math.floor(v);
+    if (n < 0 || n > 99) return "";
+    return n < 10 ? "0" + n : String(n);
+  }
+  var s = String(v || "").trim();
+  if (!s) return "";
+  if (/^\d+$/.test(s)) {
+    var num = parseInt(s, 10);
+    if (num < 0 || num > 99) return "";
+    return num < 10 ? "0" + num : String(num);
+  }
+  return s;
+}
+
+function projectPublic_(p) {
+  return {
+    project_id: p.project_id,
+    sheet_name: p.sheet_name,
+    nombre_display: p.nombre_display || p.sheet_name,
+    hash_admin: p.hash_admin,
+    created_at: p.created_at,
+    cantidad_premios: p.cantidad_premios,
+    premio_1: p.premio_1,
+    premio_2: p.premio_2,
+    premio_3: p.premio_3,
+    modalidad: p.modalidad,
+    fecha_sorteo: p.fecha_sorteo,
+    whatsapp: p.whatsapp,
+    sinpe: p.sinpe,
+    precio: p.precio,
+    banner: p.banner,
+    activo: p.activo
+  };
+}
+
+function handleListProjects_() {
+  var projects = listAllProjects_(false).map(function (p) {
+    var pub = projectPublic_(p);
+    return pub;
+  });
+  return { status: "SUCCESS", data: { projects: projects } };
+}
+
+function handleCreateProject_(data) {
+  var sheetName = validateSheetName_(data.sheet_name || data.nombre_rifa || data.project_name);
+  var display = String(data.nombre_display || sheetName).trim() || sheetName;
+  var vf = validateModalidadFecha_(data.modalidad, data.fecha_sorteo || data.fecha);
+  var cantidad = Math.min(3, Math.max(1, Number(data.cantidad_premios) || 1));
+  var premio1 = String(data.premio_1 || data.objeto || "").trim();
+  var premio2 = cantidad >= 2 ? String(data.premio_2 || "").trim() : "";
+  var premio3 = cantidad >= 3 ? String(data.premio_3 || "").trim() : "";
+  if (!premio1) throw new Error("El premio 1 es obligatorio.");
+
+  var existing = listAllProjects_(true);
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].sheet_name.toLowerCase() === sheetName.toLowerCase()) {
+      throw new Error("Ya existe un proyecto con la hoja «" + sheetName + "».");
+    }
+  }
+
+  var ss = getSs_();
+  // Huérfana de un intento fallido anterior (sin fila en Proyectos): limpiar
+  if (ss.getSheetByName(sheetName)) {
+    deleteSheetByName_(ss, sheetName);
+  }
+
+  try {
+    initNumerosSheet_(ss, sheetName);
+
+    var projectId = "rifa_" + Utilities.getUuid().replace(/-/g, "").slice(0, 12);
+    var hash = uniqueHash_();
+    var now = Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone() || "America/Costa_Rica",
+      "yyyy-MM-dd'T'HH:mm:ss"
+    );
+
+    var sh = ensureProyectosSheet_();
+    var row = [
+      projectId,
+      sheetName,
+      display,
+      hash,
+      now,
+      cantidad,
+      premio1,
+      premio2,
+      premio3,
+      vf.modalidad,
+      vf.fecha_sorteo,
+      String(data.whatsapp || "").trim(),
+      String(data.sinpe || "").trim(),
+      String(data.precio || "").trim(),
+      defaultBannerJson_(),
+      "TRUE"
+    ];
+    sh.appendRow(row);
+
+    var project = projectPublic_({
+      project_id: projectId,
+      sheet_name: sheetName,
+      nombre_display: display,
+      hash_admin: hash,
+      created_at: now,
+      cantidad_premios: cantidad,
+      premio_1: premio1,
+      premio_2: premio2,
+      premio_3: premio3,
+      modalidad: vf.modalidad,
+      fecha_sorteo: vf.fecha_sorteo,
+      whatsapp: String(data.whatsapp || "").trim(),
+      sinpe: String(data.sinpe || "").trim(),
+      precio: String(data.precio || "").trim(),
+      banner: JSON.parse(defaultBannerJson_()),
+      activo: true
+    });
+
+    return { status: "SUCCESS", data: { project: project, hash_admin: hash } };
+  } catch (err) {
+    // Si algo falla, borrar la hoja creada para no dejar rifas huérfanas
+    try {
+      deleteSheetByName_(ss, sheetName);
+    } catch (cleanupErr) {
+      /* ignore */
+    }
+    throw err;
+  }
+}
+
+function handleGetProject_(data) {
+  var p = findProjectById_(data.project_id);
+  if (!p) throw new Error("Proyecto no encontrado.");
+  return { status: "SUCCESS", data: { project: projectPublic_(p) } };
+}
+
+function handleUpdateProject_(data) {
+  var p = findProjectById_(data.project_id);
+  if (!p) throw new Error("Proyecto no encontrado.");
+  applyProjectUpdates_(p, data, true);
+  return { status: "SUCCESS", data: { project: projectPublic_(findProjectById_(data.project_id)) } };
+}
+
+function handleDeleteProject_(data) {
+  var p = findProjectById_(data.project_id);
+  if (!p) throw new Error("Proyecto no encontrado.");
+  var hard = data.hard === true || String(data.hard).toLowerCase() === "true";
+  var sh = ensureProyectosSheet_();
+  if (hard) {
+    var ss = getSs_();
+    var numSh = ss.getSheetByName(p.sheet_name);
+    if (numSh) ss.deleteSheet(numSh);
+    sh.deleteRow(p._row);
+  } else {
+    var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length)).getValues()[0];
+    var idx = colIndex_(headers, "activo");
+    if (idx >= 0) sh.getRange(p._row, idx + 1).setValue("FALSE");
+  }
+  return { status: "SUCCESS", data: { deleted: true, hard: hard } };
+}
+
+function applyProjectUpdates_(p, data, allowDisplay) {
+  var sh = ensureProyectosSheet_();
+  var lastCol = Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length);
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var rowVals = sh.getRange(p._row, 1, 1, lastCol).getValues()[0];
+
+  function setKey(key, val) {
+    var i = colIndex_(headers, key);
+    if (i >= 0) rowVals[i] = val;
+  }
+
+  if (allowDisplay && data.nombre_display != null) {
+    setKey("nombre_display", String(data.nombre_display).trim());
+  }
+
+  var cantidad =
+    data.cantidad_premios != null ? Math.min(3, Math.max(1, Number(data.cantidad_premios) || 1)) : p.cantidad_premios;
+  setKey("cantidad_premios", cantidad);
+
+  if (data.premio_1 != null) setKey("premio_1", String(data.premio_1).trim());
+  if (data.premio_2 != null) setKey("premio_2", cantidad >= 2 ? String(data.premio_2).trim() : "");
+  if (data.premio_3 != null) setKey("premio_3", cantidad >= 3 ? String(data.premio_3).trim() : "");
+
+  var modalidad = data.modalidad != null ? data.modalidad : p.modalidad;
+  var fecha = data.fecha_sorteo != null ? data.fecha_sorteo : data.fecha != null ? data.fecha : p.fecha_sorteo;
+  var vf = validateModalidadFecha_(modalidad, fecha);
+  setKey("modalidad", vf.modalidad);
+  setKey("fecha_sorteo", vf.fecha_sorteo);
+
+  if (data.whatsapp != null) setKey("whatsapp", String(data.whatsapp).trim());
+  if (data.sinpe != null) setKey("sinpe", String(data.sinpe).trim());
+  if (data.precio != null) setKey("precio", String(data.precio).trim());
+
+  if (data.banner_json != null) {
+    var bj = data.banner_json;
+    if (typeof bj === "object") bj = JSON.stringify(bj);
+    setKey("banner_json", String(bj));
+  } else if (data.banner != null && typeof data.banner === "object") {
+    setKey("banner_json", JSON.stringify(data.banner));
+  }
+
+  sh.getRange(p._row, 1, 1, lastCol).setValues([rowVals]);
+}
+
+function handleResolveByHash_(data) {
+  var hash = String(data.hash || data.hash_admin || "").trim();
+  var p = findProjectByHash_(hash);
+  if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
+  var numeros = readNumbers_(p.sheet_name);
+  return {
+    status: "SUCCESS",
+    data: {
+      project: projectPublic_(p),
+      numeros: numeros
+    }
+  };
+}
+
+function handleUpdateNumbers_(data) {
+  var hash = String(data.hash || data.hash_admin || "").trim();
+  var p = findProjectByHash_(hash);
+  if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
+  var lista = data.listaCambios || data.changes || [];
+  if (!Array.isArray(lista) || !lista.length) {
+    throw new Error("No hay cambios para guardar.");
+  }
+
+  var ss = getSs_();
+  var sh = ss.getSheetByName(p.sheet_name);
+  if (!sh) throw new Error("Hoja del proyecto no encontrada.");
+
+  var map = {};
+  var values = sh.getRange(2, 1, 100, 5).getValues();
+  for (var i = 0; i < values.length; i++) {
+    map[pad2_(values[i][0])] = i;
+  }
+
+  for (var c = 0; c < lista.length; c++) {
+    var item = lista[c];
+    var num = pad2_(item.num != null ? item.num : item.numero);
+    var idx = map[num];
+    if (idx == null) continue;
+    var estado = String(item.estado != null ? item.estado : values[idx][1]).trim() || "Disponible";
+    if (estado !== "Disponible" && estado !== "Reservado" && estado !== "Pagado") {
+      throw new Error("Estado inválido para el número " + num + ".");
+    }
+    var nombre = item.nombre != null ? String(item.nombre).trim() : String(values[idx][2] || "");
+    var telefono = item.telefono != null ? String(item.telefono).trim() : String(values[idx][3] || "");
+    var contacto = item.contacto != null ? String(item.contacto).trim() : String(values[idx][4] || "");
+    if ((estado === "Reservado" || estado === "Pagado") && !nombre) {
+      throw new Error("El nombre es obligatorio para números reservados o pagados (" + num + ").");
+    }
+    if (estado === "Disponible") {
+      nombre = "";
+      telefono = "";
+      contacto = "";
+    }
+    values[idx][1] = estado;
+    values[idx][2] = nombre;
+    values[idx][3] = telefono;
+    values[idx][4] = contacto;
+  }
+
+  sh.getRange(2, 1, 100, 1).setNumberFormat("@");
+  sh.getRange(2, 1, 100, 5).setValues(values);
+  return { status: "SUCCESS", data: { updated: lista.length, numeros: readNumbers_(p.sheet_name) } };
+}
+
+function handleUpdateConfig_(data) {
+  var hash = String(data.hash || data.hash_admin || "").trim();
+  var p = findProjectByHash_(hash);
+  if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
+  var cfg = data.config || data;
+  applyProjectUpdates_(p, cfg, true);
+  var updated = findProjectByHash_(hash);
+  return { status: "SUCCESS", data: { project: projectPublic_(updated) } };
+}
+
+function handleUpdateBanner_(data) {
+  var hash = String(data.hash || data.hash_admin || "").trim();
+  var p = findProjectByHash_(hash);
+  if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
+  var banner = data.banner != null ? data.banner : data.banner_json;
+  if (banner == null) throw new Error("Falta banner.");
+  applyProjectUpdates_(p, { banner: typeof banner === "string" ? JSON.parse(banner) : banner }, false);
+  var updated = findProjectByHash_(hash);
+  return { status: "SUCCESS", data: { project: projectPublic_(updated) } };
+}

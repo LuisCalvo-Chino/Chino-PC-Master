@@ -1,148 +1,451 @@
-<section id="rifa-app" class="content-section rifa-booting">
-    <!-- Solo visible hasta que initRifaApp termina; luego desvanece en 1.5s -->
+<section id="rifa-app" class="content-section rifa-booting" aria-label="Sistema de Rifa">
     <div id="rifa-splash" class="rifa-splash" aria-live="polite" aria-busy="true">
-        <img src="imagenes/Loading.gif" alt="Cargando datos de la rifa" class="rifa-splash-img" width="256" height="256" />
+        <img src="imagenes/Loading.gif" alt="Cargando" class="rifa-splash-img" width="256" height="256" />
     </div>
 
-    <!-- Logo que permanece fijo en la parte superior -->
-    <div class="rifa-logo-container rifa-reveal-layer">
-        <img src="imagenes/Extracción Logo.png" alt="Chino PC Master Logo" class="rifa-intro-logo">
+    <!-- ========== HUB (WebApps > Rifa) ========== -->
+    <div id="rifa-hub" class="rifa-hub rifa-reveal-layer" hidden>
+        <header class="rifa-hub-toolbar" aria-label="Barra Maestro Rifa">
+            <div class="rifa-hub-toolbar__left">
+                <button type="button" class="rifa-btn rifa-btn--toolbar hub-nav-btn is-active" data-hub-view="lista">Lista</button>
+                <button type="button" class="rifa-btn rifa-btn--toolbar hub-nav-btn" data-hub-view="guia">Guía</button>
+            </div>
+            <div class="rifa-hub-toolbar__center">
+                <h2 class="rifa-hub-title tech-font">Proyectos de Rifa</h2>
+                <div class="rifa-hub-master-row" role="group" aria-labelledby="rifa-hub-master-heading">
+                    <span id="rifa-hub-master-heading" class="rifa-hub-master-heading">Llave Maestra</span>
+                    <input
+                        type="password"
+                        id="rifa-master-pin"
+                        class="rifa-input rifa-hub-master-input"
+                        placeholder="MASTER_ADMIN_PIN del Apps Script"
+                        autocomplete="off"
+                        aria-describedby="rifa-hub-master-hint"
+                    />
+                    <button type="button" class="rifa-btn rifa-btn--primary rifa-btn--toolbar" id="rifa-master-pin-save">
+                        Guardar
+                    </button>
+                </div>
+                <p id="rifa-hub-master-hint" class="rifa-hub-master-hint">
+                    Se guarda en este navegador y se usa para crear, listar y editar todos los proyectos.
+                </p>
+            </div>
+            <div class="rifa-hub-toolbar__right">
+                <button type="button" class="rifa-btn rifa-btn--primary hub-nav-btn" data-hub-view="nuevo" id="rifa-btn-nuevo">
+                    <span class="rifa-btn-plus" aria-hidden="true">+</span> Nuevo
+                </button>
+            </div>
+        </header>
+
+        <div id="rifa-hub-pane-lista" class="rifa-hub-pane" data-hub-pane="lista">
+            <div class="rifa-table-scroll">
+                <table class="rifa-projects-table" id="rifa-projects-table">
+                    <thead>
+                        <tr>
+                            <th>Hoja</th>
+                            <th>Premios</th>
+                            <th>Modalidad</th>
+                            <th>Fecha</th>
+                            <th>Precio</th>
+                            <th>Link admin</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rifa-projects-tbody">
+                        <tr><td colspan="7" class="rifa-muted">Guarda la Llave Maestra y se cargarán los proyectos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rifa-hub-pane-guia" class="rifa-hub-pane" data-hub-pane="guia" hidden>
+            <article class="rifa-guide">
+                <h3>Despliegue del backend (una sola vez)</h3>
+                <ol>
+                    <li>Crea un Google Spreadsheet vacío (será el documento principal de todas las rifas).</li>
+                    <li>En <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a>, crea un proyecto Apps Script y pega el contenido de <code>assets/gas-rifa-Código.js.txt</code> en <code>Código.js</code>.</li>
+                    <li>Propiedades del script: <code>SPREADSHEET_ID</code> (ID de la URL del Sheet) y <code>MASTER_ADMIN_PIN</code> (llave que tú eliges).</li>
+                    <li>Implementar → Aplicación web → Ejecutar como tú → acceso <strong>Cualquiera</strong>. Copia la URL <code>/exec</code>.</li>
+                    <li>En <code>index.html</code> asigna esa URL a <code>window.CPM_RIFA_GAS_URL</code>.</li>
+                </ol>
+                <h3>Uso diario</h3>
+                <ul>
+                    <li>Guarda la Llave Maestra en la barra superior.</li>
+                    <li>Usa <strong>+ Nuevo</strong> para crear una rifa (se crea una hoja 00–99 y un link <code>#r/…</code>).</li>
+                    <li>Comparte el link administrador con quien gestiona la rifa (no requiere login del sitio).</li>
+                </ul>
+                <p class="rifa-muted">Documentación detallada: <code>docs/rifa-implementacion.md</code></p>
+            </article>
+        </div>
+
+        <div id="rifa-hub-pane-nuevo" class="rifa-hub-pane" data-hub-pane="nuevo" hidden>
+            <form id="rifa-new-form" class="rifa-new-form" novalidate>
+                <h3 class="rifa-card-title">Nueva rifa</h3>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Nombre de la rifa (hoja)</span>
+                    <span class="rifa-field__help">Identificador corto sin espacios (2–20 caracteres: letras, números, _ o -). También será el nombre de la hoja en Spreadsheets donde viven los números 00–99. Ejemplo: <code>Navidad26</code>.</span>
+                    <input type="text" id="rifa-new-sheet" class="rifa-input" required pattern="[A-Za-z0-9_-]{2,20}" maxlength="20" placeholder="Navidad26" autocomplete="off" />
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Nombre para mostrar (opcional)</span>
+                    <span class="rifa-field__help">Título legible en listados y banners. Si lo dejas vacío se usa el nombre de la hoja.</span>
+                    <input type="text" id="rifa-new-display" class="rifa-input" maxlength="80" placeholder="Rifa Navidad 2026" autocomplete="off" />
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Cantidad de premios</span>
+                    <span class="rifa-field__help">Puedes rifar 1, 2 o 3 premios (1.er, 2.º y 3.er lugar). Solo se pedirán los nombres según esta cantidad.</span>
+                    <select id="rifa-new-premios-n" class="rifa-input">
+                        <option value="1">1 premio</option>
+                        <option value="2">2 premios</option>
+                        <option value="3">3 premios</option>
+                    </select>
+                </label>
+
+                <label class="rifa-field" data-premio-field="1">
+                    <span class="rifa-field__label">Premio 1.er lugar</span>
+                    <span class="rifa-field__help">Objeto o servicio principal que se está rifando.</span>
+                    <input type="text" id="rifa-new-premio1" class="rifa-input" required maxlength="120" placeholder="iPhone 15" />
+                </label>
+                <label class="rifa-field" data-premio-field="2" hidden>
+                    <span class="rifa-field__label">Premio 2.º lugar</span>
+                    <span class="rifa-field__help">Segundo premio (opcional según cantidad).</span>
+                    <input type="text" id="rifa-new-premio2" class="rifa-input" maxlength="120" />
+                </label>
+                <label class="rifa-field" data-premio-field="3" hidden>
+                    <span class="rifa-field__label">Premio 3.er lugar</span>
+                    <span class="rifa-field__help">Tercer premio (opcional según cantidad).</span>
+                    <input type="text" id="rifa-new-premio3" class="rifa-input" maxlength="120" />
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Modalidad de sorteo</span>
+                    <span class="rifa-field__help">
+                        <strong>Chances</strong>: sorteos martes y viernes 7:30 p.m. — la fecha debe ser martes o viernes.
+                        <strong>Lotería Nacional</strong>: domingos 7:30 p.m. — la fecha debe ser domingo.
+                        <strong>RNG del App</strong>: cualquier fecha; el sorteo se hace en la pestaña Rifa del link admin.
+                    </span>
+                    <select id="rifa-new-modalidad" class="rifa-input" required>
+                        <option value="Chances">Chances</option>
+                        <option value="Loteria Nacional">Lotería Nacional</option>
+                        <option value="RNG">RNG del App</option>
+                    </select>
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Fecha del sorteo</span>
+                    <span class="rifa-field__help">Día del sorteo. Se valida según la modalidad elegida.</span>
+                    <input type="date" id="rifa-new-fecha" class="rifa-input" required />
+                    <span id="rifa-new-fecha-hint" class="rifa-field__hint" aria-live="polite"></span>
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Número SINPE</span>
+                    <span class="rifa-field__help">Número SINPE Móvil donde se pagan los números. Se usa en los afiches.</span>
+                    <input type="text" id="rifa-new-sinpe" class="rifa-input" required maxlength="20" placeholder="8888-8888" />
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">WhatsApp (opcional al crear)</span>
+                    <span class="rifa-field__help">Contacto para consultas. También se puede completar después en Config.</span>
+                    <input type="text" id="rifa-new-whatsapp" class="rifa-input" maxlength="20" placeholder="8888-8888" />
+                </label>
+
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Precio por número</span>
+                    <span class="rifa-field__help">Costo de cada número (colones). Aparece en banners y afiches.</span>
+                    <input type="text" id="rifa-new-precio" class="rifa-input rifa-input-precio" required maxlength="40" placeholder="₡2000" inputmode="numeric" />
+                </label>
+
+                <div class="rifa-form-actions">
+                    <button type="submit" class="rifa-btn rifa-btn--primary" id="rifa-new-submit">Crear proyecto</button>
+                    <button type="button" class="rifa-btn" data-hub-view="lista">Cancelar</button>
+                </div>
+                <p id="rifa-new-result" class="rifa-new-result" hidden></p>
+            </form>
+        </div>
     </div>
 
-    <!-- Título con efecto aparición de caracteres (animación propia, no incluido en fade-in) -->
-    <h2 class="section-title rifa-title-typing rifa-reveal-layer" id="rifa-titulo">SISTEMA DE RIFA</h2>
-    
-    <!-- Contenido principal (oculto al inicio) -->
-    <div id="rifa-content" class="rifa-content rifa-reveal-layer" style="pointer-events: none;">
-        <!-- VISTA GRÁFICA -->
-        <div id="vista-grafica" class="rifa-vista active">
-        <!-- Botones de navegación -->
-        <div class="rifa-nav-buttons">
-            <button id="btn-descargar" class="btn-rifa-action" title="Descargar como imagen">
-                <img src="imagenes/Cámara.png" alt="Descargar" class="btn-icon">
-            </button>
-            <button id="btn-ver-lista" class="btn-rifa-action" title="Ver lista de números">
-                <img src="imagenes/Lista.png" alt="Lista" class="btn-icon">
-            </button>
-            <button type="button" id="btn-config" class="btn-rifa-action btn-config-right btn-config-trigger" title="Configuración (hoja Config)">
-                <img src="imagenes/Config.png" alt="Configuración" class="btn-icon">
-            </button>
+    <!-- ========== ADMIN (#r/hash) ========== -->
+    <div id="rifa-admin" class="rifa-admin rifa-reveal-layer" hidden>
+        <div class="rifa-public-bar" id="rifa-public-bar">
+            <a href="#" class="rifa-public-bar__brand" id="rifa-public-home-link">Chino PC Master</a>
+            <span class="rifa-public-bar__sep">·</span>
+            <span class="rifa-public-bar__tag" id="rifa-admin-title">Rifa</span>
         </div>
 
-        <!-- Grid de números -->
-        <div class="numbers-grid-wrapper">
-            <div id="numbers-grid" class="numbers-grid">
-                <!-- Se cargará dinámicamente -->
+        <nav class="rifa-admin-tabs" aria-label="Secciones de la rifa">
+            <button type="button" class="rifa-tab is-active" data-adtab="cuadricula">Cuadrícula</button>
+            <button type="button" class="rifa-tab" data-adtab="lista">Lista</button>
+            <button type="button" class="rifa-tab" data-adtab="config">Config</button>
+            <button type="button" class="rifa-tab" data-adtab="banner">Banner</button>
+            <button type="button" class="rifa-tab" data-adtab="rng" id="rifa-tab-rng" hidden>Rifa</button>
+        </nav>
+
+        <!-- Cuadrícula -->
+        <div class="rifa-adpanel is-active" data-adpanel="cuadricula">
+            <div class="rifa-toolbar-stats" id="rifa-stats-top">
+                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
+                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
+            </div>
+            <div class="rifa-grid-layout">
+                <div class="numbers-grid-wrapper">
+                    <div id="rifa-numbers-grid" class="numbers-grid rifa-numbers-grid"></div>
+                </div>
+                <aside id="rifa-select-panel" class="rifa-select-panel" hidden>
+                    <button type="button" class="rifa-select-panel__toggle" id="rifa-select-toggle" aria-expanded="true">Formulario</button>
+                    <div class="rifa-select-panel__body" id="rifa-select-body">
+                        <h4>Actualizar seleccionados (<span id="rifa-sel-count">0</span>)</h4>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Nombre (obligatorio)</span>
+                            <input type="text" id="rifa-sel-nombre" class="rifa-input" placeholder="Nombre del comprador" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Teléfono (opcional)</span>
+                            <input type="text" id="rifa-sel-tel" class="rifa-input" placeholder="8888-8888" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Contacto / Instagram (opcional)</span>
+                            <input type="text" id="rifa-sel-contacto" class="rifa-input" placeholder="@usuario" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Estado</span>
+                            <select id="rifa-sel-estado" class="rifa-input">
+                                <option value="Reservado">Reservado</option>
+                                <option value="Pagado">Pagado</option>
+                                <option value="Disponible">Disponible</option>
+                            </select>
+                        </label>
+                        <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-sel-guardar" style="width:100%">Guardar</button>
+                        <button type="button" class="rifa-btn" id="rifa-sel-cancelar" style="width:100%;margin-top:8px">Cancelar</button>
+                    </div>
+                </aside>
+            </div>
+            <div class="rifa-toolbar-stats" id="rifa-stats-bottom">
+                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
+                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
             </div>
         </div>
 
-        <!-- Panel de selección -->
-        <div id="panel-seleccion" class="rifa-panel" style="display: none;">
-            <h4>Actualizar Números Seleccionados</h4>
-            <div class="form-group">
-                <label for="input-nombre">Nombre/Cliente</label>
-                <input type="text" id="input-nombre" placeholder="Nombre del comprador">
+        <!-- Lista -->
+        <div class="rifa-adpanel" data-adpanel="lista" hidden>
+            <div class="rifa-toolbar-stats rifa-lista-actions">
+                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
+                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
+                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
+                <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-csv-dl">Descargar CSV</button>
+                <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-lista-guardar" disabled>Guardar cambios</button>
             </div>
-            <div class="form-group">
-                <label for="select-estado">Estado</label>
-                <select id="select-estado">
-                    <option value="Disponible">Disponible</option>
-                    <option value="Reservado">Reservado</option>
-                    <option value="Pagado">Pagado</option>
-                </select>
-            </div>
-            <button id="btn-guardar-seleccion" class="btn-submit" style="width: 100%;">Actualizar Estado</button>
-            <button id="btn-cancelar-seleccion" class="btn-cancelar" style="width: 100%; margin-top: 10px;">Cancelar</button>
-        </div>
-
-        <!-- Estadísticas -->
-        <div class="rifa-stats">
-            <div class="stat-card">
-                <span class="stat-label">Total Números</span>
-                <span id="stat-total" class="stat-value">0</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-label">Disponibles</span>
-                <span id="stat-available" class="stat-value">0</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-label">Reservados</span>
-                <span id="stat-reserved" class="stat-value">0</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-label">Pagados</span>
-                <span id="stat-paid" class="stat-value">0</span>
+            <div class="rifa-table-scroll">
+                <table class="rifa-tabla rifa-lista-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>#</th>
+                            <th>Estado</th>
+                            <th>Nombre</th>
+                            <th>Teléfono</th>
+                            <th>Contacto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rifa-lista-tbody"></tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Indicador de carga -->
-        <div id="loading-indicator" class="loading-indicator">
-            <p>Cargando datos de la rifa...</p>
+        <!-- Config -->
+        <div class="rifa-adpanel rifa-adpanel--config" data-adpanel="config" hidden>
+            <form id="rifa-config-form" class="rifa-config-form" novalidate>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Cantidad de premios</span>
+                    <select id="cfg-premios-n" class="rifa-input">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </label>
+                <label class="rifa-field" data-cfg-premio="1">
+                    <span class="rifa-field__label">Premio 1</span>
+                    <input type="text" id="cfg-premio1" class="rifa-input" />
+                </label>
+                <label class="rifa-field" data-cfg-premio="2" hidden>
+                    <span class="rifa-field__label">Premio 2</span>
+                    <input type="text" id="cfg-premio2" class="rifa-input" />
+                </label>
+                <label class="rifa-field" data-cfg-premio="3" hidden>
+                    <span class="rifa-field__label">Premio 3</span>
+                    <input type="text" id="cfg-premio3" class="rifa-input" />
+                </label>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Modalidad</span>
+                    <select id="cfg-modalidad" class="rifa-input">
+                        <option value="Chances">Chances</option>
+                        <option value="Loteria Nacional">Lotería Nacional</option>
+                        <option value="RNG">RNG del App</option>
+                    </select>
+                </label>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Fecha del sorteo</span>
+                    <input type="date" id="cfg-fecha" class="rifa-input" />
+                    <span id="cfg-fecha-hint" class="rifa-field__hint"></span>
+                </label>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">WhatsApp</span>
+                    <input type="text" id="cfg-whatsapp" class="rifa-input" />
+                </label>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">SINPE</span>
+                    <input type="text" id="cfg-sinpe" class="rifa-input" />
+                </label>
+                <label class="rifa-field">
+                    <span class="rifa-field__label">Precio</span>
+                    <input type="text" id="cfg-precio" class="rifa-input rifa-input-precio" placeholder="₡2000" inputmode="numeric" />
+                </label>
+                <button type="submit" class="rifa-btn rifa-btn--primary">Guardar configuración</button>
+            </form>
+        </div>
+
+        <!-- Banner -->
+        <div class="rifa-adpanel" data-adpanel="banner" hidden>
+            <div class="rifa-banner-split">
+                <div class="rifa-banner-form-col">
+                    <form id="rifa-banner-form" class="rifa-banner-form">
+                        <h4>Fondo</h4>
+                        <div class="rifa-form-row">
+                            <label class="rifa-inline-field"><span>Color 1</span><input type="color" id="bn-bg1" value="#EEEEEE" /></label>
+                            <label class="rifa-inline-field"><span>Color 2</span><input type="color" id="bn-bg2" value="#EEEEEE" /></label>
+                        </div>
+                        <div class="rifa-form-row">
+                            <label class="rifa-check rifa-inline-field"><input type="checkbox" id="bn-grad" /> Usar degradado</label>
+                            <label class="rifa-inline-field rifa-inline-field--grow">
+                                <span>Orientación</span>
+                                <select id="bn-orient" class="rifa-input">
+                                    <option value="to bottom">Vertical</option>
+                                    <option value="to right">Horizontal</option>
+                                    <option value="135deg">Diagonal</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <h4>Tipografía</h4>
+                        <div class="rifa-form-row">
+                            <select id="bn-font" class="rifa-input">
+                                <option value="Inter, sans-serif" selected>Inter</option>
+                                <option value="Montserrat, sans-serif">Montserrat</option>
+                                <option value="Poppins, sans-serif">Poppins</option>
+                                <option value="Roboto, sans-serif">Roboto</option>
+                                <option value="'Open Sans', sans-serif">Open Sans</option>
+                                <option value="Lato, sans-serif">Lato</option>
+                                <option value="Nunito, sans-serif">Nunito</option>
+                                <option value="Raleway, sans-serif">Raleway</option>
+                                <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
+                                <option value="Orbitron, sans-serif">Orbitron</option>
+                                <option value="'Roboto Mono', monospace">Roboto Mono</option>
+                                <option value="'Playfair Display', serif">Playfair Display</option>
+                                <option value="Merriweather, serif">Merriweather</option>
+                                <option value="Georgia, serif">Georgia</option>
+                            </select>
+                        </div>
+
+                        <h4>Head</h4>
+                        <div class="rifa-form-row rifa-form-row--head">
+                            <select id="bn-head-mode" class="rifa-input rifa-input--compact">
+                                <option value="text">Título de texto</option>
+                                <option value="logo">Logotipo</option>
+                            </select>
+                            <div id="bn-head-text-wrap" class="rifa-head-slot">
+                                <input type="text" id="bn-title" class="rifa-input" placeholder="Título" />
+                            </div>
+                            <div id="bn-head-logo-wrap" class="rifa-head-slot" hidden>
+                                <input type="file" id="bn-logo-file" accept="image/*" />
+                                <button type="button" class="rifa-btn rifa-btn--sm" id="bn-logo-upload">Subir</button>
+                                <input type="hidden" id="bn-logo-url" />
+                            </div>
+                        </div>
+
+                        <h4>Color de texto</h4>
+                        <div class="rifa-form-row rifa-form-row--colors">
+                            <label class="rifa-inline-field"><span>Título</span><input type="color" id="bn-c-titulo" value="#222222" /></label>
+                            <label class="rifa-inline-field"><span>Premio 1</span><input type="color" id="bn-c-p1" value="#222222" /></label>
+                            <label class="rifa-inline-field"><span>Premio 2</span><input type="color" id="bn-c-p2" value="#444444" /></label>
+                            <label class="rifa-inline-field"><span>Premio 3</span><input type="color" id="bn-c-p3" value="#444444" /></label>
+                        </div>
+                        <div class="rifa-form-row rifa-form-row--colors">
+                            <label class="rifa-inline-field"><span>Costo</span><input type="color" id="bn-c-costo" value="#222222" /></label>
+                            <label class="rifa-inline-field"><span>Modalidad/Fecha</span><input type="color" id="bn-c-mod" value="#444444" /></label>
+                            <label class="rifa-inline-field"><span>WhatsApp</span><input type="color" id="bn-c-wa" value="#222222" /></label>
+                            <label class="rifa-inline-field"><span>SINPE</span><input type="color" id="bn-c-sinpe" value="#222222" /></label>
+                        </div>
+
+                        <h4>Color Números</h4>
+                        <div class="rifa-form-row rifa-form-row--colors">
+                            <label class="rifa-inline-field"><span>Texto disponible</span><input type="color" id="bn-n-dt" value="#222222" /></label>
+                            <label class="rifa-inline-field"><span>Fondo disponible</span><input type="color" id="bn-n-db" value="#FFFFFF" /></label>
+                        </div>
+                        <div class="rifa-form-row rifa-form-row--colors">
+                            <label class="rifa-inline-field"><span>Texto tomado</span><input type="color" id="bn-n-tt" value="#777777" /></label>
+                            <label class="rifa-inline-field"><span>Fondo tomado</span><input type="color" id="bn-n-tb" value="#DDDDDD" /></label>
+                        </div>
+
+                        <h4>Iconos adicionales</h4>
+                        <div class="rifa-icon-row">
+                            <label class="rifa-check"><input type="checkbox" id="bn-i-wa" checked /> WhatsApp</label>
+                            <div class="rifa-icon-upload" data-icon-panel="whatsapp">
+                                <input type="file" id="bn-i-wa-file" accept="image/*" />
+                                <button type="button" class="rifa-btn rifa-btn--sm" data-icon-upload="whatsapp">Subir</button>
+                                <input type="hidden" id="bn-i-wa-url" />
+                            </div>
+                        </div>
+                        <div class="rifa-icon-row">
+                            <label class="rifa-check"><input type="checkbox" id="bn-i-sinpe" checked /> SINPE</label>
+                            <div class="rifa-icon-upload" data-icon-panel="sinpe">
+                                <input type="file" id="bn-i-sinpe-file" accept="image/*" />
+                                <button type="button" class="rifa-btn rifa-btn--sm" data-icon-upload="sinpe">Subir</button>
+                                <input type="hidden" id="bn-i-sinpe-url" />
+                            </div>
+                        </div>
+                        <div class="rifa-icon-row">
+                            <label class="rifa-check"><input type="checkbox" id="bn-i-tomado" /> Icono Tomado</label>
+                            <div class="rifa-icon-upload" data-icon-panel="tomado" hidden>
+                                <input type="file" id="bn-i-tomado-file" accept="image/*" />
+                                <button type="button" class="rifa-btn rifa-btn--sm" data-icon-upload="tomado">Subir</button>
+                                <input type="hidden" id="bn-i-tomado-url" />
+                            </div>
+                        </div>
+
+                        <div class="rifa-form-actions">
+                            <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-banner-save">Guardar diseño</button>
+                            <button type="button" class="rifa-btn" id="rifa-banner-reset" title="Restaurar colores, tipografía e iconos por defecto">Restablecer por defecto</button>
+                            <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Descargar JPG</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="rifa-banner-preview-col">
+                    <button type="button" class="rifa-btn rifa-preview-toggle" id="rifa-preview-toggle">Vista previa</button>
+                    <div class="rifa-banner-preview-box" id="rifa-banner-preview-box">
+                        <div id="rifa-banner-stage" class="rifa-banner-stage" aria-hidden="true"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RNG -->
+        <div class="rifa-adpanel" data-adpanel="rng" hidden>
+            <div class="rifa-rng">
+                <div id="rifa-rng-display" class="rifa-rng-display">--</div>
+                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn--lg" id="rifa-rng-btn">Sortear número</button>
+                <ul id="rifa-rng-winners" class="rifa-rng-winners"></ul>
+            </div>
         </div>
     </div>
 
-    <!-- CANVAS OCULTO PARA EXPORTAR JPG (html2canvas) -->
-    <div id="canvas-render" class="rifa-reveal-layer">
-        <img id="b-logo" style="width: 450px; margin-bottom: 25px;" crossorigin="anonymous" />
-        <div id="b-obj" class="canvas-brand-title" style="text-align: center; margin-bottom: 24px; color: white;"></div>
-        <div id="b-grid" class="b-grid"></div>
-        <div style="margin-top: auto; text-align: center; width: 100%; padding-bottom: 60px;">
-            <h2 id="b-precio" style="font-size: 40px; margin: 10px 0; color: white;"></h2>
-            <h3 id="b-mod-fecha" style="font-size: 30px; margin: 10px 0; font-weight: 400; color: white; white-space: nowrap;"></h3>
-            <div class="wa-container">
-                <img id="b-wa-icon" style="width: 70px;" crossorigin="anonymous" />
-                <span id="b-wa-num" class="canvas-brand-phone"></span>
-            </div>
-        </div>
-    </div>
-
-    <!-- VISTA LISTA -->
-    <div id="vista-lista" class="rifa-vista rifa-reveal-layer">
-        <!-- Botones de navegación -->
-        <div class="rifa-nav-buttons">
-            <button id="btn-volver" class="btn-rifa-action" title="Volver a vista gráfica">
-                <img src="imagenes/Regresar.png" alt="Volver" class="btn-icon">
-            </button>
-            <button id="btn-guardar-cambios" class="btn-rifa-action" title="Guardar todos los cambios">
-                <img src="imagenes/Guardar.png" alt="Guardar" class="btn-icon">
-            </button>
-            <button type="button" id="btn-config-lista" class="btn-rifa-action btn-config-right btn-config-trigger" title="Configuración (hoja Config)">
-                <img src="imagenes/Config.png" alt="Configuración" class="btn-icon">
-            </button>
-        </div>
-
-        <!-- Tabla de Lista -->
-        <div class="rifa-table-wrapper">
-            <table class="rifa-tabla">
-                <thead>
-                    <tr>
-                        <th style="width: 10%;">#</th>
-                        <th style="width: 50%;">Cliente / Nombre</th>
-                        <th style="width: 40%;">Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-body">
-                    <!-- Se cargará dinámicamente -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-    </div>
-
-    <!-- Modal fuera de #rifa-content para quedar por encima del logo (stacking context) -->
-    <div id="rifa-config-modal" class="rifa-config-modal" aria-hidden="true" hidden>
-        <div class="rifa-config-backdrop" id="rifa-config-backdrop"></div>
-        <div class="rifa-config-dialog" role="dialog" aria-labelledby="rifa-config-titulo">
-            <div class="rifa-config-head">
-                <h3 id="rifa-config-titulo">Configuración</h3>
-                <button type="button" id="rifa-config-cerrar-x" class="rifa-config-cerrar-x" aria-label="Cerrar">×</button>
-            </div>
-            <p class="rifa-config-hint">Filas 2 a 6 de la hoja Config (objeto, fecha, modalidad, WhatsApp y precio).</p>
-            <div id="rifa-config-fields" class="rifa-config-fields"></div>
-            <div class="rifa-config-actions">
-                <button type="button" id="rifa-config-guardar" class="btn-submit rifa-config-btn-primary">Guardar en hoja</button>
-                <button type="button" id="rifa-config-cerrar" class="btn-cancelar rifa-config-btn-secondary">Cancelar</button>
-            </div>
-        </div>
-    </div>
+    <!-- Off-screen JPG capture root -->
+    <div id="rifa-capture-root" class="rifa-capture-root" aria-hidden="true"></div>
 </section>

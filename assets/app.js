@@ -15,6 +15,16 @@ document.addEventListener("DOMContentLoaded", () => {
         rifa: "rifa"
     };
 
+    // Evitar flash del header del sitio en links públicos #r/<hash> y #u/|#a/
+    (function applyStandaloneChromeEarly() {
+        const raw = String(window.location.hash || "").replace(/^#/, "").trim();
+        if (/^r\/.+$/.test(raw)) {
+            document.body.classList.add("cpm-rifa-standalone");
+        } else if (/^(u|a)\/.+$/i.test(raw)) {
+            document.body.classList.add("cpm-angels-standalone", "cpm-angels-route");
+        }
+    })();
+
     const homeLink = document.getElementById("home-link");
     const dropdownBtn = document.getElementById("webapps-menu-btn");
     const dropdownMenu = document.getElementById("webapps-dropdown-menu");
@@ -170,8 +180,25 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionStorage.removeItem(AUTH_STORAGE_KEY);
     }
 
-    function canAccessPage(page, session) {
+    function isPublicRifaAdminAccess(routeCtx) {
+        // Hub (#rifa) siempre requiere permiso; no usar el hash de la URL como atajo
+        if (routeCtx?.rifa?.mode === "hub") return false;
+        if (routeCtx?.rifa?.mode === "admin") {
+            return Boolean(String(routeCtx.rifa.hash || "").trim()) || /^r\/.+$/.test(
+                String(window.location.hash || "").replace(/^#/, "").trim()
+            );
+        }
+        // Sin ctx (carga inicial): solo público si la URL es #r/<hash>
+        const raw = String(window.location.hash || "").replace(/^#/, "").trim();
+        return /^r\/.+$/.test(raw);
+    }
+
+    function canAccessPage(page, session, routeCtx) {
         if (PUBLIC_PAGES.has(page)) return true;
+        // Link administrador de rifa (#r/<hash>): público, sin login ni contraseña
+        if (page === "rifa" && isPublicRifaAdminAccess(routeCtx)) {
+            return true;
+        }
         if (page === "angels-dashboard") {
             return Boolean(session && isAdminSession(session));
         }
@@ -489,16 +516,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function checkAccess(page) {
+    function checkAccess(page, routeCtx) {
         const pageName = resolvePage(page);
         const session = getSession();
-        if (canAccessPage(pageName, session)) return true;
+        if (canAccessPage(pageName, session, routeCtx || null)) return true;
         routeDenied(pageName);
         return false;
     }
 
-    function protectRoutes(page) {
-        return checkAccess(page);
+    function protectRoutes(page, routeCtx) {
+        return checkAccess(page, routeCtx);
     }
 
     function routeDenied(page) {
@@ -521,22 +548,40 @@ document.addEventListener("DOMContentLoaded", () => {
     /**
      * Rutas Ángeles: #u/<hash20> y #a/<hash20> (hash case-sensitive).
      * Super admin: #angels-dashboard
+     * Rifa: #rifa (hub) y #r/<hash> (admin público)
      */
     function parseRouteFromHash(rawHash) {
         const raw = String(rawHash || "").replace(/^#/, "").trim();
         const userMatch = raw.match(/^u\/(.+)$/i);
         if (userMatch) {
-            return { page: "angels", angels: { mode: "u", hash: userMatch[1] } };
+            return { page: "angels", angels: { mode: "u", hash: userMatch[1] }, rifa: null };
         }
         const adminMatch = raw.match(/^a\/(.+)$/i);
         if (adminMatch) {
-            return { page: "angels", angels: { mode: "a", hash: adminMatch[1] } };
+            return { page: "angels", angels: { mode: "a", hash: adminMatch[1] }, rifa: null };
+        }
+        const rifaAdminMatch = raw.match(/^r\/(.+)$/);
+        if (rifaAdminMatch) {
+            let hash = rifaAdminMatch[1];
+            try {
+                hash = decodeURIComponent(hash);
+            } catch (e) {
+                /* keep raw */
+            }
+            return {
+                page: "rifa",
+                angels: null,
+                rifa: { mode: "admin", hash }
+            };
         }
         const clean = raw.toLowerCase();
         if (clean === "angels-dashboard") {
-            return { page: "angels-dashboard", angels: null };
+            return { page: "angels-dashboard", angels: null, rifa: null };
         }
-        return { page: clean || "home", angels: null };
+        if (clean === "rifa") {
+            return { page: "rifa", angels: null, rifa: { mode: "hub" } };
+        }
+        return { page: clean || "home", angels: null, rifa: null };
     }
 
     function htmlFileForPage(page) {
@@ -544,11 +589,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return page;
     }
 
-    function hashStringForRoute(page, angels) {
+    function hashStringForRoute(page, angels, rifa) {
         if (page === "angels-dashboard") return "#angels-dashboard";
         if (page === "angels" && angels?.mode && angels?.hash) {
             const prefix = angels.mode === "a" ? "a" : "u";
             return `#${prefix}/${angels.hash}`;
+        }
+        if (page === "rifa" && rifa?.mode === "admin" && rifa?.hash) {
+            return `#r/${rifa.hash}`;
         }
         if (page === "home") return "#";
         return `#${page}`;
@@ -572,7 +620,8 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadPage(page, options = {}) {
         const pageName = resolvePage(page);
         const session = getSession();
-        if (!options.skipGuard && !canAccessPage(pageName, session)) {
+        const routeCtx = { rifa: options.rifa || null, angels: options.angels || null };
+        if (!options.skipGuard && !canAccessPage(pageName, session, routeCtx)) {
             finishAppLoadingTransition();
             return routeDenied(pageName);
         }
@@ -591,7 +640,13 @@ document.addEventListener("DOMContentLoaded", () => {
             currentPage = pageName;
             
             if (pageName === "rifa") {
-                await handleRifaAnimation();
+                const rifaCtx = options.rifa || { mode: "hub" };
+                if (rifaCtx.mode === "admin") {
+                    document.body.classList.add("cpm-rifa-standalone");
+                } else {
+                    document.body.classList.remove("cpm-rifa-standalone");
+                }
+                await handleRifaAnimation(rifaCtx);
             } else if (pageName === "certificados") {
                 await loadCertificadosScript();
                 if (typeof window.initCertificadosAdminApp === "function") {
@@ -644,6 +699,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (pageName !== "angels" && pageName !== "angels-dashboard") {
                 document.body.classList.remove("cpm-angels-route", "cpm-angels-standalone");
             }
+            if (pageName !== "rifa") {
+                document.body.classList.remove("cpm-rifa-standalone");
+            }
 
             setupContactFormOnCurrentPage();
             applyProtectedLinksState();
@@ -663,14 +721,20 @@ document.addEventListener("DOMContentLoaded", () => {
     async function navigateTo(page, options = {}) {
         const pageName = resolvePage(page);
         const angels = options.angels != null ? options.angels : null;
-        if (!options.skipGuard && !protectRoutes(pageName)) {
+        const rifa =
+            options.rifa != null
+                ? options.rifa
+                : pageName === "rifa"
+                  ? { mode: "hub" }
+                  : null;
+        if (!options.skipGuard && !protectRoutes(pageName, { rifa, angels })) {
             finishAppLoadingTransition();
             return;
         }
-        const ok = await loadPage(pageName, { ...options, angels });
+        const ok = await loadPage(pageName, { ...options, angels, rifa });
         if (!ok) return;
-        const state = { page: pageName, angels };
-        const url = hashStringForRoute(pageName, angels);
+        const state = { page: pageName, angels, rifa };
+        const url = hashStringForRoute(pageName, angels, rifa);
         if (options.replaceHistory) {
             window.history.replaceState(state, "", url);
         } else if (!options.fromPopState) {
@@ -688,7 +752,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 return {
                     page: route.page,
                     scrollTarget: String(link.getAttribute("data-scroll-target") || "").trim() || "",
-                    angels: route.angels
+                    angels: route.angels,
+                    rifa: null
+                };
+            }
+            if (route.page === "rifa" && route.rifa) {
+                return {
+                    page: "rifa",
+                    scrollTarget: String(link.getAttribute("data-scroll-target") || "").trim() || "",
+                    angels: null,
+                    rifa: route.rifa
                 };
             }
         }
@@ -701,7 +774,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return {
             page,
             scrollTarget: String(link.getAttribute("data-scroll-target") || "").trim() || "",
-            angels: null
+            angels: null,
+            rifa: page === "rifa" ? { mode: "hub" } : null
         };
     }
 
@@ -731,8 +805,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Rifa: la entrada visual la controla rifa.js (splash + transición 1.5s al terminar la carga).
-    async function handleRifaAnimation() {
-        await loadRifaScript();
+    async function handleRifaAnimation(rifaCtx) {
+        await loadRifaScript(rifaCtx || { mode: "hub" });
     }
 
     function liberarRifaSplashConError(textoPlano) {
@@ -843,50 +917,69 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Cargar el script de rifa dinámicamente
-    function loadRifaScript() {
+    // Cargar API + app de rifa dinámicamente
+    function loadRifaScript(rifaCtx) {
+        const ctx = rifaCtx || { mode: "hub" };
         return new Promise((resolve) => {
-            const oldScript = document.getElementById("rifa-script");
-            if (oldScript) oldScript.remove();
-
-            const script = document.createElement("script");
-            script.id = "rifa-script";
-            script.src = "assets/rifa.js";
-            script.onload = () => {
+            function runInit() {
                 (async () => {
                     if (typeof window.initRifaApp === "function") {
                         try {
-                            await window.initRifaApp();
+                            await window.initRifaApp({
+                                showMessage,
+                                getSession,
+                                rifa: ctx,
+                                navigateHome: () => navigateTo("home", { replaceHistory: true })
+                            });
                         } catch (e) {
                             console.error(e);
+                            liberarRifaSplashConError(
+                                e?.message || "Error al inicializar la rifa. Revisa la consola (F12)."
+                            );
                         }
                     } else {
                         console.error("initRifaApp no esta definida en rifa.js");
                         liberarRifaSplashConError(
                             "No se pudo inicializar la rifa (initRifaApp). Revisa la consola (F12)."
                         );
-                        const el = document.querySelector("#rifa-app #loading-indicator");
-                        if (el) {
-                            el.innerHTML =
-                                "<p class='error-message'>No se pudo inicializar la rifa (initRifaApp). Revisa la consola.</p>";
-                        }
                     }
                     resolve();
                 })();
-            };
-            script.onerror = () => {
-                console.error("Error cargando rifa.js");
-                liberarRifaSplashConError(
-                    "No se pudo cargar assets/rifa.js. Revisa la ruta del sitio y la consola (F12)."
-                );
-                const el = document.querySelector("#rifa-app #loading-indicator");
-                if (el) {
-                    el.innerHTML =
-                        "<p class='error-message'>No se pudo cargar assets/rifa.js. Revisa la ruta del sitio y la consola (F12).</p>";
+            }
+
+            function appendScript(id, src, onload) {
+                const existing = document.getElementById(id);
+                if (existing) {
+                    if (typeof onload === "function") onload();
+                    return;
                 }
-                resolve();
-            };
-            document.body.appendChild(script);
+                const s = document.createElement("script");
+                s.id = id;
+                s.src = src;
+                s.onload = () => {
+                    if (typeof onload === "function") onload();
+                };
+                s.onerror = () => {
+                    console.error("Error cargando", src);
+                    liberarRifaSplashConError(
+                        "No se pudo cargar " + src + ". Revisa la ruta del sitio y la consola (F12)."
+                    );
+                    resolve();
+                };
+                document.body.appendChild(s);
+            }
+
+            if (typeof window.initRifaApp === "function" && window.CPMRifaApi) {
+                runInit();
+                return;
+            }
+
+            const oldApp = document.getElementById("rifa-script");
+            if (oldApp) oldApp.remove();
+
+            appendScript("rifa-api-script", "assets/rifa-api.js?v=1", () => {
+                appendScript("rifa-script", "assets/rifa.js?v=26", runInit);
+            });
         });
     }
 
@@ -944,6 +1037,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", (event) => {
         const link = event.target.closest("a");
         if (!link) return;
+        // No interceptar enlaces que deben abrirse en otra pestaña (p. ej. admin Rifa)
+        if (link.target === "_blank" || link.getAttribute("data-external") === "1") return;
         const navTarget = extractPageFromLink(link);
         if (!navTarget) return;
         event.preventDefault();
@@ -954,7 +1049,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         navigateTo(navTarget.page, {
             scrollTarget: navTarget.scrollTarget,
-            angels: navTarget.angels || null
+            angels: navTarget.angels || null,
+            rifa: navTarget.rifa || null
         });
     });
 
@@ -964,7 +1060,10 @@ document.addEventListener("DOMContentLoaded", () => {
         clearSession();
         updateNavigationBySession();
         showMessage("Sesion cerrada correctamente.", "success");
-        if (!PUBLIC_PAGES.has(currentPage)) {
+        const isPublicRifaAdmin =
+            currentPage === "rifa" &&
+            String(window.location.hash || "").match(/^#r\//);
+        if (!PUBLIC_PAGES.has(currentPage) && !isPublicRifaAdmin) {
             navigateTo("home");
         } else {
             applyProtectedLinksState();
@@ -1021,13 +1120,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const raw = window.location.hash.slice(1) || "";
         const route =
             st && st.page
-                ? { page: st.page, angels: st.angels || null }
+                ? { page: st.page, angels: st.angels || null, rifa: st.rifa || null }
                 : parseRouteFromHash(raw);
-        if (!protectRoutes(route.page)) {
+        if (!protectRoutes(route.page, route)) {
             finishAppLoadingTransition();
             return;
         }
-        void navigateTo(route.page, { fromPopState: true, angels: route.angels });
+        void navigateTo(route.page, {
+            fromPopState: true,
+            angels: route.angels,
+            rifa: route.rifa
+        });
     });
 
     setupRealtimeRegisterValidation();
@@ -1035,8 +1138,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const initialRoute = parseRouteFromHash(window.location.hash.slice(1) || "home");
     (async function bootApp() {
         try {
-            if (protectRoutes(initialRoute.page)) {
-                await navigateTo(initialRoute.page, { replaceHistory: true, angels: initialRoute.angels });
+            if (protectRoutes(initialRoute.page, initialRoute)) {
+                await navigateTo(initialRoute.page, {
+                    replaceHistory: true,
+                    angels: initialRoute.angels,
+                    rifa: initialRoute.rifa
+                });
             } else {
                 finishAppLoadingTransition();
             }
