@@ -334,26 +334,6 @@
                             </label>
                         </div>
 
-                        <h4>Tipografía</h4>
-                        <div class="rifa-form-row">
-                            <select id="bn-font" class="rifa-input">
-                                <option value="Inter, sans-serif" selected>Inter</option>
-                                <option value="Montserrat, sans-serif">Montserrat</option>
-                                <option value="Poppins, sans-serif">Poppins</option>
-                                <option value="Roboto, sans-serif">Roboto</option>
-                                <option value="'Open Sans', sans-serif">Open Sans</option>
-                                <option value="Lato, sans-serif">Lato</option>
-                                <option value="Nunito, sans-serif">Nunito</option>
-                                <option value="Raleway, sans-serif">Raleway</option>
-                                <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
-                                <option value="Orbitron, sans-serif">Orbitron</option>
-                                <option value="'Roboto Mono', monospace">Roboto Mono</option>
-                                <option value="'Playfair Display', serif">Playfair Display</option>
-                                <option value="Merriweather, serif">Merriweather</option>
-                                <option value="Georgia, serif">Georgia</option>
-                            </select>
-                        </div>
-
                         <h4>Head</h4>
                         <div class="rifa-form-row rifa-form-row--head">
                             <select id="bn-head-mode" class="rifa-input rifa-input--compact">
@@ -367,6 +347,64 @@
                                 <input type="file" id="bn-logo-file" accept="image/*" />
                                 <button type="button" class="rifa-btn rifa-btn--sm" id="bn-logo-upload">Subir</button>
                                 <input type="hidden" id="bn-logo-url" />
+                            </div>
+                        </div>
+
+                        <h4>Tipografía</h4>
+                        <div class="rifa-typo-row">
+                            <div class="rifa-typo-cell" data-typo="titulo">
+                                <span class="rifa-typo-label" id="bn-typo-titulo-label">Título</span>
+                                <input type="number" id="bn-sz-titulo" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="56" title="Tamaño en px" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-titulo" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente título"></select>
+                            </div>
+                            <div class="rifa-typo-cell" data-typo="premio1">
+                                <span class="rifa-typo-label">Premio 1</span>
+                                <input type="number" id="bn-sz-p1" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="36" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-p1" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente premio 1"></select>
+                            </div>
+                        </div>
+                        <div class="rifa-typo-row">
+                            <div class="rifa-typo-cell" data-typo="premio2">
+                                <span class="rifa-typo-label">Premio 2</span>
+                                <input type="number" id="bn-sz-p2" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="30" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-p2" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente premio 2"></select>
+                            </div>
+                            <div class="rifa-typo-cell" data-typo="premio3">
+                                <span class="rifa-typo-label">Premio 3</span>
+                                <input type="number" id="bn-sz-p3" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="30" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-p3" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente premio 3"></select>
+                            </div>
+                        </div>
+                        <div class="rifa-typo-row">
+                            <div class="rifa-typo-cell" data-typo="precio">
+                                <span class="rifa-typo-label">Precio</span>
+                                <input type="number" id="bn-sz-precio" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="40" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-precio" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente precio"></select>
+                            </div>
+                            <div class="rifa-typo-cell" data-typo="modalidad">
+                                <span class="rifa-typo-label">Modalidad/Fecha</span>
+                                <input type="number" id="bn-sz-mod" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="26" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-mod" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente modalidad/fecha"></select>
+                            </div>
+                        </div>
+                        <div class="rifa-typo-row">
+                            <div class="rifa-typo-cell" data-typo="whatsapp">
+                                <span class="rifa-typo-label">WhatsApp</span>
+                                <input type="number" id="bn-sz-wa" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="30" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-wa" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente WhatsApp"></select>
+                            </div>
+                            <div class="rifa-typo-cell" data-typo="sinpe">
+                                <span class="rifa-typo-label">SINPE</span>
+                                <input type="number" id="bn-sz-sinpe" class="rifa-input rifa-input--px" min="8" max="400" step="1" value="30" />
+                                <span class="rifa-typo-unit">px</span>
+                                <select id="bn-f-sinpe" class="rifa-input rifa-input--font" data-bn-font aria-label="Fuente SINPE"></select>
                             </div>
                         </div>
 

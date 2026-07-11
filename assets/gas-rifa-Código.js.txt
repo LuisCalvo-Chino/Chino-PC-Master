@@ -266,10 +266,21 @@ function uniqueHash_() {
 }
 
 function defaultBannerJson_() {
+  var f = "Inter, sans-serif";
   return JSON.stringify({
     bg: { color1: "#EEEEEE", color2: "#EEEEEE", gradient: false, orient: "to bottom" },
-    font: "Inter, sans-serif",
+    font: f,
     head: { mode: "text", title: "", logoUrl: "" },
+    typography: {
+      titulo: { size: 56, font: f },
+      premio1: { size: 36, font: f },
+      premio2: { size: 30, font: f },
+      premio3: { size: 30, font: f },
+      precio: { size: 40, font: f },
+      modalidadFecha: { size: 26, font: f },
+      whatsapp: { size: 30, font: f },
+      sinpe: { size: 30, font: f }
+    },
     textColors: {
       titulo: "#222222",
       premio1: "#222222",

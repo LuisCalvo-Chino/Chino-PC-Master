@@ -978,7 +978,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (oldApp) oldApp.remove();
 
             appendScript("rifa-api-script", "assets/rifa-api.js?v=1", () => {
-                appendScript("rifa-script", "assets/rifa.js?v=26", runInit);
+                appendScript("rifa-script", "assets/rifa.js?v=28", runInit);
             });
         });
     }

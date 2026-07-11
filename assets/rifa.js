@@ -9,6 +9,34 @@
         tomado: "imagenes/Tomado.png"
     };
 
+    const BANNER_FONT_OPTIONS = [
+        { value: "Inter, sans-serif", label: "Inter" },
+        { value: "Montserrat, sans-serif", label: "Montserrat" },
+        { value: "Poppins, sans-serif", label: "Poppins" },
+        { value: "Roboto, sans-serif", label: "Roboto" },
+        { value: "'Open Sans', sans-serif", label: "Open Sans" },
+        { value: "Lato, sans-serif", label: "Lato" },
+        { value: "Nunito, sans-serif", label: "Nunito" },
+        { value: "Raleway, sans-serif", label: "Raleway" },
+        { value: "'Source Sans 3', sans-serif", label: "Source Sans 3" },
+        { value: "Orbitron, sans-serif", label: "Orbitron" },
+        { value: "'Roboto Mono', monospace", label: "Roboto Mono" },
+        { value: "'Playfair Display', serif", label: "Playfair Display" },
+        { value: "Merriweather, serif", label: "Merriweather" },
+        { value: "Georgia, serif", label: "Georgia" }
+    ];
+
+    const TYPO_KEYS = [
+        "titulo",
+        "premio1",
+        "premio2",
+        "premio3",
+        "precio",
+        "modalidadFecha",
+        "whatsapp",
+        "sinpe"
+    ];
+
     let showMessage = (msg) => console.log(msg);
     let navigateHome = () => {
         window.location.hash = "";
@@ -44,11 +72,27 @@
         }
     }
 
+    function defaultTypography(baseFont) {
+        const f = baseFont || "Inter, sans-serif";
+        return {
+            titulo: { size: 56, font: f },
+            premio1: { size: 36, font: f },
+            premio2: { size: 30, font: f },
+            premio3: { size: 30, font: f },
+            precio: { size: 40, font: f },
+            modalidadFecha: { size: 26, font: f },
+            whatsapp: { size: 30, font: f },
+            sinpe: { size: 30, font: f }
+        };
+    }
+
     function defaultBanner() {
+        const font = "Inter, sans-serif";
         return {
             bg: { color1: "#EEEEEE", color2: "#EEEEEE", gradient: false, orient: "to bottom" },
-            font: "Inter, sans-serif",
+            font,
             head: { mode: "text", title: "", logoUrl: "" },
+            typography: defaultTypography(font),
             textColors: {
                 titulo: "#222222",
                 premio1: "#222222",
@@ -73,13 +117,41 @@
         };
     }
 
+    function clampBannerPx(n, fallback) {
+        const v = Number(n);
+        if (!Number.isFinite(v)) return fallback;
+        return Math.min(400, Math.max(8, Math.round(v)));
+    }
+
+    function mergeTypography(rawTypo, legacyFont, defaults) {
+        const baseFont = legacyFont || defaults.titulo.font;
+        const out = defaultTypography(baseFont);
+        TYPO_KEYS.forEach((key) => {
+            const src = rawTypo && typeof rawTypo === "object" ? rawTypo[key] : null;
+            if (!src || typeof src !== "object") {
+                out[key] = {
+                    size: defaults[key].size,
+                    font: baseFont
+                };
+                return;
+            }
+            out[key] = {
+                size: clampBannerPx(src.size, defaults[key].size),
+                font: String(src.font || baseFont || defaults[key].font)
+            };
+        });
+        return out;
+    }
+
     function mergeBanner(raw) {
         const d = defaultBanner();
         if (!raw || typeof raw !== "object") return d;
+        const font = raw.font || d.font;
         return {
             bg: Object.assign({}, d.bg, raw.bg || {}),
-            font: raw.font || d.font,
+            font,
             head: Object.assign({}, d.head, raw.head || {}),
+            typography: mergeTypography(raw.typography, font, d.typography),
             textColors: Object.assign({}, d.textColors, raw.textColors || {}),
             numberColors: Object.assign({}, d.numberColors, raw.numberColors || {}),
             icons: {
@@ -87,6 +159,36 @@
                 sinpe: Object.assign({}, d.icons.sinpe, (raw.icons && raw.icons.sinpe) || {}),
                 tomado: Object.assign({}, d.icons.tomado, (raw.icons && raw.icons.tomado) || {})
             }
+        };
+    }
+
+    function ensureFontSelectOptions(sel, currentValue) {
+        if (!sel) return;
+        const value = String(currentValue || "Inter, sans-serif");
+        if (!sel.options.length) {
+            BANNER_FONT_OPTIONS.forEach((opt) => {
+                const o = document.createElement("option");
+                o.value = opt.value;
+                o.textContent = opt.label;
+                sel.appendChild(o);
+            });
+        }
+        const exists = Array.from(sel.options).some((o) => o.value === value);
+        if (!exists && value) {
+            const o = document.createElement("option");
+            o.value = value;
+            o.textContent = value.split(",")[0].replace(/['"]/g, "");
+            sel.appendChild(o);
+        }
+        sel.value = value;
+    }
+
+    function typoOf(b, key) {
+        const t = b?.typography?.[key];
+        const d = defaultTypography(b?.font)[key];
+        return {
+            size: clampBannerPx(t?.size, d.size),
+            font: String(t?.font || b?.font || d.font)
         };
     }
 
@@ -681,10 +783,28 @@
         $("bn-bg2").value = b.bg.color2;
         $("bn-grad").checked = !!b.bg.gradient;
         $("bn-orient").value = b.bg.orient || "to bottom";
-        $("bn-font").value = b.font;
         $("bn-head-mode").value = b.head.mode || "text";
         $("bn-title").value = b.head.title || project?.nombre_display || project?.sheet_name || "";
         $("bn-logo-url").value = b.head.logoUrl || "";
+
+        const ty = b.typography;
+        $("bn-sz-titulo").value = ty.titulo.size;
+        $("bn-sz-p1").value = ty.premio1.size;
+        $("bn-sz-p2").value = ty.premio2.size;
+        $("bn-sz-p3").value = ty.premio3.size;
+        $("bn-sz-precio").value = ty.precio.size;
+        $("bn-sz-mod").value = ty.modalidadFecha.size;
+        $("bn-sz-wa").value = ty.whatsapp.size;
+        $("bn-sz-sinpe").value = ty.sinpe.size;
+        ensureFontSelectOptions($("bn-f-titulo"), ty.titulo.font);
+        ensureFontSelectOptions($("bn-f-p1"), ty.premio1.font);
+        ensureFontSelectOptions($("bn-f-p2"), ty.premio2.font);
+        ensureFontSelectOptions($("bn-f-p3"), ty.premio3.font);
+        ensureFontSelectOptions($("bn-f-precio"), ty.precio.font);
+        ensureFontSelectOptions($("bn-f-mod"), ty.modalidadFecha.font);
+        ensureFontSelectOptions($("bn-f-wa"), ty.whatsapp.font);
+        ensureFontSelectOptions($("bn-f-sinpe"), ty.sinpe.font);
+
         $("bn-c-titulo").value = b.textColors.titulo || "#222222";
         $("bn-c-p1").value = b.textColors.premio1;
         $("bn-c-p2").value = b.textColors.premio2;
@@ -703,18 +823,6 @@
         $("bn-i-wa-url").value = b.icons.whatsapp.url || "";
         $("bn-i-sinpe-url").value = b.icons.sinpe.url || "";
         $("bn-i-tomado-url").value = b.icons.tomado.url || "";
-        // Si la fuente guardada no está en el select, añadirla temporalmente
-        const fontSel = $("bn-font");
-        if (fontSel && b.font) {
-            const exists = Array.from(fontSel.options).some((o) => o.value === b.font);
-            if (!exists) {
-                const opt = document.createElement("option");
-                opt.value = b.font;
-                opt.textContent = b.font.split(",")[0].replace(/['"]/g, "");
-                fontSel.appendChild(opt);
-            }
-            fontSel.value = b.font;
-        }
         syncHeadMode();
         syncIconUploadPanels();
     }
@@ -735,9 +843,60 @@
         const lw = $("bn-head-logo-wrap");
         if (tw) tw.hidden = modeH !== "text";
         if (lw) lw.hidden = modeH !== "logo";
+
+        const tituloCell = document.querySelector('.rifa-typo-cell[data-typo="titulo"]');
+        const label = $("bn-typo-titulo-label");
+        const fontSel = $("bn-f-titulo");
+        const sizeInput = $("bn-sz-titulo");
+        const isLogo = modeH === "logo";
+        if (tituloCell) tituloCell.classList.toggle("is-logo-mode", isLogo);
+        if (label) label.textContent = isLogo ? "Logo (altura)" : "Título";
+        if (fontSel) fontSel.hidden = isLogo;
+        if (sizeInput) {
+            sizeInput.title = isLogo ? "Altura del logotipo en px" : "Tamaño de tipografía en px";
+        }
+    }
+
+    function readTypographyFromForm() {
+        const defaults = defaultTypography();
+        return {
+            titulo: {
+                size: clampBannerPx($("bn-sz-titulo")?.value, defaults.titulo.size),
+                font: $("bn-f-titulo")?.value || defaults.titulo.font
+            },
+            premio1: {
+                size: clampBannerPx($("bn-sz-p1")?.value, defaults.premio1.size),
+                font: $("bn-f-p1")?.value || defaults.premio1.font
+            },
+            premio2: {
+                size: clampBannerPx($("bn-sz-p2")?.value, defaults.premio2.size),
+                font: $("bn-f-p2")?.value || defaults.premio2.font
+            },
+            premio3: {
+                size: clampBannerPx($("bn-sz-p3")?.value, defaults.premio3.size),
+                font: $("bn-f-p3")?.value || defaults.premio3.font
+            },
+            precio: {
+                size: clampBannerPx($("bn-sz-precio")?.value, defaults.precio.size),
+                font: $("bn-f-precio")?.value || defaults.precio.font
+            },
+            modalidadFecha: {
+                size: clampBannerPx($("bn-sz-mod")?.value, defaults.modalidadFecha.size),
+                font: $("bn-f-mod")?.value || defaults.modalidadFecha.font
+            },
+            whatsapp: {
+                size: clampBannerPx($("bn-sz-wa")?.value, defaults.whatsapp.size),
+                font: $("bn-f-wa")?.value || defaults.whatsapp.font
+            },
+            sinpe: {
+                size: clampBannerPx($("bn-sz-sinpe")?.value, defaults.sinpe.size),
+                font: $("bn-f-sinpe")?.value || defaults.sinpe.font
+            }
+        };
     }
 
     function readBannerFromForm() {
+        const typography = readTypographyFromForm();
         return {
             bg: {
                 color1: $("bn-bg1").value,
@@ -745,12 +904,14 @@
                 gradient: $("bn-grad").checked,
                 orient: $("bn-orient").value
             },
-            font: $("bn-font").value,
+            // Compatibilidad con diseños antiguos: fuente global = título
+            font: typography.titulo.font,
             head: {
                 mode: $("bn-head-mode").value,
                 title: $("bn-title").value,
                 logoUrl: $("bn-logo-url").value
             },
+            typography,
             textColors: {
                 titulo: $("bn-c-titulo")?.value || "#FFFFFF",
                 premio1: $("bn-c-p1").value,
@@ -810,24 +971,34 @@
             ? `linear-gradient(${b.bg.orient}, ${b.bg.color1}, ${b.bg.color2})`
             : b.bg.color1;
         const n = project?.cantidad_premios || 1;
+        const tTitulo = typoOf(b, "titulo");
+        const tP1 = typoOf(b, "premio1");
+        const tP2 = typoOf(b, "premio2");
+        const tP3 = typoOf(b, "premio3");
+        const tPrecio = typoOf(b, "precio");
+        const tMod = typoOf(b, "modalidadFecha");
+        const tWa = typoOf(b, "whatsapp");
+        const tSinpe = typoOf(b, "sinpe");
+
         const premios = [];
         if (n >= 1 && project?.premio_1) {
-            premios.push({ label: premioLabel(1), t: project.premio_1, c: b.textColors.premio1 });
+            premios.push({ label: premioLabel(1), t: project.premio_1, c: b.textColors.premio1, typo: tP1 });
         }
         if (n >= 2 && project?.premio_2) {
-            premios.push({ label: premioLabel(2), t: project.premio_2, c: b.textColors.premio2 });
+            premios.push({ label: premioLabel(2), t: project.premio_2, c: b.textColors.premio2, typo: tP2 });
         }
         if (n >= 3 && project?.premio_3) {
-            premios.push({ label: premioLabel(3), t: project.premio_3, c: b.textColors.premio3 });
+            premios.push({ label: premioLabel(3), t: project.premio_3, c: b.textColors.premio3, typo: tP3 });
         }
 
         const titleColor = b.textColors.titulo || "#FFFFFF";
         let headHtml = "";
         if (b.head.mode === "logo" && b.head.logoUrl) {
-            headHtml = `<img src="${escapeAttr(b.head.logoUrl)}" alt="" style="max-width:420px;max-height:160px;object-fit:contain;" crossorigin="anonymous" />`;
+            const logoH = tTitulo.size;
+            headHtml = `<img src="${escapeAttr(b.head.logoUrl)}" alt="" style="max-width:420px;height:${logoH}px;width:auto;object-fit:contain;" crossorigin="anonymous" />`;
         } else {
             const title = b.head.title || project?.nombre_display || project?.sheet_name || "Rifa";
-            headHtml = `<div style="font-size:56px;font-weight:700;color:${escapeAttr(titleColor)};text-align:center;line-height:1.15;word-break:break-word;">${escapeHtml(title)}</div>`;
+            headHtml = `<div style="font-family:${escapeAttr(tTitulo.font)};font-size:${tTitulo.size}px;font-weight:700;color:${escapeAttr(titleColor)};text-align:center;line-height:1.15;word-break:break-word;">${escapeHtml(title)}</div>`;
         }
 
         let cells = "";
@@ -851,35 +1022,36 @@
 
         const waIcon =
             b.icons.whatsapp.enabled
-                ? `<img src="${escapeAttr(b.icons.whatsapp.url || DEFAULT_ICON.whatsapp)}" style="width:48px;height:48px;object-fit:contain;" crossorigin="anonymous" />`
+                ? `<img src="${escapeAttr(b.icons.whatsapp.url || DEFAULT_ICON.whatsapp)}" style="width:${tWa.size}px;height:${tWa.size}px;object-fit:contain;flex-shrink:0;" crossorigin="anonymous" />`
                 : "";
         const sinpeIcon =
             b.icons.sinpe.enabled
-                ? `<img src="${escapeAttr(b.icons.sinpe.url || DEFAULT_ICON.sinpe)}" style="width:48px;height:48px;object-fit:contain;" crossorigin="anonymous" />`
+                ? `<img src="${escapeAttr(b.icons.sinpe.url || DEFAULT_ICON.sinpe)}" style="width:${tSinpe.size}px;height:${tSinpe.size}px;object-fit:contain;flex-shrink:0;" crossorigin="anonymous" />`
                 : "";
 
         const premiosHtml = premios
             .map(
-                (p, i) =>
-                    `<div style="color:${p.c};font-size:${i === 0 ? 36 : 30}px;margin:4px 0;text-align:center;font-weight:700;line-height:1.2;">${escapeHtml(p.label)}: ${escapeHtml(p.t)}</div>`
+                (p) =>
+                    `<div style="font-family:${escapeAttr(p.typo.font)};color:${p.c};font-size:${p.typo.size}px;margin:4px 0;text-align:center;font-weight:700;line-height:1.2;">${escapeHtml(p.label)}: ${escapeHtml(p.t)}</div>`
             )
             .join("");
 
         const precioTxt = `Precio: ${formatColonPrice(project?.precio || "")}`;
         const fechaLarga = formatFechaLargaEs(project?.fecha_sorteo || "");
         const modFecha = `${project?.modalidad || ""}${fechaLarga ? ": " + fechaLarga : ""}`;
+        const baseFont = tTitulo.font || b.font || "Inter, sans-serif";
 
         // Cuadrícula fija 10×10 dentro del ancho útil (1080 - padding)
-        const bannerInner = `<div data-rifa-banner-root="1" style="width:1080px;height:1920px;background:${bg};font-family:${escapeAttr(b.font)};display:flex;flex-direction:column;align-items:stretch;padding:40px 40px 48px;box-sizing:border-box;color:#fff;overflow:hidden;">
+        const bannerInner = `<div data-rifa-banner-root="1" style="width:1080px;height:1920px;background:${bg};font-family:${escapeAttr(baseFont)};display:flex;flex-direction:column;align-items:stretch;padding:40px 40px 48px;box-sizing:border-box;color:#fff;overflow:hidden;">
             <div style="flex:0 0 auto;display:flex;justify-content:center;margin-bottom:16px;">${headHtml}</div>
             <div style="flex:0 0 auto;margin-bottom:12px;">${premiosHtml}</div>
             <div style="flex:0 0 auto;width:100%;max-width:1000px;margin:12px auto 20px;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr));gap:6px;aspect-ratio:1/1;align-self:center;">${cells}</div>
             <div style="flex:1 1 auto;"></div>
             <div style="flex:0 0 auto;text-align:center;">
-                <div style="color:${b.textColors.costo};font-size:40px;font-weight:700;margin:8px 0;">${escapeHtml(precioTxt)}</div>
-                <div style="color:${b.textColors.modalidadFecha};font-size:26px;margin:8px 0;line-height:1.25;">${escapeHtml(modFecha)}</div>
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px;color:${b.textColors.whatsapp};font-size:30px;">${waIcon}<span>${escapeHtml(project?.whatsapp || "")}</span></div>
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;color:${b.textColors.sinpe};font-size:30px;">${sinpeIcon}<span>${escapeHtml(project?.sinpe || "")}</span></div>
+                <div style="font-family:${escapeAttr(tPrecio.font)};color:${b.textColors.costo};font-size:${tPrecio.size}px;font-weight:700;margin:8px 0;">${escapeHtml(precioTxt)}</div>
+                <div style="font-family:${escapeAttr(tMod.font)};color:${b.textColors.modalidadFecha};font-size:${tMod.size}px;margin:8px 0;line-height:1.25;">${escapeHtml(modFecha)}</div>
+                <div style="font-family:${escapeAttr(tWa.font)};display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px;color:${b.textColors.whatsapp};font-size:${tWa.size}px;">${waIcon}<span>${escapeHtml(project?.whatsapp || "")}</span></div>
+                <div style="font-family:${escapeAttr(tSinpe.font)};display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;color:${b.textColors.sinpe};font-size:${tSinpe.size}px;">${sinpeIcon}<span>${escapeHtml(project?.sinpe || "")}</span></div>
             </div>
         </div>`;
 
@@ -1108,6 +1280,14 @@
         });
 
         $("bn-head-mode")?.addEventListener("change", () => {
+            const modeH = $("bn-head-mode")?.value;
+            const sizeEl = $("bn-sz-titulo");
+            // Al pasar a logo, si el tamaño sigue siendo el de texto por defecto, usar altura típica de logo
+            if (modeH === "logo" && sizeEl && Number(sizeEl.value) === 56) {
+                sizeEl.value = "160";
+            } else if (modeH === "text" && sizeEl && Number(sizeEl.value) === 160) {
+                sizeEl.value = "56";
+            }
             syncHeadMode();
             refreshBannerPreview();
         });

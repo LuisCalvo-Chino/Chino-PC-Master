@@ -4841,6 +4841,49 @@ body.cpm-rifa-standalone .rifa-public-bar {
     margin-top: 0;
 }
 
+.rifa-typo-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 0.85rem;
+    align-items: center;
+}
+.rifa-typo-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    min-width: 0;
+}
+.rifa-typo-label {
+    flex: 0 1 7.5rem;
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+.rifa-typo-unit {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.rifa-input--px {
+    width: 4.25rem;
+    flex: 0 0 auto;
+    padding: 0.35rem 0.4rem;
+    text-align: center;
+}
+.rifa-input--font {
+    flex: 1 1 7rem;
+    min-width: 0;
+    max-width: 100%;
+}
+.rifa-typo-cell.is-logo-mode .rifa-input--font {
+    display: none !important;
+}
+@media (max-width: 900px) {
+    .rifa-typo-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .rifa-grid-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
