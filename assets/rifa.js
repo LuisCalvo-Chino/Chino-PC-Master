@@ -51,6 +51,7 @@
     let seleccion = new Set();
     let rngWinners = [];
     let rngBusy = false;
+    let bannerBusy = false;
 
     function $(id) {
         return document.getElementById(id);
@@ -1106,7 +1107,135 @@
         });
     }
 
+    /** En móvil el <a download> con data: URL no guarda nada: se usa overlay + Web Share. */
+    function isMobileLike() {
+        if (typeof navigator === "undefined") return false;
+        const ua = navigator.userAgent || "";
+        const iPadOS = /Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+        return /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(ua) || iPadOS;
+    }
+
+    function canvasToBlob(canvas, type, quality) {
+        return new Promise((resolve, reject) => {
+            if (typeof canvas.toBlob === "function") {
+                canvas.toBlob(
+                    (blob) =>
+                        blob ? resolve(blob) : reject(new Error("No se pudo generar la imagen.")),
+                    type,
+                    quality
+                );
+                return;
+            }
+            try {
+                const bin = atob(canvas.toDataURL(type, quality).split(",")[1]);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                resolve(new Blob([arr], { type }));
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            a.remove();
+            URL.revokeObjectURL(url);
+        }, 30000);
+    }
+
+    function closeBannerResult() {
+        const prev = $("rifa-banner-result");
+        if (!prev) return;
+        const url = prev.getAttribute("data-object-url");
+        if (url) URL.revokeObjectURL(url);
+        prev.remove();
+    }
+
+    /** Overlay con la imagen ya generada: guardar nativo, descargar o mantener pulsado. */
+    function openBannerResult(blob, filename) {
+        closeBannerResult();
+        const url = URL.createObjectURL(blob);
+        let file = null;
+        try {
+            file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+        } catch (e) {
+            file = null;
+        }
+        const canShareFile = !!(
+            file &&
+            navigator.canShare &&
+            navigator.share &&
+            navigator.canShare({ files: [file] })
+        );
+
+        const ov = document.createElement("div");
+        ov.id = "rifa-banner-result";
+        ov.className = "rifa-banner-result";
+        ov.setAttribute("data-object-url", url);
+        ov.innerHTML = `
+            <div class="rifa-banner-result__box" role="dialog" aria-modal="true" aria-label="Banner generado">
+                <p class="rifa-banner-result__hint">Banner listo. ${
+                    canShareFile
+                        ? "Pulsa <strong>Guardar imagen</strong> para enviarlo a tu galería"
+                        : "Mantén presionada la imagen para guardarla"
+                }, o descárgalo como archivo.</p>
+                <div class="rifa-banner-result__imgwrap">
+                    <img class="rifa-banner-result__img" alt="Banner de la rifa" src="${escapeAttr(url)}" />
+                </div>
+                <div class="rifa-banner-result__actions">
+                    ${
+                        canShareFile
+                            ? '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share">Guardar imagen</button>'
+                            : ""
+                    }
+                    <button type="button" class="rifa-btn" data-act="download">Descargar archivo</button>
+                    <button type="button" class="rifa-btn" data-act="close">Cerrar</button>
+                </div>
+            </div>`;
+
+        ov.addEventListener("click", async (ev) => {
+            const btn = ev.target.closest("[data-act]");
+            if (!btn) {
+                if (ev.target === ov) closeBannerResult();
+                return;
+            }
+            const act = btn.getAttribute("data-act");
+            if (act === "close") {
+                closeBannerResult();
+            } else if (act === "download") {
+                downloadBlob(blob, filename);
+            } else if (act === "share") {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: filename,
+                        text: `Rifa ${project?.sheet_name || ""}`.trim()
+                    });
+                } catch (e) {
+                    if (e?.name !== "AbortError") {
+                        showMessage(
+                            "No se pudo compartir. Mantén presionada la imagen para guardarla.",
+                            "error"
+                        );
+                    }
+                }
+            }
+        });
+
+        document.body.appendChild(ov);
+    }
+
     async function descargarBannerJpg() {
+        if (bannerBusy) return;
         const root = $("rifa-capture-root");
         if (!root) return;
         const b = readBannerFromForm();
@@ -1116,6 +1245,10 @@
         const target =
             root.querySelector("[data-rifa-banner-root]") || root.firstElementChild;
         if (!target) return;
+        bannerBusy = true;
+        const buttons = Array.from(document.querySelectorAll(".rifa-btn-banner-dl"));
+        buttons.forEach((btn) => (btn.disabled = true));
+        showMessage("Generando banner…", "info");
         try {
             const html2canvas = await loadHtml2Canvas();
             const canvas = await html2canvas(target, {
@@ -1129,15 +1262,19 @@
                 backgroundColor: null,
                 logging: false
             });
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-            const a = document.createElement("a");
-            a.href = dataUrl;
-            a.download = `Rifa_${project?.sheet_name || "banner"}.jpg`;
-            a.click();
-            showMessage("Banner JPG descargado.", "success");
+            const blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+            const filename = `Rifa_${project?.sheet_name || "banner"}.jpg`;
+            if (isMobileLike()) {
+                openBannerResult(blob, filename);
+            } else {
+                downloadBlob(blob, filename);
+                showMessage("Banner JPG descargado.", "success");
+            }
         } catch (e) {
             showMessage(e.message || String(e), "error");
         } finally {
+            buttons.forEach((btn) => (btn.disabled = false));
+            bannerBusy = false;
             root.innerHTML = "";
         }
     }
