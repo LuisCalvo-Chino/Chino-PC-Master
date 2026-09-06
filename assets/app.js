@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "29"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "31"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -13,11 +13,39 @@ document.addEventListener("DOMContentLoaded", () => {
         "contacto",
         "webapps",
         "canje",
-        "angels"
+        "angels",
+        "angeles-secretos",
+        "terminos",
+        "privacidad"
     ]);
     const PERMISSION_PAGES = {
         rifa: "rifa"
     };
+    /**
+     * Páginas del sitio (portafolio + legales) que muestran el footer institucional.
+     * Las rutas de aplicación (rifa, admin, certificados, ángeles) lo ocultan para
+     * que la herramienta ocupe toda la pantalla.
+     */
+    const FOOTER_PAGES = new Set([
+        "home",
+        "soluciones",
+        "trayectoria",
+        "contacto",
+        "webapps",
+        "canje",
+        "angeles-secretos",
+        "terminos",
+        "privacidad"
+    ]);
+
+    function applyFooterVisibility(pageName) {
+        document.body.classList.toggle("cpm-no-footer", !FOOTER_PAGES.has(pageName));
+    }
+
+    (function setFooterYear() {
+        const el = document.getElementById("site-footer-year");
+        if (el) el.textContent = String(new Date().getFullYear());
+    })();
 
     // Evitar flash del header del sitio en links públicos #r/<hash> y #u/|#a/
     (function applyStandaloneChromeEarly() {
@@ -27,6 +55,8 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (/^(u|a)\/.+$/i.test(raw)) {
             document.body.classList.add("cpm-angels-standalone", "cpm-angels-route");
         }
+        // Evitar flash del footer en rutas de aplicación antes del primer render
+        applyFooterVisibility(parseRouteFromHash(raw).page || "home");
     })();
 
     const homeLink = document.getElementById("home-link");
@@ -644,7 +674,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const content = await response.text();
             mainContent.innerHTML = content;
             currentPage = pageName;
-            
+            applyFooterVisibility(pageName);
+
             if (pageName === "rifa") {
                 const rifaCtx = options.rifa || { mode: "hub" };
                 if (rifaCtx.mode === "admin") {
@@ -715,6 +746,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return true;
         } catch (error) {
             mainContent.innerHTML = "<p>Error al cargar la pagina.</p>";
+            applyFooterVisibility("home");
             console.error(error);
             return false;
         } finally {

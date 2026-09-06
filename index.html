@@ -7,7 +7,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Nunito:wght@400;700&family=Open+Sans:wght@400;700&family=Orbitron:wght@700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&family=Source+Sans+3:wght@400;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=42">
 </head>
 <body class="cpm-app-loading">
 
@@ -106,8 +106,95 @@
         </div>
     </main>
 
-    <footer>
-        <p class="tech-font">© 2026 CHINO PC MASTER // ESTADO: OPERATIVO</p>
+    <footer class="site-footer" id="site-footer">
+        <div class="site-footer__inner">
+            <div class="site-footer__brand">
+                <a href="#" class="site-footer__logo-link" data-page="home" aria-label="Ir al inicio">
+                    <img src="imagenes/Extracción Logo.png" alt="Chino PC Master" class="site-footer__logo" width="190" height="64" loading="lazy" decoding="async">
+                </a>
+                <p class="site-footer__tagline">Transformando procesos, optimizando resultados.</p>
+                <p class="site-footer__blurb">
+                    Automatización sobre Google Workspace, soporte técnico y de redes, y aplicaciones web a
+                    la medida. Costa Rica.
+                </p>
+                <ul class="site-footer__social" aria-label="Redes sociales">
+                    <li>
+                        <a href="https://wa.me/50662005921" target="_blank" rel="noopener noreferrer" title="WhatsApp +506 6200 5921" aria-label="WhatsApp: +506 6200 5921">
+                            <img src="imagenes/social/whatsapp.png" alt="" width="24" height="24" loading="lazy" decoding="async">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.facebook.com/ChinoPCMaster" target="_blank" rel="noopener noreferrer" title="Facebook" aria-label="Facebook: ChinoPCMaster">
+                            <img src="imagenes/social/facebook.png" alt="" width="24" height="24" loading="lazy" decoding="async">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.instagram.com/chino_pcmaster" target="_blank" rel="noopener noreferrer" title="Instagram" aria-label="Instagram: chino_pcmaster">
+                            <img src="imagenes/social/instagram.png" alt="" width="24" height="24" loading="lazy" decoding="async">
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <nav class="site-footer__col" aria-labelledby="footer-nav-sitio">
+                <h2 class="site-footer__title tech-font" id="footer-nav-sitio">Sitio</h2>
+                <ul class="site-footer__list">
+                    <li><a href="#" data-page="home">Inicio</a></li>
+                    <li><a href="#soluciones" data-page="soluciones">Soluciones</a></li>
+                    <li><a href="#trayectoria" data-page="trayectoria">Trayectoria</a></li>
+                    <li><a href="#canje" data-page="canje">Verificar certificado</a></li>
+                    <li><a href="#contacto" data-page="contacto">Contacto</a></li>
+                </ul>
+            </nav>
+
+            <nav class="site-footer__col" aria-labelledby="footer-nav-apps">
+                <h2 class="site-footer__title tech-font" id="footer-nav-apps">Aplicaciones</h2>
+                <ul class="site-footer__list">
+                    <li><a href="#angeles-secretos" data-page="angeles-secretos">Ángeles Secretos</a></li>
+                    <li><a href="#webapps" data-page="webapps">Todas las WebApps</a></li>
+                    <li>
+                        <a href="lenguajetransformacional.html" data-external="1" target="_blank" rel="noopener">
+                            Lenguaje Transformacional
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="site-footer__col site-footer__col--contact">
+                <h2 class="site-footer__title tech-font">Contacto</h2>
+                <ul class="site-footer__list site-footer__list--contact">
+                    <li>
+                        <a href="https://wa.me/50662005921" target="_blank" rel="noopener noreferrer" class="site-footer__contact-line">
+                            <img src="imagenes/social/whatsapp.png" alt="" width="18" height="18" loading="lazy" decoding="async">
+                            <span class="tech-font">+506 6200 5921</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.facebook.com/ChinoPCMaster" target="_blank" rel="noopener noreferrer" class="site-footer__contact-line">
+                            <img src="imagenes/social/facebook.png" alt="" width="18" height="18" loading="lazy" decoding="async">
+                            <span>facebook.com/ChinoPCMaster</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.instagram.com/chino_pcmaster" target="_blank" rel="noopener noreferrer" class="site-footer__contact-line">
+                            <img src="imagenes/social/instagram.png" alt="" width="18" height="18" loading="lazy" decoding="async">
+                            <span>@chino_pcmaster</span>
+                        </a>
+                    </li>
+                </ul>
+                <a href="#contacto" data-page="contacto" class="site-footer__cta">Solicitar cotización</a>
+            </div>
+        </div>
+
+        <div class="site-footer__bar">
+            <p class="site-footer__copy tech-font">
+                © <span id="site-footer-year">2026</span> CHINO PC MASTER // ESTADO: OPERATIVO
+            </p>
+            <ul class="site-footer__legal">
+                <li><a href="#terminos" data-page="terminos">Términos y Condiciones</a></li>
+                <li><a href="#privacidad" data-page="privacidad">Política de Privacidad</a></li>
+            </ul>
+        </div>
     </footer>
 
     <div id="auth-message" class="auth-message" aria-live="polite"></div>
@@ -167,14 +254,14 @@
     <!-- Web App Maestro Ángeles / Rifa multi: URL .../macros/s/.../exec -->
     <script>
         /** Subir este número al cambiar HTML parcial (rifa.html, etc.) o JS dinámico — evita caché en GitHub Pages */
-        window.CPM_ASSET_V = "30";
+        window.CPM_ASSET_V = "31";
         window.CPM_ANGELS_MASTER_GAS_URL = "https://script.google.com/macros/s/AKfycbxLoQNdHqetK7cBzYCp3XEILGjH7KPWAbdadaEioOqSctUJ_gJOJJVQ0TKMP3itmT7FuQ/exec";
         /** Rifa multi-proyecto: Web App /exec */
         window.CPM_RIFA_GAS_URL = "https://script.google.com/macros/s/AKfycbyWYEfJevJ_vi9JffQeXgFB8Ru2VDOzXOQvlo29wp2qUTDi5vxzOlrybkQ1WsKXYiA/exec";
         /** Opcional: clave API ImgBB (Ángeles + Rifa banner). Si no se define, se usa la clave por defecto del proyecto. */
         // window.CPM_IMGBB_API_KEY = "TU_CLAVE_IMGBB";
     </script>
-    <script src="assets/app.js?v=29"></script>
+    <script src="assets/app.js?v=30"></script>
 
 </body>
 </html>
