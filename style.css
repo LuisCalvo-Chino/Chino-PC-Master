@@ -5393,16 +5393,25 @@ body.cpm-no-footer .site-footer {
    PÁGINAS DE DOCUMENTO (Ángeles Secretos, Términos, Privacidad)
    ========================================================================== */
 
-.doc-page {
-    max-width: 980px;
+/*
+ * .doc-page es la propia <section>, así que su max-width incluye el padding
+ * lateral. Se define un canal fijo (en vez del 10% heredado de `section`) para
+ * que el ancho útil no se encoja al crecer la pantalla.
+ */
+.content-section.doc-page {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1240px;
     margin: 0 auto;
+    padding-left: clamp(20px, 3vw, 40px);
+    padding-right: clamp(20px, 3vw, 40px);
 }
 
 .doc-lead {
     font-size: 1.05rem;
     line-height: 1.8;
     color: var(--text-body);
-    max-width: 70ch;
+    max-width: 78ch;
     margin-bottom: 26px;
 }
 
@@ -5487,7 +5496,7 @@ body.cpm-no-footer .site-footer {
 
 .doc-sub {
     color: var(--text-muted);
-    max-width: 68ch;
+    max-width: 76ch;
     margin-bottom: 6px;
 }
 
@@ -5597,6 +5606,13 @@ body.cpm-no-footer .site-footer {
     margin-top: 22px;
 }
 
+/* 8 tarjetas: 4x2 en pantallas anchas, 2x4 en el resto. */
+@media (min-width: 1080px) {
+    .doc-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
 .doc-grid article {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -5678,8 +5694,8 @@ body.cpm-no-footer .site-footer {
 }
 
 /* --- Páginas legales --- */
-.doc-page--legal {
-    max-width: 860px;
+.content-section.doc-page--legal {
+    max-width: 1040px;
 }
 
 .doc-legal-meta {
@@ -5716,7 +5732,7 @@ body.cpm-no-footer .site-footer {
     color: var(--text-body);
     line-height: 1.8;
     margin-bottom: 12px;
-    max-width: 72ch;
+    max-width: 80ch;
 }
 
 .doc-legal p:last-child {
