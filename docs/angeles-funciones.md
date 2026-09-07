@@ -1,6 +1,12 @@
 # Ángeles Secretos — Catálogo de funciones
 
-Documento de referencia: qué hace la app, separado por los dos paneles que usan las personas del evento.
+Documento de referencia interno: qué hace la app, separado por los dos paneles que usan las personas del equipo.
+
+> **La versión canónica y publicada de este documento vive en el sitio:**
+> [`#angeles-secretos`](https://luiscalvo-chino.github.io/Chino-PC-Master/#angeles-secretos).
+> Ahí está además el contexto de VIVE, la petición de donaciones, el canal de soporte y el origen
+> del proyecto. Este archivo se queda como referencia rápida de funciones.
+
 Las capturas están en [`docs/angeles-capturas/`](angeles-capturas/) y se generaron con datos de demostración.
 
 > El panel Maestro (`#angels-dashboard`) queda fuera de este documento a propósito: es la consola interna
@@ -8,7 +14,11 @@ Las capturas están en [`docs/angeles-capturas/`](angeles-capturas/) y se genera
 > en la carpeta (`01-maestro-*` a `05-maestro-*`) por si hacen falta para documentación interna.
 
 **Cómo funciona, en una línea:** el sitio web es la interfaz; el correo se compone con el diseño que
-define el capitán y sale automáticamente, cada semana, desde el Gmail de la cuenta del propio evento.
+define el Capi de Ángeles y sale automáticamente cada miércoles desde el Gmail de los Ángeles Secretos.
+
+**Dónde encaja:** VIVE es un entrenamiento transformacional cuya etapa final dura tres meses. En la
+segunda mitad de esa etapa entran los Ángeles Secretos: cada participante recibe un mensaje anónimo
+todos los miércoles, hasta el día de su graduación.
 
 ---
 
@@ -16,8 +26,8 @@ define el capitán y sale automáticamente, cada semana, desde el Gmail de la cu
 
 | Panel | Cómo se entra | Quién lo usa |
 |---|---|---|
-| **Capitanes** | `#a/<hash>` — el enlace + la contraseña del proyecto, **sin cuenta en el sitio** | Quien monta y conduce el evento |
-| **Ángeles** | `#u/<hash>` — solo el enlace, **sin contraseña ni cuenta** | Quienes juegan y escriben |
+| **Capitanes** | `#a/<hash>` — el enlace + la contraseña del proyecto, **sin cuenta en el sitio** | El Capi de Ángeles, quien monta y conduce el juego |
+| **Ángeles** | `#u/<hash>` — solo el enlace, **sin contraseña ni cuenta** | Quienes juegan y escriben a los participantes |
 
 Ambos enlaces son públicos por diseño: no hay registro, no hay fricción, no hay app que instalar.
 
@@ -43,7 +53,7 @@ Editor visual de la plantilla del correo, dividido en 5 bloques, con **vista pre
 5. **Footer** — fondo, mensaje libre en texto o HTML y su propia tipografía.
 
 Extras: botón **Descarga HTML** para exportar la plantilla renderizada y **Guardar diseño** para
-dejarla fija en el proyecto. Lo que el capitán ve es exactamente lo que recibirá el angelado.
+dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá el angelado.
 
 ### 1.2 Ángeles y Angelados
 ![Tabla de ángeles](angeles-capturas/08-organizador-tabla-angeles.png)
@@ -51,7 +61,7 @@ dejarla fija en el proyecto. Lo que el capitán ve es exactamente lo que recibir
 - Tabla editable: **Nombre del Ángel**, **Nombre del Angelado** y **email del Angelado**.
 - Añadir filas, editar en línea, eliminar y guardar la tabla completa.
 - Estado del envío en vivo: **zona horaria, semana actual calculada, reloj del servidor** y si el
-  **envío automático está activo**.
+  **envío automático de los miércoles está activo**.
 - El ciclo de semanas corre de jueves a miércoles, con W1 desde la fecha de inicio del proyecto.
 
 ### 1.3 Mantenimiento y cola de envíos
@@ -76,7 +86,7 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
 - Campo de **saludo** personalizado (con aviso si se deja vacío).
 - **Editor enriquecido**: negrita, cursiva, subrayado, alineación izquierda/centro/derecha,
   **inserción de hipervínculos** con texto visible y URL, e **inserción de imágenes**.
-- **Vista previa en vivo** del correo final, con el diseño exacto que configuró el capitán.
+- **Vista previa en vivo** del correo final, con el diseño exacto que configuró el Capi.
 - **Descarga HTML** del mensaje.
 - **Enviar a cola**: el mensaje queda guardado como pendiente, listo para el envío programado.
 - Aviso de anonimato visible en el propio editor.
@@ -100,7 +110,7 @@ Lista de las parejas Ángel ↔ Angelado que le corresponden a ese enlace.
   - ⚠️ **Por redactar** — aún no hay mensaje en cola esa semana.
   - 📧 **Envío pendiente** — guardado, esperando el envío programado.
   - ✅ **Enviado** — el correo ya salió.
-  - ❌ **Error** — falló el envío; hay que avisar al capitán.
+  - ❌ **Error** — falló el envío; hay que avisar al Capi.
 
 ### 2.5 En el teléfono
 ![Vista móvil](angeles-capturas/14-participante-movil.png)
@@ -114,11 +124,11 @@ el ángel realmente está.
 ## 3 · Por qué se usa
 
 - **Cero fricción para el ángel.** Ni registro, ni contraseña, ni app que instalar: abre el enlace y escribe.
-- **El correo tiene la cara del evento.** Colores, gradientes, banner propio y tipografía por sección,
+- **El correo tiene la cara del equipo.** Colores, gradientes, logo propio y tipografía por sección,
   con vista previa fiel y sin tocar HTML.
-- **Sale del Gmail del evento.** El remitente es la cuenta del propio evento: nada llega desde una
-  dirección desconocida.
-- **Se envía solo.** Activador semanal y cola de mensajes; el capitán solo interviene si quiere
+- **Sale del Gmail de los Ángeles.** El remitente es la cuenta de Ángeles Secretos del equipo: nada
+  llega desde una dirección desconocida.
+- **Se envía solo.** Activador semanal y cola de mensajes; el Capi solo interviene si quiere
   adelantar un envío.
 - **Nadie se queda a ciegas.** Cada ángel ve si su mensaje está por redactar, pendiente, enviado o con
   error, semana por semana.
