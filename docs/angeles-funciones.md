@@ -4,8 +4,12 @@ Documento de referencia interno: qué hace la app, separado por los dos paneles 
 
 > **La versión canónica y publicada de este documento vive en el sitio:**
 > [`#angeles-secretos`](https://luiscalvo-chino.github.io/Chino-PC-Master/#angeles-secretos).
-> Ahí está además el contexto de VIVE, la petición de donaciones, el canal de soporte y el origen
-> del proyecto. Este archivo se queda como referencia rápida de funciones.
+> Ahí están además la petición de donaciones, el canal de soporte y el origen del proyecto.
+> Este archivo se queda como referencia rápida de funciones.
+>
+> **La página publicada es deliberadamente anónima:** no nombra el programa ni describe el proceso
+> que viven los participantes, porque los Ángeles Secretos son una sorpresa y cualquiera podría
+> encontrar la página antes de tiempo. Este archivo interno sigue la misma regla.
 
 Las capturas están en [`docs/angeles-capturas/`](angeles-capturas/) y se generaron con datos de demostración.
 
@@ -14,11 +18,8 @@ Las capturas están en [`docs/angeles-capturas/`](angeles-capturas/) y se genera
 > en la carpeta (`01-maestro-*` a `05-maestro-*`) por si hacen falta para documentación interna.
 
 **Cómo funciona, en una línea:** el sitio web es la interfaz; el correo se compone con el diseño que
-define el Capi de Ángeles y sale automáticamente cada miércoles desde el Gmail de los Ángeles Secretos.
-
-**Dónde encaja:** VIVE es un entrenamiento transformacional cuya etapa final dura tres meses. En la
-segunda mitad de esa etapa entran los Ángeles Secretos: cada participante recibe un mensaje anónimo
-todos los miércoles, hasta el día de su graduación.
+define el Capi de Ángeles y sale automáticamente, en la fecha configurada, desde el Gmail de los
+Ángeles Secretos.
 
 ---
 
@@ -61,8 +62,9 @@ dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá e
 - Tabla editable: **Nombre del Ángel**, **Nombre del Angelado** y **email del Angelado**.
 - Añadir filas, editar en línea, eliminar y guardar la tabla completa.
 - Estado del envío en vivo: **zona horaria, semana actual calculada, reloj del servidor** y si el
-  **envío automático de los miércoles está activo**.
-- El ciclo de semanas corre de jueves a miércoles, con W1 desde la fecha de inicio del proyecto.
+  **envío automático está activo**.
+- El ciclo semanal y el día de envío se fijan al crear el proyecto; a partir de ahí la app cuenta las
+  semanas sola.
 
 ### 1.3 Mantenimiento y cola de envíos
 ![Mantenimiento](angeles-capturas/09-organizador-mantenimiento.png)
@@ -70,7 +72,7 @@ dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá e
 - Listado de todos los mensajes en cola con **semana, ángel, angelado y estado** (SENT / PENDING / ERROR).
 - **Filtros** por semana, por ángel y por angelado.
 - **Eliminar** un mensaje concreto antes de que salga.
-- **Ejecutar cola ahora**: dispara el envío manualmente sin esperar al activador semanal.
+- **Ejecutar cola ahora**: dispara el envío manualmente sin esperar al día programado.
 - **Refrescar** para ver el estado actualizado.
 
 ---

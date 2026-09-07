@@ -1,0 +1,18 @@
+# Chino PC Master — https://luiscalvo-chino.github.io/Chino-PC-Master/
+# Los archivos .html sueltos son fragmentos que carga la SPA desde index.html;
+# no son páginas independientes y no deben indexarse por separado.
+User-agent: *
+Disallow: /angeles-secretos.html
+Disallow: /angels.html
+Disallow: /rifa.html
+Disallow: /admin.html
+Disallow: /certificados.html
+Disallow: /canje.html
+Disallow: /contacto.html
+Disallow: /home.html
+Disallow: /soluciones.html
+Disallow: /trayectoria.html
+Disallow: /webapps.html
+Disallow: /terminos.html
+Disallow: /privacidad.html
+Disallow: /docs/
