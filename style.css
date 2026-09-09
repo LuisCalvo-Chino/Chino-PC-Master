@@ -3576,6 +3576,123 @@ main {
     pointer-events: none;
 }
 
+/* Ángel que ya envió su mensaje de la semana: se muestra, pero no se puede seleccionar.
+   Tono verde apagado = completado (no es un error ni un deshabilitado neutro). */
+#usr-angel-select option[data-done="1"] {
+    color: #7fd4b8;
+    background: rgba(16, 44, 38, 0.95);
+    font-style: italic;
+}
+
+#usr-angel-select option[data-done="error"] {
+    color: #ffb4a6;
+    background: rgba(52, 24, 22, 0.95);
+    font-style: italic;
+}
+
+.angels-angel-done-note {
+    margin: 0.35rem 0 0.6rem 0;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid rgba(127, 212, 184, 0.4);
+    background: rgba(16, 44, 38, 0.45);
+    color: #b7ead9;
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.angels-angel-done-note[hidden] {
+    display: none !important;
+}
+
+/* Overlay de proceso: bloquea la pantalla mientras viaja la petición (evita dobles envíos). */
+.angels-busy {
+    position: fixed;
+    inset: 0;
+    z-index: 12500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.angels-busy[hidden] {
+    display: none !important;
+}
+
+.angels-busy__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 6, 16, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.angels-busy__card {
+    position: relative;
+    z-index: 1;
+    max-width: 360px;
+    width: 100%;
+    padding: 1.4rem 1.2rem;
+    text-align: center;
+}
+
+.angels-busy__spinner {
+    width: 42px;
+    height: 42px;
+    margin: 0 auto 0.9rem auto;
+    box-sizing: border-box;
+    border: 3px solid rgba(0, 229, 255, 0.22);
+    border-top-color: #00e5ff;
+    border-radius: 50%;
+    animation: cpm-app-loader-spin 0.78s linear infinite;
+}
+
+.angels-busy__title {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.95rem;
+    color: #80deea;
+    letter-spacing: 0.04em;
+}
+
+.angels-busy__text {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: rgba(224, 230, 255, 0.85);
+}
+
+.angels-notice .angels-modal__card {
+    text-align: center;
+}
+
+.angels-notice__icon {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.angels-notice__text {
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: rgba(224, 230, 255, 0.9);
+}
+
+.angels-notice .angels-modal__actions {
+    justify-content: center;
+}
+
+.angels-notice--error .angels-modal__card h3 {
+    color: #ff8a80;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .angels-busy__spinner {
+        animation-duration: 2.4s;
+    }
+}
+
 .angels-textarea {
     width: 100%;
     min-height: 5rem;

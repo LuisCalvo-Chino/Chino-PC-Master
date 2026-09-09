@@ -457,6 +457,76 @@
         URL.revokeObjectURL(url);
     }
 
+    /* ——— Overlay de proceso + modal de aviso: un solo camino para «esperando servidor»
+       y «resultado», de modo que el usuario nunca pueda disparar dos veces la misma acción. ——— */
+
+    function setBusyOverlay(on, title, text) {
+        const el = document.getElementById("angels-busy");
+        if (!el) return;
+        if (on) {
+            const t = document.getElementById("angels-busy-title");
+            const x = document.getElementById("angels-busy-text");
+            if (t) t.textContent = title || "Procesando…";
+            if (x) x.textContent = text || "Espera un momento, no cierres ni recargues esta ventana.";
+            el.hidden = false;
+        } else {
+            el.hidden = true;
+        }
+    }
+
+    /** Aviso modal con un único botón «Aceptar»; resuelve cuando el usuario lo pulsa. */
+    function showNoticeModal(opts) {
+        const o = opts || {};
+        const el = document.getElementById("angels-notice");
+        if (!el) {
+            window.alert(o.text || "");
+            return Promise.resolve();
+        }
+        const icon = document.getElementById("angels-notice-icon");
+        const title = document.getElementById("angels-notice-title");
+        const text = document.getElementById("angels-notice-text");
+        const btn = document.getElementById("angels-notice-accept");
+        const isError = o.variant === "error";
+        el.classList.toggle("angels-notice--error", isError);
+        if (icon) icon.textContent = o.icon || (isError ? "⚠️" : "✅");
+        if (title) title.textContent = o.title || (isError ? "No se pudo completar" : "Listo");
+        if (text) text.textContent = o.text || "";
+        if (btn) btn.textContent = o.acceptLabel || "Aceptar";
+        el.hidden = false;
+        return new Promise((resolve) => {
+            const close = () => {
+                btn?.removeEventListener("click", close);
+                el.hidden = true;
+                resolve();
+            };
+            btn?.addEventListener("click", close);
+            btn?.focus();
+        });
+    }
+
+    /* Tras un window.location.reload() la app vuelve siempre a la primera pestaña; este par
+       de helpers recuerda a cuál debe saltar para que el usuario aterrice donde le importa. */
+    function pendingTabKey(scope, hash) {
+        return `angels_pending_tab_${scope}_${String(hash || "")}`;
+    }
+
+    function setPendingTab(scope, hash, tab) {
+        try {
+            sessionStorage.setItem(pendingTabKey(scope, hash), tab);
+        } catch (e) {}
+    }
+
+    function takePendingTab(scope, hash) {
+        try {
+            const k = pendingTabKey(scope, hash);
+            const v = sessionStorage.getItem(k) || "";
+            if (v) sessionStorage.removeItem(k);
+            return v;
+        } catch (e) {
+            return "";
+        }
+    }
+
     function adminUnlockKey(hash) {
         return `angels_admin_unlock_${hash}`;
     }
@@ -1346,6 +1416,12 @@
         let angelesList = [];
         let designLoadedAt = 0;
         const DESIGN_CACHE_TTL_MS = 3 * 60 * 1000;
+        /* Estado por Ángel en la semana en curso: el que ya tiene mensaje queda bloqueado
+           en el selector (el Emisor rechaza un segundo mensaje de la misma semana). */
+        let angelWeekStatus = {};
+        let angelStatusLoadedAt = 0;
+        const ANGEL_STATUS_TTL_MS = 45 * 1000;
+        const bootTab = takePendingTab("user", hash);
 
         function formatReplySummaryTitle(it) {
             const base = it.title || "Respuesta";
@@ -1357,7 +1433,36 @@
             const sel = document.getElementById("usr-angel-select");
             const btn = document.getElementById("usr-save-msg");
             if (!btn || !sel) return;
-            btn.disabled = !resolved || sel.value === "";
+            const opt = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+            btn.disabled = !resolved || sel.value === "" || Boolean(opt && opt.disabled);
+        }
+
+        /** null si el Ángel aún puede redactar; si no, cómo mostrar su mensaje ya alojado. */
+        function angelDoneInfo(nombreAngel) {
+            const st = String(angelWeekStatus[String(nombreAngel || "")] || "").toUpperCase();
+            if (!st || st === "MISSING") return null;
+            if (st === "SENT" || st === "ENVIADO") {
+                return { key: "1", icon: "✅", label: "mensaje enviado" };
+            }
+            if (st === "ERROR") {
+                return { key: "error", icon: "⚠️", label: "mensaje registrado (falló el envío)" };
+            }
+            return { key: "1", icon: "✅", label: "mensaje en cola" };
+        }
+
+        function renderAngelDoneNote(rows, doneNames) {
+            const note = document.getElementById("usr-angel-done-note");
+            if (!note) return;
+            if (!doneNames.length) {
+                note.hidden = true;
+                note.textContent = "";
+                return;
+            }
+            note.hidden = false;
+            note.textContent =
+                doneNames.length === rows.length
+                    ? "✅ Todos los Ángeles ya tienen su mensaje de esta semana. No queda nada por redactar; revisa «Status semanal» para ver el detalle."
+                    : `✅ Ya tienen su mensaje de esta semana: ${doneNames.join(", ")}. Aparecen marcados en la lista y no se pueden volver a seleccionar.`;
         }
 
         function applyAngelesListToSelect(list) {
@@ -1365,16 +1470,32 @@
             const lbl = document.getElementById("usr-angelado-lbl");
             if (!sel) return;
             const rows = Array.isArray(list) ? list : [];
+            const prev = sel.value;
             const placeholder =
                 '<option value="" disabled selected>Selecciona un Ángel</option>';
+            const doneNames = [];
             sel.innerHTML =
                 placeholder +
                 rows
-                    .map(
-                        (r, i) =>
-                            `<option value="${i}" data-email="${esc(r.email_angelado)}">${esc(r.nombre_angel)}</option>`
-                    )
+                    .map((r, i) => {
+                        const done = angelDoneInfo(r.nombre_angel);
+                        if (done) doneNames.push(r.nombre_angel);
+                        const attrs = done ? ` disabled data-done="${done.key}"` : "";
+                        const suffix = done ? ` — ${done.icon} ${done.label}` : "";
+                        return `<option value="${i}" data-email="${esc(r.email_angelado)}"${attrs}>${esc(
+                            r.nombre_angel
+                        )}${esc(suffix)}</option>`;
+                    })
                     .join("");
+            /* Conserva la selección previa salvo que ese Ángel acabe de quedar bloqueado. */
+            if (prev !== "") {
+                const keep = Array.prototype.find.call(
+                    sel.options,
+                    (o) => o.value === prev && !o.disabled
+                );
+                if (keep) sel.value = prev;
+            }
+            renderAngelDoneNote(rows, doneNames);
             const upd = () => {
                 const ix = Number(sel.value);
                 const row = Number.isFinite(ix) && ix >= 0 ? rows[ix] : null;
@@ -1507,6 +1628,38 @@
             }
         }
 
+        /** Guarda el estado semanal por Ángel y repinta el selector (solo la semana en curso). */
+        function absorbWeekStatusRows(rows, requestedWeek, currentWeek) {
+            const req = String(requestedWeek || "");
+            const cur = String(currentWeek || "");
+            if (req && cur && req !== cur) return;
+            const map = {};
+            (rows || []).forEach((r) => {
+                map[String(r.angel || "")] = String(r.status || "MISSING").toUpperCase();
+            });
+            angelWeekStatus = map;
+            angelStatusLoadedAt = Date.now();
+            applyAngelesListToSelect(angelesList);
+        }
+
+        async function refreshUserAngelLocks(opts) {
+            if (!resolved) return;
+            const force = Boolean(opts && opts.force);
+            if (!force && angelStatusLoadedAt && Date.now() - angelStatusLoadedAt < ANGEL_STATUS_TTL_MS) {
+                return;
+            }
+            try {
+                const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "user_week_status",
+                    week: ""
+                });
+                const data = res.data || res;
+                absorbWeekStatusRows(data.rows || [], data.requested_week, data.current_week);
+            } catch (e) {
+                /* Silencioso: si no se puede consultar, el selector queda abierto y manda el Emisor. */
+            }
+        }
+
         async function refreshUserAngels() {
             if (!resolved) return;
             const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
@@ -1568,6 +1721,7 @@
             const rows = res.data?.rows || res.rows || [];
             const currentWeek = res.data?.current_week || res.current_week || "W0";
             const reqWk = res.data?.requested_week || res.requested_week || currentWeek;
+            absorbWeekStatusRows(rows, reqWk, currentWeek);
 
             if (selWeek && !selWeek.dataset.filled) {
                 fillWeekSelect(selWeek, currentWeek, reqWk);
@@ -1618,34 +1772,44 @@
             }
         }
 
+        function showUserTab(id) {
+            document.querySelectorAll("[data-utab]").forEach((b) => {
+                b.classList.toggle("is-active", b.getAttribute("data-utab") === id);
+            });
+            document.querySelectorAll("[data-upanel]").forEach((p) => {
+                p.classList.toggle("is-active", p.getAttribute("data-upanel") === id);
+            });
+            syncUserPreviewFabVisibility();
+            if (id !== "write") {
+                setUserPreviewPanelOpen(false);
+            } else {
+                updateUserHeadOffset();
+            }
+        }
+
+        async function loadUserTabData(id) {
+            const fullPanel = document.querySelector(`[data-upanel="${id}"]`);
+            const editorCol = document.querySelector('[data-upanel="write"] .angels-editor-col');
+            const panel = id === "write" && editorCol ? editorCol : fullPanel;
+            try {
+                if (id === "write") {
+                    await withLocalPanelLoading(panel, async () => {
+                        await refreshUserDesignFromServer();
+                        await refreshUserAngelLocks();
+                    });
+                } else if (id === "replies") await withLocalPanelLoading(panel, () => refreshReplies());
+                else if (id === "buddies") await withLocalPanelLoading(panel, () => refreshBuddies());
+                else if (id === "status") await withLocalPanelLoading(panel, () => refreshUserStatus());
+            } catch (e) {
+                /* errores ya vía showMessage en cada refresh */
+            }
+        }
+
         document.querySelectorAll("[data-utab]").forEach((btn) => {
             btn.addEventListener("click", () => {
-                document.querySelectorAll("[data-utab]").forEach((b) => b.classList.remove("is-active"));
-                btn.classList.add("is-active");
                 const id = btn.getAttribute("data-utab");
-                document.querySelectorAll("[data-upanel]").forEach((p) => {
-                    p.classList.toggle("is-active", p.getAttribute("data-upanel") === id);
-                });
-                const fullPanel = document.querySelector(`[data-upanel="${id}"]`);
-                const editorCol = document.querySelector('[data-upanel="write"] .angels-editor-col');
-                const panel =
-                    id === "write" && editorCol ? editorCol : fullPanel;
-                syncUserPreviewFabVisibility();
-                if (id !== "write") {
-                    setUserPreviewPanelOpen(false);
-                } else {
-                    updateUserHeadOffset();
-                }
-                void (async () => {
-                    try {
-                        if (id === "write") await withLocalPanelLoading(panel, () => refreshUserDesignFromServer());
-                        else if (id === "replies") await withLocalPanelLoading(panel, () => refreshReplies());
-                        else if (id === "buddies") await withLocalPanelLoading(panel, () => refreshBuddies());
-                        else if (id === "status") await withLocalPanelLoading(panel, () => refreshUserStatus());
-                    } catch (e) {
-                        /* errores ya vía showMessage en cada refresh */
-                    }
-                })();
+                showUserTab(id);
+                void loadUserTabData(id);
             });
         });
 
@@ -1822,7 +1986,12 @@
             downloadHtml("email-preview-user.html", html);
         });
 
+        /* El Emisor tarda varios segundos: mientras responde se bloquea la pantalla para que
+           «Enviar a cola» no pueda dispararse dos veces, y el resultado se confirma en modal. */
+        let userSaveInFlight = false;
+
         document.getElementById("usr-save-msg")?.addEventListener("click", async () => {
+            if (userSaveInFlight) return;
             if (!resolved) {
                 showMessage("Espera la carga del proyecto.", "error");
                 return;
@@ -1830,6 +1999,12 @@
             const sel = document.getElementById("usr-angel-select");
             if (!sel || sel.value === "") {
                 showMessage("Selecciona un Ángel antes de enviar.", "error");
+                return;
+            }
+            const selOpt = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+            if (selOpt && selOpt.disabled) {
+                showMessage("Ese Ángel ya tiene su mensaje de esta semana.", "error");
+                syncUserSaveButtonState();
                 return;
             }
             if (greetEl && !String(greetEl.value || "").trim()) {
@@ -1841,23 +2016,29 @@
                     return;
                 }
             }
-            await refreshUserDesignFromServer({ force: true });
-            const ix = Number(sel.value);
-            let list = angelesList;
-            if (!list.length) {
-                const resList = await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                    action: "user_list_angeles"
-                });
-                list = resList.data?.angeles || resList.angeles || [];
-                angelesList = list;
-            }
-            const row = list[ix];
-            if (!row) {
-                showMessage("Selecciona un Ángel antes de enviar.", "error");
-                return;
-            }
-            const html = buildEmailDocument(userDesignForPreview(), ed?.innerHTML || "");
+
+            const btn = document.getElementById("usr-save-msg");
+            userSaveInFlight = true;
+            if (btn) btn.disabled = true;
+            setBusyOverlay(
+                true,
+                "Enviando a cola…",
+                "Estamos guardando tu mensaje en el sistema. Puede tardar unos segundos: no cierres ni recargues esta ventana."
+            );
             try {
+                await refreshUserDesignFromServer({ force: true });
+                const ix = Number(sel.value);
+                let list = angelesList;
+                if (!list.length) {
+                    const resList = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                        action: "user_list_angeles"
+                    });
+                    list = resList.data?.angeles || resList.angeles || [];
+                    angelesList = list;
+                }
+                const row = list[ix];
+                if (!row) throw new Error("Selecciona un Ángel antes de enviar.");
+                const html = buildEmailDocument(userDesignForPreview(), ed?.innerHTML || "");
                 await api.postSender(resolved.sender_exec_url, resolved.secret, {
                     action: "user_save_message",
                     nombre_angel: row.nombre_angel,
@@ -1865,16 +2046,36 @@
                     email_angelado: row.email_angelado,
                     html_mensaje: html
                 });
-                showMessage("Mensaje guardado en pendientes.", "success");
-                ed.innerHTML = "";
+                setBusyOverlay(false);
+                if (ed) ed.innerHTML = "";
                 updateUserPreview();
-                refreshUserStatus();
+                await showNoticeModal({
+                    title: "Mensaje en cola",
+                    text:
+                        "Tu mensaje para " +
+                        row.nombre_angelado +
+                        " quedó guardado correctamente y está en cola para el envío programado. Al aceptar recargaremos la página y te llevaremos a «Status semanal» para que veas su estado."
+                });
+                setPendingTab("user", hash, "status");
+                window.location.reload();
             } catch (e) {
-                showMessage(e.message || "Error al guardar", "error", 10000);
+                setBusyOverlay(false);
+                /* Si el rechazo fue porque ya había mensaje, el selector debe reflejarlo al volver. */
+                void refreshUserAngelLocks({ force: true });
+                await showNoticeModal({
+                    variant: "error",
+                    title: "No se pudo enviar a cola",
+                    text: e.message || "Error al guardar el mensaje. Vuelve a intentarlo en unos minutos."
+                });
+            } finally {
+                userSaveInFlight = false;
+                syncUserSaveButtonState();
             }
         });
 
         updateUserPreview();
+
+        if (bootTab && bootTab !== "write") showUserTab(bootTab);
 
         return (async () => {
             try {
@@ -1885,6 +2086,9 @@
                     await loadUserSessionFallback();
                 }
                 updateUserPreview();
+                /* Sin await: el estado semanal solo pinta bloqueos, no debe retrasar la carga. */
+                if (bootTab && bootTab !== "write") void loadUserTabData(bootTab);
+                else void refreshUserAngelLocks({ force: true });
             } catch (e) {
                 showMessage(e.message || "No se pudo cargar el proyecto", "error");
             }
@@ -1894,6 +2098,7 @@
     function initAdminFlow(api, showMessage, hash) {
         fillFontSelects();
         let resolved = null;
+        const bootAdminTab = takePendingTab("admin", hash);
         const gate = document.getElementById("angels-admin-gate");
         const gateErr = document.getElementById("angels-admin-gate-err");
         const app = document.getElementById("angels-admin-app");
@@ -2316,8 +2521,13 @@
             });
         });
 
+        /* Guardar reescribe la hoja completa: dos envíos solapados la dejan con filas repetidas.
+           Por eso se bloquea la pantalla durante la petición y al confirmar se recarga la app,
+           de modo que la tabla siempre se repinta desde lo que quedó realmente en la hoja. */
+        let admSaveAngelesInFlight = false;
+
         document.getElementById("adm-save-angeles")?.addEventListener("click", async () => {
-            if (!resolved) return;
+            if (!resolved || admSaveAngelesInFlight) return;
             const rows = [];
             document.querySelectorAll("#adm-angeles-table tbody tr").forEach((tr) => {
                 const ins = tr.querySelectorAll("[data-f]");
@@ -2327,11 +2537,45 @@
                 });
                 if (obj.angel || obj.email) rows.push(obj);
             });
-            await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                action: "save_angeles",
-                rows
-            });
-            showMessage("Tabla guardada.", "success");
+
+            const btn = document.getElementById("adm-save-angeles");
+            const addBtn = document.getElementById("adm-add-angel-row");
+            admSaveAngelesInFlight = true;
+            if (btn) btn.disabled = true;
+            if (addBtn) addBtn.disabled = true;
+            setBusyOverlay(
+                true,
+                "Guardando tabla…",
+                "Estamos escribiendo la lista de Ángeles en la hoja. Puede tardar unos segundos: no cierres ni recargues esta ventana."
+            );
+            try {
+                await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "save_angeles",
+                    rows
+                });
+                setBusyOverlay(false);
+                await showNoticeModal({
+                    title: "Tabla guardada",
+                    text:
+                        "Se guardaron " +
+                        rows.length +
+                        (rows.length === 1 ? " fila" : " filas") +
+                        " en la hoja de Ángeles. Al aceptar recargaremos la app y volveremos a esta pestaña con los datos releídos desde la hoja, para que no queden filas duplicadas."
+                });
+                setPendingTab("admin", hash, "angeles");
+                window.location.reload();
+            } catch (e) {
+                setBusyOverlay(false);
+                await showNoticeModal({
+                    variant: "error",
+                    title: "No se pudo guardar la tabla",
+                    text: e.message || "Error al guardar. Revisa la conexión con el Emisor y vuelve a intentarlo."
+                });
+            } finally {
+                admSaveAngelesInFlight = false;
+                if (btn) btn.disabled = false;
+                if (addBtn) addBtn.disabled = false;
+            }
         });
 
         document.getElementById("adm-run-queue-now")?.addEventListener("click", async () => {
@@ -2428,6 +2672,9 @@
                     gate.hidden = true;
                     app.hidden = false;
                     await loadAdminDesign();
+                    if (bootAdminTab) {
+                        document.querySelector('[data-adtab="' + bootAdminTab + '"]')?.click();
+                    }
                 }
             } catch (e) {
                 showMessage(e.message || "No se pudo resolver el enlace", "error");

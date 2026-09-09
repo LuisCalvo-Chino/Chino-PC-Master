@@ -61,6 +61,9 @@ dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá e
 
 - Tabla editable: **Nombre del Ángel**, **Nombre del Angelado** y **email del Angelado**.
 - Añadir filas, editar en línea, eliminar y guardar la tabla completa.
+- **Guardar tabla** bloquea la pantalla mientras la hoja se escribe (no se puede pulsar dos veces),
+  confirma con un aviso cuántas filas quedaron guardadas y, al aceptar, **recarga la app y vuelve a
+  esta pestaña** releyendo la hoja: así no quedan filas ni correos duplicados.
 - Estado del envío en vivo: **zona horaria, semana actual calculada, reloj del servidor** y si el
   **envío automático está activo**.
 - El ciclo semanal y el día de envío se fijan al crear el proyecto; a partir de ahí la app cuenta las
@@ -104,12 +107,19 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
 ![Redactar](angeles-capturas/10-participante-redactar.png)
 
 - Selector de **Ángel**; la app muestra automáticamente a quién le escribe (**Angelado**).
+- El Ángel que **ya tiene su mensaje de la semana** aparece en la lista en tono verde apagado y
+  marcado (`✅ mensaje en cola` / `✅ mensaje enviado`), pero **no se puede seleccionar**: se ve que
+  ese envío está completo en lugar de dejar intentarlo y devolver un error.
 - Campo de **saludo** personalizado (con aviso si se deja vacío).
 - **Editor enriquecido**: negrita, cursiva, subrayado, alineación izquierda/centro/derecha,
   **inserción de hipervínculos** con texto visible y URL, e **inserción de imágenes**.
 - **Vista previa en vivo** del correo final, con el diseño exacto que configuró el Capi.
 - **Descarga HTML** del mensaje.
 - **Enviar a cola**: el mensaje queda guardado como pendiente, listo para el envío programado.
+  Mientras el Emisor responde se muestra una pantalla de **«Enviando a cola…»** que bloquea la
+  interacción (no hay forma de enviar dos veces). Al terminar aparece un aviso de confirmación y,
+  al pulsar **Aceptar**, la app se recarga y aterriza en **«Status semanal»** para ver el mensaje
+  ya en cola. Si algo falla, el aviso lo explica y no se pierde lo redactado.
 - Aviso de anonimato visible en el propio editor.
 
 ### 2.2 Respuestas

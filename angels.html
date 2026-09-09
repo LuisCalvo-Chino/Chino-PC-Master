@@ -570,6 +570,7 @@
                                 <option value="" disabled selected>Selecciona un Ángel</option>
                             </select>
                         </label>
+                        <p class="angels-angel-done-note" id="usr-angel-done-note" hidden></p>
                         <p><strong>Angelado:</strong> <span id="usr-angelado-lbl">—</span></p>
                         <label class="angels-design-label" for="usr-greeting">Saludo</label>
                         <input
@@ -651,6 +652,27 @@
                         <tbody></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="angels-busy" class="angels-busy" hidden role="alertdialog" aria-modal="true" aria-live="assertive" aria-busy="true" aria-labelledby="angels-busy-title">
+        <div class="angels-busy__backdrop"></div>
+        <div class="angels-busy__card angels-glass">
+            <div class="angels-busy__spinner" aria-hidden="true"></div>
+            <p class="angels-busy__title tech-font" id="angels-busy-title">Procesando…</p>
+            <p class="angels-busy__text" id="angels-busy-text">Espera un momento, no cierres ni recargues esta ventana.</p>
+        </div>
+    </div>
+
+    <div id="angels-notice" class="angels-modal angels-notice" hidden role="dialog" aria-modal="true" aria-labelledby="angels-notice-title">
+        <div class="angels-modal__backdrop"></div>
+        <div class="angels-modal__card angels-glass">
+            <p class="angels-notice__icon" id="angels-notice-icon" aria-hidden="true">✅</p>
+            <h3 id="angels-notice-title">Listo</h3>
+            <p class="angels-notice__text" id="angels-notice-text"></p>
+            <div class="angels-modal__actions">
+                <button type="button" class="angels-btn angels-btn--primary" id="angels-notice-accept">Aceptar</button>
             </div>
         </div>
     </div>
