@@ -1,0 +1,438 @@
+{
+    "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
+    "actualizado": "2026-09-09T15:30:00-06:00",
+    "productos": [
+        {
+            "id": "angeles",
+            "nombre": "Ángeles Secretos",
+            "tipo": "webapp",
+            "descripcion": "Juego de ángeles secretos por correo: el Capi arma el equipo y los mensajes salen solos cada semana."
+        },
+        {
+            "id": "rifa",
+            "nombre": "Sistema de Rifa",
+            "tipo": "webapp",
+            "descripcion": "Rifas con cuadrícula de números, control de vendidos y afiche descargable."
+        },
+        {
+            "id": "certificados",
+            "nombre": "Certificados y Canje",
+            "tipo": "webapp",
+            "descripcion": "Emisión de certificados y verificación pública por código."
+        },
+        {
+            "id": "admin",
+            "nombre": "Panel Admin",
+            "tipo": "webapp",
+            "descripcion": "Gestión de usuarios, permisos y accesos del sitio."
+        },
+        {
+            "id": "sitio",
+            "nombre": "Sitio web",
+            "tipo": "sitio",
+            "descripcion": "La página en sí: portafolio, navegación, cuentas, contenido y páginas legales."
+        }
+    ],
+    "parches": [
+        {
+            "id": "2026-09-09-parches",
+            "fecha": "2026-09-09T15:30:00-06:00",
+            "producto": "sitio",
+            "titulo": "Nace «Parches y Noticias»",
+            "resumen": "El sitio ahora lleva su propia bitácora pública: cada mejora, corrección y función nueva queda registrada con fecha y hora, ordenada por aplicación.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Sección «Parches y Noticias» con todo el historial del sitio y de sus WebApps, del más reciente al más antiguo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Filtros por aplicación: se puede ver solo Ángeles Secretos, solo Rifa, solo Certificados, solo el Panel Admin o solo los cambios del sitio."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "El parche más reciente aparece destacado arriba, con la fecha y hora exactas de publicación."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Se reconstruyó el historial completo desde el nacimiento del sitio, en marzo de 2026, agrupado en hitos legibles."
+                }
+            ]
+        },
+        {
+            "id": "2026-09-09-angeles-bloqueo-envio",
+            "fecha": "2026-09-09T12:46:00-06:00",
+            "producto": "angeles",
+            "titulo": "Ángeles ya enviados quedan bloqueados y todo envío se confirma",
+            "resumen": "Se acabaron los envíos dobles y la duda de si el mensaje salió o no: la app avisa qué está completo y confirma cada guardado.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "En «Redactar», el Ángel que ya tiene su mensaje de la semana aparece marcado como completo (✅ mensaje en cola o ✅ mensaje enviado) y ya no se puede seleccionar."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Debajo del selector se lista quiénes ya cumplieron esta semana; si están todos, la app lo dice."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "«Enviar a cola» abre una pantalla de envío que bloquea la interacción mientras se guarda, así no hay forma de mandar el mensaje dos veces."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Al terminar aparece una confirmación; al aceptar, la app recarga y lleva directo a «Status semanal» para ver el mensaje ya en cola."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En el panel del organizador, «Guardar tabla» también confirma el guardado y recarga la lista releyéndola desde la hoja."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Guardar la tabla de Ángeles varias veces seguidas ya no duplica correos ni filas."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Los errores al guardar la tabla ahora se muestran en pantalla en vez de perderse en silencio."
+                }
+            ]
+        },
+        {
+            "id": "2026-09-09-angeles-mensajes",
+            "fecha": "2026-09-09T00:03:00-06:00",
+            "producto": "angeles",
+            "titulo": "Pestaña «Mensajes» para el organizador",
+            "resumen": "El Capi ya puede revisar, sin salir del panel, qué escribió cada quien y en qué estado va cada correo.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Nueva pestaña «Mensajes» con la lista de Ángeles, el estado del mensaje de cada uno y vista previa del correo tal cual quedó redactado."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Selector de semana para revisar semanas anteriores y descarga del HTML del mensaje que se está viendo."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Las semanas previas al inicio del juego ya no aparecen en los selectores: solo se ofrecen semanas reales."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Capturas del catálogo de funciones actualizadas, incluidas las que habían quedado desfasadas."
+                }
+            ]
+        },
+        {
+            "id": "2026-09-07-angeles-vive",
+            "fecha": "2026-09-07T12:54:00-06:00",
+            "producto": "angeles",
+            "titulo": "Contexto del proyecto, donaciones y soporte",
+            "resumen": "La página de Ángeles Secretos cuenta de dónde nace la herramienta y cómo apoyarla.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Sección con el origen del proyecto y su vínculo con la comunidad VIVE."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Bloque de donaciones y canal de soporte para los equipos que usan la herramienta."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Se ajustó el monto sugerido de donación a 2000 o 3000 colones."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Se retiró de la página pública cualquier dato que pudiera arruinar la sorpresa de un juego en curso."
+                }
+            ]
+        },
+        {
+            "id": "2026-09-06-footer-legales",
+            "fecha": "2026-09-06T17:21:00-06:00",
+            "producto": "sitio",
+            "titulo": "Pie de página institucional, páginas legales y catálogo de Ángeles",
+            "resumen": "El sitio estrena un cierre formal con contacto, redes y la letra pequeña que faltaba.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Pie de página con cuatro columnas (marca, sitio, aplicaciones y contacto), redes sociales y año automático."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Páginas de Términos y Condiciones y de Política de Privacidad, esta última acorde a la Ley 8968 de Costa Rica."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Página de Ángeles Secretos con el catálogo completo de funciones de los dos paneles, ilustrado con capturas."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Contacto oficial visible: WhatsApp +506 6200 5921, Facebook ChinoPCMaster e Instagram chino_pcmaster."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "El pie solo aparece en las páginas del portafolio: las herramientas siguen ocupando toda la pantalla, sin parpadeos al abrirlas."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Imágenes optimizadas: los iconos sociales bajaron a 96 px y las capturas pasaron a WebP (Instagram pasó de 718 KB a 11 KB)."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Las páginas de documento aprovechan todo el ancho disponible en escritorio."
+                }
+            ]
+        },
+        {
+            "id": "2026-07-28-rifa-banner-movil",
+            "fecha": "2026-07-28T22:15:00-06:00",
+            "producto": "rifa",
+            "titulo": "El afiche se puede guardar y compartir desde el celular",
+            "resumen": "Descargar el banner desde un móvil ya no dejaba nada guardado; ahora funciona y además se comparte directo.",
+            "cambios": [
+                {
+                    "tipo": "corregido",
+                    "texto": "La descarga del afiche en teléfonos ya no queda vacía."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Opción de compartir el afiche directamente a WhatsApp u otras apps desde el celular."
+                }
+            ]
+        },
+        {
+            "id": "2026-07-11-rifa-multiproyecto",
+            "fecha": "2026-07-11T10:20:00-06:00",
+            "producto": "rifa",
+            "titulo": "Rifas múltiples, enlace de administración y afiche descargable",
+            "resumen": "De una sola rifa a todas las que se necesiten al mismo tiempo, cada una con su propio enlace.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Varias rifas activas a la vez, cada una con su hoja y su configuración independiente."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Hub de proyectos protegido con llave maestra para crear y administrar rifas."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Enlace de administración propio por rifa, que se abre sin pasar por el sitio."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cuadrícula de números, vista de lista, configuración, generación de afiche y sorteo aleatorio integrado."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Editor de afiche con tipografía y tamaño independientes por bloque, alto del logo ajustable e iconos de WhatsApp y SINPE alineados al texto."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "El navegador ya no sirve versiones viejas del sitio después de publicar cambios."
+                }
+            ]
+        },
+        {
+            "id": "2026-07-06-angeles-redactar",
+            "fecha": "2026-07-06T01:21:00-06:00",
+            "producto": "angeles",
+            "titulo": "Redactar, Respuestas y Status semanal para los participantes",
+            "resumen": "El panel del Ángel queda completo: escribir, leer lo que responde su angelado y saber en qué va su mensaje.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Pestaña «Redactar» con editor enriquecido y vista previa en vivo del correo final."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Pestaña «Respuestas» con lo que contesta el angelado, agrupado por semana y sin romper el anonimato."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Pestaña «Status semanal» con el estado de cada Ángel: por redactar, en cola, enviado o con error."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Carga del panel optimizada: se pide todo lo necesario de una sola vez al abrir el enlace."
+                }
+            ]
+        },
+        {
+            "id": "2026-05-13-angeles-movil",
+            "fecha": "2026-05-13T11:54:00-06:00",
+            "producto": "angeles",
+            "titulo": "Vista previa cómoda en el celular",
+            "resumen": "Escribir desde el teléfono deja de ser incómodo: la vista previa se abre y se cierra cuando hace falta.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Botón flotante de «Vista Previa» en móvil, que abre el correo en un panel deslizante."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "El editor aprovecha toda la pantalla del teléfono mientras se escribe."
+                }
+            ]
+        },
+        {
+            "id": "2026-05-04-lenguaje-transformacional",
+            "fecha": "2026-05-04T07:36:00-06:00",
+            "producto": "sitio",
+            "titulo": "«Del lenguaje automático al lenguaje elegido»",
+            "resumen": "Publicación propia con su página dedicada y el documento descargable.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Página de lectura para el artículo, con diseño propio y descarga del PDF."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Ajustes de formato y de lectura del documento en varias revisiones."
+                }
+            ]
+        },
+        {
+            "id": "2026-04-27-angeles-lanzamiento",
+            "fecha": "2026-04-27T22:19:00-06:00",
+            "producto": "angeles",
+            "titulo": "Lanzamiento de Ángeles Secretos",
+            "resumen": "La herramienta completa: dos paneles, envío automático semanal y cero registros para quien juega.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Panel de organizador con diseño del correo, tabla de parejas Ángel/Angelado y contraseña propia por proyecto."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Panel de participante que se abre solo con un enlace: sin cuenta, sin contraseña y sin instalar nada."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Envío automático semanal desde el propio Gmail del equipo, con cola de pendientes y estado por semana."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Subida de imágenes dentro del mensaje y vista previa del correo con la identidad del equipo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Panel Maestro para crear proyectos, con guía de instalación paso a paso."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Mantenimiento de la cola: ver pendientes, borrar un mensaje antes de que salga y ejecutar el envío manualmente."
+                }
+            ]
+        },
+        {
+            "id": "2026-03-29-portafolio",
+            "fecha": "2026-03-29T14:19:00-06:00",
+            "producto": "sitio",
+            "titulo": "Renovación de Inicio, Soluciones y Trayectoria",
+            "resumen": "El portafolio toma su cara definitiva, con la iconografía técnica de la marca.",
+            "cambios": [
+                {
+                    "tipo": "mejorado",
+                    "texto": "Contenido y diseño renovados en las páginas de Inicio, Soluciones y Trayectoria."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Iconografía de marca y de tecnologías (Cisco, Mikrotik, Google Workspace) y accesos a redes sociales."
+                }
+            ]
+        },
+        {
+            "id": "2026-03-27-certificados",
+            "fecha": "2026-03-27T10:05:00-06:00",
+            "producto": "certificados",
+            "titulo": "Certificados y verificación pública por código",
+            "resumen": "Emisión de certificados con firma y una página donde cualquiera puede comprobar que son auténticos.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Emisión de certificados con la identidad y la firma de la marca."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Página pública de canje: se ingresa el código y se verifica el certificado al instante."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Mejoras de interfaz en la emisión y en la verificación, y el menú pasa a llamarse «Certificado»."
+                }
+            ]
+        },
+        {
+            "id": "2026-03-27-panel-admin",
+            "fecha": "2026-03-27T14:39:00-06:00",
+            "producto": "admin",
+            "titulo": "Panel de administración de usuarios",
+            "resumen": "Un lugar para ver quién tiene cuenta y qué puede usar cada quien.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Listado de usuarios registrados con sus permisos y accesos."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Asignación de permisos por herramienta, que controla qué WebApps ve cada usuario."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Carga de las secciones internas más rápida y con indicador de progreso."
+                }
+            ]
+        },
+        {
+            "id": "2026-03-26-cuentas-movil",
+            "fecha": "2026-03-26T04:47:00-06:00",
+            "producto": "sitio",
+            "titulo": "Cuentas, permisos y navegación móvil",
+            "resumen": "El sitio deja de ser solo portafolio: aparecen las cuentas y el menú pensado para el teléfono.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Registro e inicio de sesión con ventana propia, y saludo con el nombre de la persona conectada."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Permisos por usuario: cada quien ve únicamente las herramientas que tiene habilitadas."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Rutas protegidas: las secciones privadas dejan de ser accesibles sin sesión."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Formulario de contacto conectado, para que los mensajes lleguen de verdad."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Menú lateral tipo hamburguesa en celular y encabezado en cuadrícula en escritorio."
+                }
+            ]
+        },
+        {
+            "id": "2026-03-26-inicio",
+            "fecha": "2026-03-26T02:22:00-06:00",
+            "producto": "sitio",
+            "titulo": "El sitio sale al aire",
+            "resumen": "Primera publicación de chinopcmaster en GitHub Pages: la base sobre la que se construyó todo lo demás.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Estructura inicial del sitio con Inicio, Soluciones, Trayectoria, WebApps y Contacto."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Publicación automática: cada cambio aprobado queda en línea sin pasos manuales."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Identidad visual de Chino PC Master: paleta cian y azul cobalto sobre fondo oscuro."
+                }
+            ]
+        }
+    ]
+}

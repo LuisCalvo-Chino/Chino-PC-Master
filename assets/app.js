@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "35"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "36"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "canje",
         "angels",
         "angeles-secretos",
+        "parches",
         "terminos",
         "privacidad"
     ]);
@@ -34,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "webapps",
         "canje",
         "angeles-secretos",
+        "parches",
         "terminos",
         "privacidad"
     ]);
@@ -705,6 +707,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 const mainLogo = document.querySelector(".main-logo");
                 if (mainLogo) mainLogo.classList.remove("logo-animate-up");
+            } else if (pageName === "parches") {
+                await loadParchesScript();
+                if (typeof window.initParchesApp === "function") {
+                    pageReady = window.initParchesApp({ showMessage });
+                }
+                const mainLogo = document.querySelector(".main-logo");
+                if (mainLogo) mainLogo.classList.remove("logo-animate-up");
             } else if (pageName === "angels" || pageName === "angels-dashboard") {
                 document.body.classList.add("cpm-angels-route");
                 const ang = options.angels;
@@ -921,6 +930,34 @@ document.addEventListener("DOMContentLoaded", () => {
             let ticks = 0;
             const timer = window.setInterval(() => {
                 if (typeof window.initAngelsApp === "function" || ticks++ > 200) {
+                    window.clearInterval(timer);
+                    resolve();
+                }
+            }, 50);
+        });
+    }
+
+    /** Bitácora «Parches y Noticias»: el HTML inyectado no ejecuta scripts, se carga aparte. */
+    function loadParchesScript() {
+        return new Promise((resolve) => {
+            if (typeof window.initParchesApp === "function") {
+                resolve();
+                return;
+            }
+            let el = document.getElementById("parches-script");
+            if (!el) {
+                el = document.createElement("script");
+                el.id = "parches-script";
+                el.src = `assets/parches.js?v=${ASSET_V}`;
+                el.onerror = () => {
+                    console.error("Error cargando parches.js");
+                    resolve();
+                };
+                document.body.appendChild(el);
+            }
+            let ticks = 0;
+            const timer = window.setInterval(() => {
+                if (typeof window.initParchesApp === "function" || ticks++ > 120) {
                     window.clearInterval(timer);
                     resolve();
                 }

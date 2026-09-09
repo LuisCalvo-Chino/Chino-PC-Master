@@ -5556,6 +5556,280 @@ body.cpm-no-footer .site-footer {
 }
 
 /* ==========================================================================
+   PARCHES Y NOTICIAS (bitácora pública)
+   ========================================================================== */
+
+.patch-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 14px;
+}
+
+.patch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+
+.patch-chip:hover {
+    border-color: rgba(0, 255, 255, 0.45);
+    color: var(--text-body);
+}
+
+.patch-chip.is-active {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    background: rgba(0, 255, 255, 0.08);
+}
+
+.patch-chip__n {
+    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    opacity: 0.75;
+}
+
+.patch-count {
+    margin: 0 0 26px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* La línea vertical hace que la bitácora se lea como una sucesión de hitos. */
+.patch-feed {
+    position: relative;
+    display: grid;
+    gap: 18px;
+    padding-left: 26px;
+}
+
+.patch-feed::before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.55),
+        rgba(0, 71, 171, 0.35) 45%,
+        rgba(255, 255, 255, 0.06)
+    );
+}
+
+.patch-card {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.22);
+    padding: 20px 22px;
+}
+
+.patch-card::before {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 26px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--dark-gray);
+    border: 2px solid rgba(0, 255, 255, 0.45);
+}
+
+.patch-card--featured {
+    border-color: rgba(0, 255, 255, 0.42);
+    background: rgba(0, 255, 255, 0.045);
+}
+
+.patch-card--featured::before {
+    background: var(--neon-cyan);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+}
+
+.patch-card__flag {
+    margin: 0 0 10px;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+}
+
+.patch-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.patch-tag {
+    display: inline-block;
+    border: 1px solid rgba(0, 71, 171, 0.75);
+    border-radius: 4px;
+    padding: 3px 9px;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: #cfe4ff;
+    background: rgba(0, 71, 171, 0.28);
+}
+
+.patch-tag--angeles {
+    border-color: rgba(155, 140, 240, 0.7);
+    background: rgba(155, 140, 240, 0.18);
+    color: #d8d0ff;
+}
+
+.patch-tag--rifa {
+    border-color: rgba(255, 69, 0, 0.6);
+    background: rgba(255, 69, 0, 0.16);
+    color: #ffcbb8;
+}
+
+.patch-tag--certificados {
+    border-color: rgba(95, 211, 154, 0.6);
+    background: rgba(95, 211, 154, 0.15);
+    color: #bdf0d7;
+}
+
+.patch-tag--admin {
+    border-color: rgba(224, 176, 87, 0.6);
+    background: rgba(224, 176, 87, 0.15);
+    color: #f2dcae;
+}
+
+.patch-tag--sitio {
+    border-color: rgba(0, 255, 255, 0.5);
+    background: rgba(0, 255, 255, 0.1);
+    color: #b8f6f6;
+}
+
+.patch-card__date {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+}
+
+.patch-card__hour {
+    opacity: 0.7;
+}
+
+.patch-card__title {
+    margin: 0 0 8px;
+    font-size: 1.12rem;
+    line-height: 1.35;
+    color: var(--text-heading);
+}
+
+.patch-card__lead {
+    margin: 0 0 16px;
+    font-size: 0.92rem;
+    line-height: 1.65;
+    color: var(--text-body);
+    max-width: 82ch;
+}
+
+.patch-card__changes {
+    display: grid;
+    gap: 14px;
+}
+
+.patch-change__label {
+    margin: 0 0 6px;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.patch-change__label.is-nuevo { color: #5fd39a; }
+.patch-change__label.is-mejorado { color: #7fc6ff; }
+.patch-change__label.is-corregido { color: #e0b057; }
+.patch-change__label.is-nota { color: var(--text-muted); }
+
+.patch-change__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 7px;
+}
+
+.patch-change__list li {
+    position: relative;
+    padding-left: 18px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-body);
+}
+
+.patch-change__list li::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0.62em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.patch-change--nuevo .patch-change__list li::before { background: rgba(95, 211, 154, 0.85); }
+.patch-change--mejorado .patch-change__list li::before { background: rgba(127, 198, 255, 0.85); }
+.patch-change--corregido .patch-change__list li::before { background: rgba(224, 176, 87, 0.85); }
+
+.patch-empty {
+    margin: 0;
+    padding: 22px;
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.patch-foot {
+    margin-top: 34px;
+}
+
+.patch-foot a {
+    color: var(--neon-cyan);
+}
+
+@media (max-width: 768px) {
+    .patch-feed {
+        padding-left: 20px;
+        gap: 14px;
+    }
+
+    .patch-feed::before {
+        left: 5px;
+    }
+
+    .patch-card {
+        padding: 17px 16px;
+    }
+
+    .patch-card::before {
+        left: -19px;
+        top: 22px;
+    }
+
+    .patch-card__title {
+        font-size: 1.02rem;
+    }
+}
+
+/* ==========================================================================
    PÁGINAS DE DOCUMENTO (Ángeles Secretos, Términos, Privacidad)
    ========================================================================== */
 
