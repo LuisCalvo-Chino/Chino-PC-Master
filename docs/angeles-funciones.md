@@ -67,6 +67,7 @@ dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá e
   semanas sola.
 
 ### 1.3 Mensajes de la semana (lista de Ángeles + vista previa)
+![Mensajes de la semana](angeles-capturas/08b-organizador-mensajes.png)
 
 Vista central para revisar, sin salir del panel, qué escribió cada quien:
 
