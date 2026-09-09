@@ -3806,6 +3806,55 @@ main {
     flex: 1 1 auto;
 }
 
+/* Vista previa de mensajes ya redactados (#a → «Mensajes»): metadatos y estado vacío */
+.angels-preview-meta {
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: rgba(224, 230, 255, 0.78);
+    background: rgba(0, 0, 0, 0.22);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.angels-preview-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.angels-preview-empty p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgba(224, 230, 255, 0.7);
+}
+
+.angels-preview-empty[hidden] {
+    display: none;
+}
+
+.angels-preview-frame[hidden] {
+    display: none;
+}
+
+/* Lista de Ángeles con su mensaje: fila activa resaltada */
+.angels-table--messages td:last-child {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.angels-table--messages tr.is-selected {
+    background: rgba(0, 229, 255, 0.12);
+}
+
+.angels-table--messages tr.is-selected td:first-child {
+    box-shadow: inset 3px 0 0 #00e5ff;
+}
+
 /* Vista previa (#u Redactar / #a Diseño email): 50% formulario · 50% preview en escritorio */
 @media (min-width: 901px) {
     .angels-split--preview-tall {

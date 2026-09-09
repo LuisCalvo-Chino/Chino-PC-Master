@@ -57,6 +57,60 @@
             .replace(/'/g, "&#39;");
     }
 
+    /** «W3» → 3. W0 es interna (fechas previas al inicio) y nunca se ofrece en los selectores. */
+    function weekNumFromKey(wk) {
+        const m = String(wk || "").trim().match(/^W(\d+)$/i);
+        return m ? Number(m[1]) : 0;
+    }
+
+    /** Etiqueta visible de una semana: al usuario nunca se le muestra «W0». */
+    function weekDisplayLabel(wk) {
+        const raw = String(wk || "").trim();
+        if (!raw) return "—";
+        const n = weekNumFromKey(raw);
+        return n >= 1 ? `Semana ${n}` : "Previo al inicio";
+    }
+
+    /** Marca de tiempo ISO de la hoja → texto local legible; si no parsea, se muestra tal cual. */
+    function formatTimestampLabel(raw) {
+        const t = String(raw || "").trim();
+        if (!t) return "";
+        const d = new Date(t);
+        return isNaN(d.getTime()) ? t : d.toLocaleString();
+    }
+
+    /** Mismo lenguaje de estados en «Status semanal» (participante) y «Mensajes» (organizador). */
+    function weekStatusHtml(status) {
+        const st = String(status || "").toUpperCase();
+        if (st === "SENT" || st === "ENVIADO") return "✅ Enviado";
+        if (st === "PENDING" || st === "LISTO") return "📧 Envío pendiente";
+        if (st === "ERROR") return "❌ Error";
+        return "⚠️ Por redactar";
+    }
+
+    /**
+     * Rellena un <select> de semanas con W1…semana actual (la más reciente primero).
+     * Devuelve la semana seleccionada, o "" si el proceso aún no arranca (semana actual W0).
+     */
+    function fillWeekSelect(sel, currentWeek, selectedWeek) {
+        if (!sel) return "";
+        const cur = weekNumFromKey(currentWeek);
+        if (cur < 1) {
+            sel.innerHTML = '<option value="">Aún no inicia</option>';
+            sel.disabled = true;
+            return "";
+        }
+        let opts = "";
+        for (let i = cur; i >= 1; i--) {
+            opts += `<option value="W${i}">Semana ${i}${i === cur ? " (actual)" : ""}</option>`;
+        }
+        sel.innerHTML = opts;
+        sel.disabled = false;
+        const want = weekNumFromKey(selectedWeek);
+        sel.value = want >= 1 && want <= cur ? `W${want}` : `W${cur}`;
+        return sel.value;
+    }
+
     function defaultDesign() {
         return {
             subject: "Mensaje de tu Ángel Secreto",
@@ -1293,18 +1347,10 @@
         let designLoadedAt = 0;
         const DESIGN_CACHE_TTL_MS = 3 * 60 * 1000;
 
-        function weekKeyToDisplayLabel(wk) {
-            const m = String(wk || "").match(/^W(\d+)$/i);
-            return m ? `Semana ${Number(m[1])}` : "";
-        }
-
         function formatReplySummaryTitle(it) {
             const base = it.title || "Respuesta";
-            if (it.week) {
-                const weekLabel = weekKeyToDisplayLabel(it.week);
-                if (weekLabel) return `${weekLabel} - ${base}`;
-            }
-            return base;
+            /* W0 (correo anterior a la fecha de inicio) no lleva prefijo de semana. */
+            return weekNumFromKey(it.week) >= 1 ? `${weekDisplayLabel(it.week)} - ${base}` : base;
         }
 
         function syncUserSaveButtonState() {
@@ -1514,7 +1560,7 @@
         async function refreshUserStatus() {
             if (!resolved) return;
             const selWeek = document.getElementById("usr-status-week");
-            const reqWeek = selWeek ? selWeek.value : "";
+            const reqWeek = selWeek && !selWeek.disabled ? selWeek.value : "";
             const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
                 action: "user_week_status",
                 week: reqWeek
@@ -1522,34 +1568,24 @@
             const rows = res.data?.rows || res.rows || [];
             const currentWeek = res.data?.current_week || res.current_week || "W0";
             const reqWk = res.data?.requested_week || res.requested_week || currentWeek;
-            
-            if (selWeek && selWeek.options.length === 0) {
-                const maxW = parseInt(currentWeek.replace("W", "")) || 0;
-                let opts = "";
-                for (let i = maxW; i >= 0; i--) {
-                    const w = "W" + i;
-                    opts += `<option value="${w}">${w}${i === maxW ? " (Actual)" : ""}</option>`;
-                }
-                selWeek.innerHTML = opts;
-                selWeek.value = reqWk;
-                selWeek.onchange = () => withLocalPanelLoading(document.querySelector('[data-upanel="status"]'), refreshUserStatus);
+
+            if (selWeek && !selWeek.dataset.filled) {
+                fillWeekSelect(selWeek, currentWeek, reqWk);
+                selWeek.dataset.filled = "1";
+                selWeek.onchange = () =>
+                    withLocalPanelLoading(document.querySelector('[data-upanel="status"]'), refreshUserStatus);
             }
 
             const tb = document.querySelector("#usr-status-table tbody");
-            if (tb) {
-                tb.innerHTML = rows
-                    .map((r) => {
-                        let stHtml = "";
-                        const stUpper = String(r.status || "").toUpperCase();
-                        if (stUpper === "SENT" || stUpper === "ENVIADO") stHtml = "✅ Enviado";
-                        else if (stUpper === "PENDING" || stUpper === "LISTO")
-                            stHtml = "📧 Envío pendiente";
-                        else if (stUpper === "ERROR") stHtml = "❌ Error";
-                        else stHtml = "⚠️ Por redactar";
-                        return `<tr><td>${esc(r.angel)}</td><td>${stHtml}</td></tr>`;
-                    })
-                    .join("");
+            if (!tb) return;
+            if (weekNumFromKey(reqWk) < 1) {
+                tb.innerHTML =
+                    '<tr><td colspan="2">El proceso aún no ha iniciado: todavía no hay semanas con mensajes.</td></tr>';
+                return;
             }
+            tb.innerHTML = rows
+                .map((r) => `<tr><td>${esc(r.angel)}</td><td>${weekStatusHtml(r.status)}</td></tr>`)
+                .join("");
         }
 
         async function refreshReplies() {
@@ -1946,10 +1982,14 @@
                 "<p>Vista previa de prueba — texto fijo de transformación establecido.</p>"
             );
         }
-        document.querySelectorAll("#angels-admin-app input, #angels-admin-app select, #angels-admin-app textarea").forEach((el) => {
-            el.addEventListener("change", refreshAdminPreview);
-            el.addEventListener("input", refreshAdminPreview);
-        });
+        document
+            .querySelectorAll(
+                '#angels-admin-app [data-adpanel="design"] input, #angels-admin-app [data-adpanel="design"] select, #angels-admin-app [data-adpanel="design"] textarea'
+            )
+            .forEach((el) => {
+                el.addEventListener("change", refreshAdminPreview);
+                el.addEventListener("input", refreshAdminPreview);
+            });
 
         document.getElementById("adm-preview-toggle")?.addEventListener("click", () => {
             document.getElementById("adm-preview-box")?.classList.toggle("is-open");
@@ -2061,6 +2101,206 @@
             }
         }
 
+        /* ——— Pestaña «Mensajes»: Ángeles + estado semanal + vista previa del correo redactado ——— */
+        let admMsgWeek = "";
+        let admMsgRows = [];
+        let admMsgAngeladoByAngel = {};
+        let admMsgSelectedAngel = "";
+        let admMsgHtml = "";
+
+        function admMsgPanel() {
+            return document.querySelector('[data-adpanel="messages"]');
+        }
+
+        /** En móvil la Vista Previa es un desplegable, igual que en «Diseño email». */
+        function setAdmMsgPreviewOpen(open) {
+            const box = document.getElementById("adm-msg-preview-box");
+            if (!box) return;
+            box.classList.toggle("is-open", open);
+            if (open && window.matchMedia("(max-width: 900px)").matches) {
+                box.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+
+        /** `state` = "message" (pinta el HTML del correo) | "empty" (texto explicativo). */
+        function setAdmMsgPreview(state, opts) {
+            const o = opts || {};
+            const frame = document.getElementById("adm-msg-preview-frame");
+            const empty = document.getElementById("adm-msg-preview-empty");
+            const meta = document.getElementById("adm-msg-preview-meta");
+            const dl = document.getElementById("adm-msg-download-html");
+            if (meta) meta.textContent = o.meta || "Selecciona un Ángel de la lista.";
+            if (state === "message") {
+                admMsgHtml = String(o.html || "");
+                if (frame) {
+                    /* Lo guardado en la hoja ya es el documento de correo completo: se pinta tal cual. */
+                    frame.srcdoc = admMsgHtml;
+                    frame.hidden = false;
+                }
+                if (empty) empty.hidden = true;
+                if (dl) dl.disabled = false;
+                return;
+            }
+            admMsgHtml = "";
+            if (frame) {
+                frame.srcdoc = "";
+                frame.hidden = true;
+            }
+            if (empty) {
+                empty.hidden = false;
+                empty.innerHTML = `<p>${esc(
+                    o.text || "Selecciona un Ángel de la lista para ver aquí su mensaje."
+                )}</p>`;
+            }
+            if (dl) dl.disabled = true;
+        }
+
+        function renderAdmMsgList() {
+            const tb = document.querySelector("#adm-msg-table tbody");
+            if (!tb) return;
+            if (!admMsgRows.length) {
+                tb.innerHTML =
+                    '<tr><td colspan="3">Sin Ángeles para esta semana. Revisa la pestaña «Ángeles».</td></tr>';
+                return;
+            }
+            tb.innerHTML = admMsgRows
+                .map((r) => {
+                    const angel = String(r.angel || "");
+                    const isSel = angel && angel === admMsgSelectedAngel ? " is-selected" : "";
+                    const btn =
+                        `<button type="button" class="angels-icon-btn adm-msg-open" data-angel="${escAttr(angel)}"` +
+                        ` title="Ver el mensaje de ${escAttr(angel)}" aria-label="Ver el mensaje de ${escAttr(
+                            angel
+                        )}">✉️</button>`;
+                    return `<tr class="adm-msg-row${isSel}"><td>${esc(angel)}</td><td>${weekStatusHtml(
+                        r.status
+                    )}</td><td>${btn}</td></tr>`;
+                })
+                .join("");
+        }
+
+        async function openAdminMessage(angel) {
+            if (!resolved) return;
+            const name = String(angel || "").trim();
+            if (!name) return;
+            admMsgSelectedAngel = name;
+            renderAdmMsgList();
+            const weekLbl = weekDisplayLabel(admMsgWeek);
+            const angelado = admMsgAngeladoByAngel[name] || "";
+            try {
+                const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "admin_get_message",
+                    week: admMsgWeek,
+                    nombre_angel: name,
+                    nombre_angelado: angelado
+                });
+                const d = res.data || res;
+                if (!d.found) {
+                    setAdmMsgPreview("empty", {
+                        meta: `${name} · ${weekLbl}`,
+                        text: `${name} todavía no ha redactado su mensaje de ${weekLbl.toLowerCase()}.`
+                    });
+                    return;
+                }
+                const stamp = formatTimestampLabel(d.sent_at || d.created_at || "");
+                setAdmMsgPreview("message", {
+                    html: d.html,
+                    meta:
+                        `${name} → ${d.angelado || angelado || "—"} · ${weekDisplayLabel(d.week || admMsgWeek)}` +
+                        ` · ${weekStatusHtml(d.msg_status)}${stamp ? ` · ${stamp}` : ""}`
+                });
+            } catch (e) {
+                const msg = String(e && e.message ? e.message : e);
+                setAdmMsgPreview("empty", {
+                    meta: `${name} · ${weekLbl}`,
+                    text: /no reconocida/i.test(msg)
+                        ? "El Emisor de este proyecto no tiene aún la acción «admin_get_message». Copia otra vez el script del Emisor desde el panel Maestro y vuelve a publicar el Web App."
+                        : msg
+                });
+            }
+        }
+
+        async function loadAdminMessages() {
+            if (!resolved) return;
+            const sel = document.getElementById("adm-msg-week");
+            const reqWeek = sel && !sel.disabled ? sel.value : "";
+            const [statusRes, angelesRes] = await Promise.all([
+                api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "user_week_status",
+                    week: reqWeek
+                }),
+                api.postSender(resolved.sender_exec_url, resolved.secret, { action: "get_angeles" })
+            ]);
+            const rows = statusRes.data?.rows || statusRes.rows || [];
+            const currentWeek = statusRes.data?.current_week || statusRes.current_week || "W0";
+            const reqWk = statusRes.data?.requested_week || statusRes.requested_week || currentWeek;
+            admMsgWeek = reqWk;
+
+            if (sel && !sel.dataset.filled) {
+                fillWeekSelect(sel, currentWeek, reqWk);
+                sel.dataset.filled = "1";
+                sel.onchange = () => withLocalPanelLoading(admMsgPanel(), loadAdminMessages);
+            }
+
+            admMsgAngeladoByAngel = {};
+            (angelesRes.data?.angeles || angelesRes.angeles || []).forEach((a) => {
+                admMsgAngeladoByAngel[String(a.nombre_angel || "")] = String(a.nombre_angelado || "");
+            });
+
+            const hint = document.getElementById("adm-msg-hint");
+            if (weekNumFromKey(reqWk) < 1) {
+                admMsgRows = [];
+                admMsgSelectedAngel = "";
+                if (hint) {
+                    hint.textContent = "El proceso aún no ha iniciado: todavía no hay semanas con mensajes.";
+                }
+                const tbEmpty = document.querySelector("#adm-msg-table tbody");
+                if (tbEmpty) {
+                    tbEmpty.innerHTML =
+                        '<tr><td colspan="3">El proceso aún no ha iniciado: todavía no hay semanas con mensajes.</td></tr>';
+                }
+                setAdmMsgPreview("empty", { meta: "—", text: "El proceso aún no ha iniciado." });
+                return;
+            }
+            if (hint) {
+                hint.textContent = `${weekDisplayLabel(
+                    reqWk
+                )} · pulsa ✉️ en un Ángel para ver en la Vista Previa el mensaje que tiene preparado o que ya se envió.`;
+            }
+            admMsgRows = rows;
+            if (admMsgSelectedAngel && !rows.some((r) => String(r.angel || "") === admMsgSelectedAngel)) {
+                admMsgSelectedAngel = "";
+            }
+            renderAdmMsgList();
+            if (admMsgSelectedAngel) await openAdminMessage(admMsgSelectedAngel);
+            else setAdmMsgPreview("empty", {});
+        }
+
+        document.querySelector("#adm-msg-table")?.addEventListener("click", (ev) => {
+            const btn = ev.target.closest(".adm-msg-open");
+            if (!btn || !resolved) return;
+            setAdmMsgPreviewOpen(true);
+            void withLocalPanelLoading(admMsgPanel(), () =>
+                openAdminMessage(btn.getAttribute("data-angel") || "")
+            );
+        });
+
+        document.getElementById("adm-msg-reload")?.addEventListener("click", () =>
+            withLocalPanelLoading(admMsgPanel(), loadAdminMessages)
+        );
+
+        document.getElementById("adm-msg-preview-toggle")?.addEventListener("click", () => {
+            const box = document.getElementById("adm-msg-preview-box");
+            setAdmMsgPreviewOpen(!box?.classList.contains("is-open"));
+        });
+
+        document.getElementById("adm-msg-download-html")?.addEventListener("click", () => {
+            if (!admMsgHtml) return;
+            const n = weekNumFromKey(admMsgWeek);
+            const safe = String(admMsgSelectedAngel || "angel").replace(/[^A-Za-z0-9_-]+/g, "_");
+            downloadHtml(`mensaje-${safe}${n >= 1 ? `-semana-${n}` : ""}.html`, admMsgHtml);
+        });
+
         document.querySelectorAll("[data-adtab]").forEach((btn) => {
             btn.addEventListener("click", async () => {
                 document.querySelectorAll("[data-adtab]").forEach((b) => b.classList.remove("is-active"));
@@ -2071,6 +2311,7 @@
                 });
                 const adPanel = document.querySelector(`[data-adpanel="${id}"]`);
                 if (id === "angeles" && resolved) await withLocalPanelLoading(adPanel, () => loadAngelesTable());
+                if (id === "messages" && resolved) await withLocalPanelLoading(adPanel, () => loadAdminMessages());
                 if (id === "maint" && resolved) await withLocalPanelLoading(adPanel, () => loadPendientes());
             });
         });
@@ -2125,7 +2366,7 @@
                 .map((r) => {
                     const st = String(r.status || "");
                     const btnDel = `<button type="button" class="angels-btn angels-btn--sm angels-btn--danger adm-delete-row" data-row="${r.row_index}">Eliminar</button>`;
-                    return `<tr><td>${esc(r.week)}</td><td>${esc(r.angel)}</td><td>${esc(r.angelado)}</td><td>${esc(st)}</td><td><div style="display:flex;gap:8px;">${btnDel}</div></td></tr>`;
+                    return `<tr><td>${esc(weekDisplayLabel(r.week))}</td><td>${esc(r.angel)}</td><td>${esc(r.angelado)}</td><td>${esc(st)}</td><td><div style="display:flex;gap:8px;">${btnDel}</div></td></tr>`;
                 })
                 .join("");
         }
@@ -2139,12 +2380,14 @@
             
             const selW = document.getElementById("adm-filter-week");
             if (selW && selW.options.length <= 1) {
-                const weeks = [...new Set(allPendRows.map(r => r.week))].sort((a, b) => {
-                    const na = parseInt(a.replace("W", "")) || 0;
-                    const nb = parseInt(b.replace("W", "")) || 0;
-                    return nb - na;
-                });
-                selW.innerHTML = '<option value="">Todas</option>' + weeks.map(w => `<option value="${w}">${w}</option>`).join("");
+                const weeks = [...new Set(allPendRows.map((r) => r.week))].sort(
+                    (a, b) => weekNumFromKey(b) - weekNumFromKey(a)
+                );
+                selW.innerHTML =
+                    '<option value="">Todas</option>' +
+                    weeks
+                        .map((w) => `<option value="${escAttr(w)}">${esc(weekDisplayLabel(w))}</option>`)
+                        .join("");
             }
             
             renderPendientesTable();

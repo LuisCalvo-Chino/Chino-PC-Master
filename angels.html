@@ -285,6 +285,7 @@
             <nav class="angels-tabs" role="tablist" aria-label="Admin">
                 <button type="button" class="angels-tab is-active" data-adtab="design">Diseño email</button>
                 <button type="button" class="angels-tab" data-adtab="angeles">Ángeles</button>
+                <button type="button" class="angels-tab" data-adtab="messages">Mensajes</button>
                 <button type="button" class="angels-tab" data-adtab="maint">Mantenimiento</button>
             </nav>
             <div class="angels-tab-panels">
@@ -462,6 +463,54 @@
                     <p class="angels-hint angels-mt" id="adm-sender-hint">
                         Semanas jueves→miércoles (W1 desde fecha de inicio). Envío automático: activador semanal los <strong>miércoles</strong> en Apps Script (editor → Activadores). Carga estado…
                     </p>
+                </div>
+                <div class="angels-tab-panel" data-adpanel="messages">
+                    <div class="angels-split angels-split--preview-tall">
+                        <div class="angels-editor-col">
+                            <div class="angels-row angels-mb">
+                                <label>Semana
+                                    <select id="adm-msg-week" class="angels-input"></select>
+                                </label>
+                                <button type="button" class="angels-btn" id="adm-msg-reload">Refrescar</button>
+                            </div>
+                            <div class="angels-status-legend angels-glass" role="note" aria-label="Significado de los estados">
+                                <p class="angels-status-legend__title">Estados del mensaje</p>
+                                <ul class="angels-status-legend__list">
+                                    <li><span class="angels-status-legend__badge">⚠️ Por redactar</span> — El Ángel aún no ha guardado mensaje para esa semana.</li>
+                                    <li><span class="angels-status-legend__badge">📧 Envío pendiente</span> — El mensaje está en cola y espera el envío programado.</li>
+                                    <li><span class="angels-status-legend__badge">✅ Enviado</span> — El correo ya salió hacia el Angelado.</li>
+                                    <li><span class="angels-status-legend__badge">❌ Error</span> — Falló el envío; revisa Mantenimiento.</li>
+                                </ul>
+                            </div>
+                            <p class="angels-hint" id="adm-msg-hint">Pulsa ✉️ en un Ángel para ver en la Vista Previa el mensaje que tiene preparado o que ya se envió.</p>
+                            <div class="angels-table-wrap">
+                                <table class="angels-table angels-table--messages" id="adm-msg-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Ángel</th>
+                                            <th>Estado</th>
+                                            <th>Mensaje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="angels-preview-col">
+                            <button type="button" class="angels-preview-toggle" id="adm-msg-preview-toggle">Vista previa</button>
+                            <div class="angels-preview-box angels-glass" id="adm-msg-preview-box">
+                                <div class="angels-preview-header">
+                                    <span class="angels-preview-title">Vista Previa</span>
+                                    <button type="button" class="angels-btn angels-btn--sm" id="adm-msg-download-html" disabled>Descarga HTML</button>
+                                </div>
+                                <p class="angels-preview-meta" id="adm-msg-preview-meta">Selecciona un Ángel de la lista.</p>
+                                <div class="angels-preview-empty" id="adm-msg-preview-empty">
+                                    <p>Selecciona un Ángel de la lista para ver aquí su mensaje.</p>
+                                </div>
+                                <iframe class="angels-preview-frame" id="adm-msg-preview-frame" title="Vista previa del mensaje del Ángel" hidden></iframe>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="angels-tab-panel" data-adpanel="maint">
                     <div class="angels-row angels-row--end angels-mb">

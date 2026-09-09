@@ -66,7 +66,25 @@ dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá e
 - El ciclo semanal y el día de envío se fijan al crear el proyecto; a partir de ahí la app cuenta las
   semanas sola.
 
-### 1.3 Mantenimiento y cola de envíos
+### 1.3 Mensajes de la semana (lista de Ángeles + vista previa)
+
+Vista central para revisar, sin salir del panel, qué escribió cada quien:
+
+- **Lista de Ángeles del proceso** con su **estado del mensaje**, con la misma leyenda que ve el
+  participante en «Status semanal» (⚠️ Por redactar · 📧 Envío pendiente · ✅ Enviado · ❌ Error).
+- Botón ✉️ en cada fila: abre en la **Vista Previa** el correo tal cual quedó redactado — el que
+  está en espera de envío o el que ya se envió. Si ese Ángel aún no ha redactado, la vista previa
+  lo dice explícitamente.
+- **Selector de semana** para revisar semanas anteriores sin cambiar de pestaña; al cambiar de
+  semana se recarga el mensaje del Ángel que estuviera seleccionado.
+- **Descarga HTML** del mensaje que se está viendo.
+- En móvil, la Vista Previa es un desplegable, igual que en «Diseño de email» y «Redactar».
+
+> Requiere que el Emisor del proyecto tenga la acción `admin_get_message`. Si el proyecto se creó
+> con una versión anterior del script, la vista previa lo indica: hay que copiar de nuevo el script
+> del Emisor desde el panel Maestro y volver a publicar el Web App.
+
+### 1.4 Mantenimiento y cola de envíos
 ![Mantenimiento](angeles-capturas/09-organizador-mantenimiento.png)
 
 - Listado de todos los mensajes en cola con **semana, ángel, angelado y estado** (SENT / PENDING / ERROR).

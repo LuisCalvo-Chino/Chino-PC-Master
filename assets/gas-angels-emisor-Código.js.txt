@@ -32,6 +32,7 @@ function doPost(e) {
     if (action === "list_pendientes") return jsonOut_(handleListPendientes_());
     // Envíos de correo: SOLO por trigger time-driven interno (anti-spam). No exponer envío por Web App.
     if (action === "admin_delete_pending") return jsonOut_(handleAdminDeletePending_(data));
+    if (action === "admin_get_message") return jsonOut_(handleAdminGetMessage_(data));
     if (action === "admin_run_queue_now") return jsonOut_(handleAdminRunQueueNow_(data));
     if (action === "user_list_angeles") return jsonOut_(handleGetAngeles_());
     if (action === "user_save_message") return jsonOut_(handleUserSaveMessage_(data));
@@ -520,6 +521,69 @@ function handleForceSendPending_(data) {
     Utilities.sleep(2000);
   }
   return { status: "SUCCESS", data: { sent: sent, errors: errors } };
+}
+
+/**
+ * Organizador: HTML del mensaje de un Ángel en una semana (para vista previa en el panel `#a/`).
+ * Busca primero en Pendientes (estado real) y, si no está, en Enviados (semanas ya despachadas y purgadas).
+ */
+function handleAdminGetMessage_(data) {
+  initSheets_();
+  const wk = String((data && data.week) || "").trim() || computeWeekKey_();
+  const angel = String((data && data.nombre_angel) || "").trim();
+  const angelado = String((data && data.nombre_angelado) || "").trim();
+  if (!angel) return { status: "ERROR", message: "Falta nombre_angel." };
+
+  const ss = getSs_();
+  const vP = ss.getSheetByName("Pendientes").getDataRange().getValues();
+  const vE = ss.getSheetByName("Enviados").getDataRange().getValues();
+
+  function matches_(rowAngel, rowAngelado) {
+    if (String(rowAngel) !== angel) return false;
+    if (!angelado) return true;
+    const ra = String(rowAngelado || "");
+    return !ra || ra === angelado;
+  }
+
+  for (let r = vP.length - 1; r >= 1; r--) {
+    if (String(vP[r][0]) !== wk) continue;
+    if (!matches_(vP[r][1], vP[r][2])) continue;
+    return {
+      status: "SUCCESS",
+      data: {
+        found: true,
+        source: "pendientes",
+        week: wk,
+        angel: String(vP[r][1] || ""),
+        angelado: String(vP[r][2] || ""),
+        msg_status: String(vP[r][5] || "PENDING"),
+        html: String(vP[r][4] || ""),
+        created_at: String(vP[r][6] || ""),
+        sent_at: ""
+      }
+    };
+  }
+
+  for (let r = vE.length - 1; r >= 1; r--) {
+    if (String(vE[r][0]) !== wk) continue;
+    if (!matches_(vE[r][1], vE[r][2])) continue;
+    return {
+      status: "SUCCESS",
+      data: {
+        found: true,
+        source: "enviados",
+        week: wk,
+        angel: String(vE[r][1] || ""),
+        angelado: String(vE[r][2] || ""),
+        msg_status: "SENT",
+        html: String(vE[r][4] || ""),
+        created_at: "",
+        sent_at: String(vE[r][5] || "")
+      }
+    };
+  }
+
+  return { status: "SUCCESS", data: { found: false, week: wk, angel: angel, angelado: angelado } };
 }
 
 function handleAdminDeletePending_(data) {
