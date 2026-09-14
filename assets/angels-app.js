@@ -140,14 +140,24 @@
                 signature: { family: "Georgia", size: 14, color: "#b39ddb" },
                 footer: { family: "Arial", size: 12, color: "#cfd8dc" },
                 link: { color: "#80deea", visited: "#b39ddb" }
-            }
+            },
+            darkMode: { protect: true }
         };
     }
 
     /** Compatibilidad con JSON antiguo (solo contentBg / barColor / sin footer.message). */
     function normalizeDesign(d) {
         const o = Object.assign(defaultDesign(), d || {});
-        const H = o.header || {};
+        /* Protección de modo oscuro: activada por defecto en proyectos nuevos. Un diseño guardado
+           desde el panel antes de existir la opción (siempre trae sections.content) la conserva
+           apagada, para que sus correos no cambien sin que el Capi lo decida. */
+        if (!o.darkMode || typeof o.darkMode !== "object") o.darkMode = { protect: false };
+        if (d && !d.darkMode && d.sections && typeof d.sections.content === "object") {
+            o.darkMode = { protect: false };
+        }
+        /* Copias: rellenar header/sections aquí no debe tocar el diseño recibido (si no, al
+           normalizarlo otra vez parecería guardado desde el panel). */
+        const H = Object.assign({}, o.header);
         if (!H.bg || typeof H.bg !== "object") {
             H.bg = {
                 solid: H.barColor || "#1e3a5f",
@@ -157,7 +167,7 @@
             };
         }
         o.header = H;
-        const sec = o.sections || {};
+        const sec = Object.assign({}, o.sections);
         if (!sec.content || typeof sec.content !== "object") {
             sec.content = {
                 solid: sec.contentBg || "#121a2e",
@@ -184,16 +194,86 @@
         return o;
     }
 
-    function sectionBgCss(sec, legacySolid) {
-        const solid = String(sec && sec.solid != null ? sec.solid : legacySolid || "#0b1020");
-        if (!sec || !sec.gradient) return solid;
-        const c2 = String(sec.color2 || solid);
-        const raw0 = String(sec.orient || "linear-diag").toLowerCase();
+    /** Solo colores hex (lo que entregan los <input type="color">); cualquier otra cosa cae al respaldo. */
+    function cssColor(v, fallback) {
+        const s = String(v || "").trim();
+        return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(s) ? s : fallback;
+    }
+
+    function gradientCss(c1, c2, orient) {
+        const raw0 = String(orient || "linear-diag").toLowerCase();
         const raw = raw0 === "linear" ? "linear-diag" : raw0;
-        if (raw === "radial") return `radial-gradient(circle at 30% 20%, ${solid}, ${c2})`;
-        if (raw === "linear-down" || raw === "todown") return `linear-gradient(to bottom, ${solid}, ${c2})`;
-        if (raw === "linear-right" || raw === "toright") return `linear-gradient(to right, ${solid}, ${c2})`;
-        return `linear-gradient(135deg, ${solid}, ${c2})`;
+        if (raw === "radial") return `radial-gradient(circle at 30% 20%, ${c1}, ${c2})`;
+        if (raw === "linear-down" || raw === "todown") return `linear-gradient(to bottom, ${c1}, ${c2})`;
+        if (raw === "linear-right" || raw === "toright") return `linear-gradient(to right, ${c1}, ${c2})`;
+        return `linear-gradient(135deg, ${c1}, ${c2})`;
+    }
+
+    /**
+     * Fondo de una sección del correo. El color sólido va siempre, como atributo bgcolor (Outlook de
+     * escritorio) y como background-color (lo que leen los motores de modo oscuro); el gradiente, si
+     * lo hay, va encima. Sin ese sólido, Outlook —que no dibuja gradientes— dejaba la sección en blanco.
+     */
+    function sectionBg(sec, legacySolid) {
+        const solid = String(sec && sec.solid != null ? sec.solid : legacySolid || "#0b1020");
+        const hex = cssColor(solid, "");
+        const grad = sec && sec.gradient ? gradientCss(solid, String(sec.color2 || solid), sec.orient) : "";
+        return {
+            solid: hex,
+            gradient: Boolean(grad),
+            style: `background-color:${solid};` + (grad ? `background:${grad};` : ""),
+            attr: hex ? ` bgcolor="${hex}"` : ""
+        };
+    }
+
+    /* Emojis, incluidas secuencias con ZWJ, tonos de piel, banderas y teclas. ©, ®, ™ y compañía
+       cuentan como pictográficos pero se escriben como texto: solo entran con el selector de emoji. */
+    const EMOJI_RE =
+        /(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|(?:(?![\u00A9\u00AE\u203C\u2049\u2122\u2139])\p{Extended_Pictographic}|[\u00A9\u00AE\u203C\u2049\u2122\u2139]\uFE0F)(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic}\uFE0F?)*)/gu;
+
+    /**
+     * Envuelve cada emoji del texto (nunca de atributos) en <span class="cpm-emoji">. Con el texto
+     * recortado a gradiente el relleno es transparente y un emoji se pintaría como silueta de un
+     * solo color; la regla de esa clase le devuelve un relleno opaco y así conserva sus colores.
+     */
+    function wrapEmoji(html) {
+        const s = String(html || "");
+        EMOJI_RE.lastIndex = 0;
+        if (!EMOJI_RE.test(s)) return s;
+        const tpl = document.createElement("template");
+        tpl.innerHTML = s;
+        const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach((node) => {
+            const t = node.nodeValue;
+            const frag = document.createDocumentFragment();
+            let last = 0;
+            let m;
+            EMOJI_RE.lastIndex = 0;
+            while ((m = EMOJI_RE.exec(t))) {
+                if (m.index > last) frag.appendChild(document.createTextNode(t.slice(last, m.index)));
+                const sp = document.createElement("span");
+                sp.className = "cpm-emoji";
+                sp.textContent = m[0];
+                frag.appendChild(sp);
+                last = m.index + m[0].length;
+            }
+            if (!last) return;
+            if (last < t.length) frag.appendChild(document.createTextNode(t.slice(last)));
+            node.parentNode.replaceChild(frag, node);
+        });
+        return tpl.innerHTML;
+    }
+
+    /** Pintura de un texto del correo: color sólido y, si el organizador lo activó, su gradiente. */
+    function textPaint(font, fallback) {
+        const color = cssColor(font && font.color, fallback);
+        const grad =
+            font && font.gradient
+                ? gradientCss(color, cssColor(font.color2, color), font.orient || "linear-right")
+                : "";
+        return { color, grad };
     }
 
     /** Extrae el file id de URLs típicas de Google Drive. */
@@ -309,35 +389,105 @@
         wrap.hidden = false;
     }
 
+    /**
+     * Hojas de estilo para el modo oscuro de los clientes de correo. Cada bloque va en su propio
+     * <style>: si un cliente descarta uno por no entenderlo (Gmail lo hace con el bloque entero),
+     * los demás —y el de los enlaces— siguen en pie.
+     *
+     * - Outlook.com y sus apps marcan con data-ogsc / data-ogsb lo que recolorearon en modo oscuro;
+     *   esas reglas les devuelven el color original.
+     * - Gmail invierte colores sólidos (fondos y texto) pero nunca gradientes. El texto con gradiente
+     *   se pinta recortando un gradiente a la forma de las letras, y la protección convierte cada
+     *   color sólido en un «gradiente» de un solo color para que Gmail tampoco lo toque. Esas reglas
+     *   van dos veces: con «u + .body» (solo Gmail, que cambia el doctype por <u>) y dentro de
+     *   @supports para el resto de clientes que sepan recortar. Donde no aplican, el texto conserva
+     *   su color sólido en línea.
+     */
+    function emailDarkModeCss(sections, texts, linkColor, protect) {
+        let outlook = "";
+        sections.forEach(([k, bg]) => {
+            if (bg.solid) outlook += `[data-ogsb] .cpm-s-${k}{background-color:${bg.solid}!important;}`;
+        });
+        texts.forEach(([k, p]) => {
+            outlook += `[data-ogsc] .cpm-t-${k}{color:${p.color}!important;}`;
+        });
+        outlook += `[data-ogsc] .cpm-t-body a{color:${linkColor}!important;}[data-ogsc] .cpm-t-foot a{color:${linkColor}!important;}`;
+
+        const clip = (img) =>
+            `background-image:${img};-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;`;
+        const rules = [];
+        texts.forEach(([k, p]) => {
+            if (!protect && !p.grad) return;
+            rules.push([`.cpm-c-${k}`, clip(p.grad || `linear-gradient(${p.color},${p.color})`)]);
+            /* El subrayado usa el color del texto, que aquí es transparente. */
+            rules.push([`.cpm-c-${k} u`, `text-decoration-color:${p.color};`]);
+            rules.push([`.cpm-c-${k} .cpm-emoji`, `color:${p.color}!important;-webkit-text-fill-color:${p.color};`]);
+            if (k === "body" || k === "foot") {
+                rules.push([`.cpm-c-${k} a`, clip(`linear-gradient(${linkColor},${linkColor})`) + `text-decoration-color:${linkColor};`]);
+            }
+        });
+        if (protect) {
+            sections.forEach(([k, bg]) => {
+                if (!bg.gradient && bg.solid) {
+                    rules.push([`.cpm-s-${k}`, `background-image:linear-gradient(${bg.solid},${bg.solid})!important;`]);
+                }
+            });
+        }
+
+        let css = "<style>:root{color-scheme:light only;supported-color-schemes:light only;}</style>";
+        css += `<style>${outlook}</style>`;
+        if (rules.length) {
+            css += "<style>" + rules.map(([sel, decl]) => `u + .body ${sel}{${decl}}`).join("") + "</style>";
+            css +=
+                "<style>@supports (-webkit-background-clip:text) or (background-clip:text){" +
+                rules.map(([sel, decl]) => `${sel}{${decl}}`).join("") +
+                "}</style>";
+        }
+        return css;
+    }
+
     function buildEmailDocument(design, bodyHtml) {
         const d = normalizeDesign(design || {});
-        const bgCss = sectionBgCss(d.bg, d.bg && d.bg.solid);
+        const pageBg = sectionBg(d.bg, d.bg && d.bg.solid);
         const hh = Math.max(50, Math.min(400, Number(d.header?.heightPx) || 120));
         const headerUrl = d.header?.imageUrl ? escUrlAttr(driveToViewUrl(d.header.imageUrl)) : "";
-        const hBgCss = sectionBgCss(d.header && d.header.bg, d.header && d.header.barColor);
-        const cBgCss = sectionBgCss(d.sections && d.sections.content, d.sections && d.sections.contentBg);
-        const fBgCss = sectionBgCss(d.sections && d.sections.footer, d.sections && d.sections.footerBg);
+        const headBg = sectionBg(d.header && d.header.bg, d.header && d.header.barColor);
+        const contentBg = sectionBg(d.sections && d.sections.content, d.sections && d.sections.contentBg);
+        const footBg = sectionBg(d.sections && d.sections.footer, d.sections && d.sections.footerBg);
         const fg = d.fonts?.greeting || { family: "Georgia", size: 18, color: "#e8eaf6" };
         const fb = d.fonts?.body || { family: "Arial", size: 15, color: "#eceff1" };
         const fs = d.fonts?.signature || { family: "Georgia", size: 14, color: "#b39ddb" };
         const footerSec = (d.sections && d.sections.footer) || {};
         const fmf = footerSec.messageFont || d.fonts?.footer || { family: "Arial", size: 12, color: "#cfd8dc" };
+        const protect = Boolean(d.darkMode && d.darkMode.protect);
+        const paint = {
+            greet: textPaint(fg, "#e8eaf6"),
+            body: textPaint(fb, "#eceff1"),
+            sig: textPaint(fs, "#b39ddb"),
+            foot: textPaint(fmf, "#cfd8dc")
+        };
+        const clipOn = (k) => protect || Boolean(paint[k].grad);
+        /* El gradiente de un texto corto (saludo, firma, pie) abarca solo el ancho de sus letras. */
+        const clipWrap = (k, html, tag) =>
+            clipOn(k) ? `<${tag} class="cpm-c-${k}" style="display:inline-block;">${wrapEmoji(html)}</${tag}>` : html;
+
         const greetLine = String(d.greetingUserLine != null ? d.greetingUserLine : "").trim();
         const greetStyle = `margin:0 0 12px 0;font-family:${esc(fg.family)},sans-serif;font-size:${Number(fg.size) || 18}px;color:${esc(fg.color || "#e8eaf6")};`;
-        const greeting = greetLine
-            ? `<p style="${greetStyle}">${esc(greetLine).replace(/\n/g, "<br/>")}</p>`
-            : `<p style="${greetStyle}">Hola <strong>Angelado</strong>,</p>`;
+        const greetHtml = greetLine ? esc(greetLine).replace(/\n/g, "<br/>") : "Hola <strong>Angelado</strong>,";
+        const greeting = `<p class="cpm-t-greet" style="${greetStyle}">${clipWrap("greet", greetHtml, "span")}</p>`;
         const sig =
-            '<p style="margin:16px 0 0 0;font-family:' +
+            '<p class="cpm-t-sig" style="margin:16px 0 0 0;font-family:' +
             esc(fs.family) +
             ",sans-serif;font-size:" +
             (Number(fs.size) || 14) +
             'px;color:' +
             esc(fs.color || "#b39ddb") +
-            ';font-style:italic;">— Tu Ángel Secreto</p>';
+            ';font-style:italic;">' +
+            clipWrap("sig", "— Tu Ángel Secreto", "span") +
+            "</p>";
         const inner =
             greeting +
-            `<div style="font-family:${esc(fb.family)},sans-serif;font-size:${Number(fb.size) || 15}px;line-height:1.55;color:${esc(fb.color || "#eceff1")};">${bodyHtml || ""}</div>` +
+            `<div class="cpm-t-body${clipOn("body") ? " cpm-c-body" : ""}" style="font-family:${esc(fb.family)},sans-serif;font-size:${Number(fb.size) || 15}px;line-height:1.55;color:${esc(fb.color || "#eceff1")};">${clipOn("body") ? wrapEmoji(bodyHtml) : bodyHtml || ""}</div>` +
             sig;
         const footerRaw = String(footerSec.message || "").trim();
         const footerMsg = footerRaw
@@ -346,46 +496,147 @@
                 : "<p style=\"margin:0;\">" + esc(footerRaw).replace(/\n/g, "<br/>") + "</p>"
             : FOOTER_MESSAGE_DEFAULT;
         const footerInner =
-            '<div style="font-family:' +
+            '<div class="cpm-t-foot" style="font-family:' +
             esc(fmf.family || "Arial") +
             ",sans-serif;font-size:" +
             (Number(fmf.size) || 12) +
             'px;color:' +
             esc(fmf.color || "#cfd8dc") +
             ';text-align:center;line-height:1.45;">' +
-            footerMsg +
+            clipWrap("foot", footerMsg, "div") +
             "</div>";
         const linkColor = esc(d.fonts?.link?.color || "#80deea");
         const linkVisited = esc(d.fonts?.link?.visited || "#b39ddb");
+        const darkCss = emailDarkModeCss(
+            [
+                ["page", pageBg],
+                ["head", headBg],
+                ["content", contentBg],
+                ["foot", footBg]
+            ],
+            [
+                ["greet", paint.greet],
+                ["body", paint.body],
+                ["sig", paint.sig],
+                ["foot", paint.foot]
+            ],
+            cssColor(d.fonts?.link?.color, "#80deea"),
+            protect
+        );
 
         /* Estructura de tabla 100% height para asegurar que el fondo de página cubra todo el viewport en clientes de correo */
         const headerCellOpen =
-            '<tr><td style="padding:0;margin:0;background:' +
-            hBgCss +
-            ';text-align:center;line-height:0;font-size:0;">';
+            '<tr><td class="cpm-s-head"' +
+            headBg.attr +
+            ' style="padding:0;margin:0;' +
+            headBg.style +
+            'text-align:center;line-height:0;font-size:0;">';
         const headerBlock = headerUrl
             ? `<img src="${headerUrl}" alt="" height="${hh}" style="display:block;margin:0 auto;max-width:100%;height:${hh}px;width:auto;object-fit:contain;" />`
             : `<div style="display:block;height:${hh}px;width:100%;font-size:1px;line-height:normal;">&nbsp;</div>`;
         return (
-            '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;} a{color:' + linkColor + ';} a:visited{color:' + linkVisited + ';}</style></head><body style="margin:0;padding:0;">' +
-            '<table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" style="background:' +
-            bgCss +
-            ';min-height:100vh;">' +
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">' +
+            '<style>html,body{margin:0;padding:0;height:100%;} a{color:' + linkColor + ';} a:visited{color:' + linkVisited + ';}</style>' +
+            darkCss +
+            '</head><body class="body" style="margin:0;padding:0;">' +
+            '<table class="cpm-s-page" role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0"' +
+            pageBg.attr +
+            ' style="' +
+            pageBg.style +
+            'min-height:100vh;">' +
             '<tr><td align="center" valign="middle" style="padding:20px;">' +
             '<table role="presentation" width="100%" style="max-width:640px;margin:0;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);" cellspacing="0" cellpadding="0" border="0">' +
             headerCellOpen +
             headerBlock +
-            '</td></tr><tr><td style="padding:20px;background:' +
-            cBgCss +
-            ';">' +
+            '</td></tr><tr><td class="cpm-s-content"' +
+            contentBg.attr +
+            ' style="padding:20px;' +
+            contentBg.style +
+            '">' +
             inner +
-            '</td></tr><tr><td style="padding:12px 20px;background:' +
-            fBgCss +
-            ';">' +
+            '</td></tr><tr><td class="cpm-s-foot"' +
+            footBg.attr +
+            ' style="padding:12px 20px;' +
+            footBg.style +
+            '">' +
             footerInner +
             "</td></tr></table>" +
             "</td></tr></table></body></html>"
         );
+    }
+
+    /* ——— Simulación de modo oscuro para la vista previa del organizador ———
+       Aproxima cómo recolorea Gmail: invierte la luminosidad de los colores sólidos (fondos y texto)
+       y deja intactos gradientes, imágenes y texto recortado con gradiente. «full» imita Gmail en
+       iPhone (lo invierte todo); «partial» imita Gmail en Android y Outlook (solo oscurece fondos
+       claros y aclara textos oscuros). */
+
+    function parseRgba(s) {
+        const m = String(s || "").match(/rgba?\(([^)]+)\)/);
+        if (!m) return null;
+        const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+        return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    }
+
+    function flipLightness(c) {
+        const r = c.r / 255;
+        const g = c.g / 255;
+        const b = c.b / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const l = (max + min) / 2;
+        const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+        let h = 0;
+        if (max !== min) {
+            if (max === r) h = ((g - b) / (max - min)) % 6;
+            else if (max === g) h = (b - r) / (max - min) + 2;
+            else h = (r - g) / (max - min) + 4;
+            h *= 60;
+            if (h < 0) h += 360;
+        }
+        /* Gmail no llega al negro ni al blanco puros. */
+        const l2 = 0.1 + (1 - l) * 0.8;
+        return `hsla(${h.toFixed(1)}, ${(s * 100).toFixed(1)}%, ${(l2 * 100).toFixed(1)}%, ${c.a})`;
+    }
+
+    function applyDarkModeSimulation(doc, mode) {
+        const win = doc && doc.defaultView;
+        if (!win || (mode !== "full" && mode !== "partial")) return;
+        const flip = (css, kind) => {
+            const c = parseRgba(css);
+            if (!c || c.a === 0) return null;
+            const l = (Math.max(c.r, c.g, c.b) + Math.min(c.r, c.g, c.b)) / 510;
+            if (mode === "partial" && (kind === "bg" ? l <= 0.5 : l >= 0.5)) return null;
+            return flipLightness(c);
+        };
+        /* Primero se mide todo y luego se pinta: si no, los hijos heredarían el color ya invertido. */
+        const plan = [];
+        doc.querySelectorAll("body, body *").forEach((el) => {
+            const cs = win.getComputedStyle(el);
+            const bg = cs.backgroundImage === "none" ? flip(cs.backgroundColor, "bg") : null;
+            const fill = parseRgba(cs.webkitTextFillColor);
+            const fg = fill && fill.a === 0 ? null : flip(cs.color, "fg");
+            plan.push([el, bg, fg]);
+        });
+        plan.forEach(([el, bg, fg]) => {
+            if (bg) el.style.setProperty("background-color", bg, "important");
+            if (fg) el.style.setProperty("color", fg, "important");
+        });
+        doc.documentElement.style.background = "#121212";
+    }
+
+    /** Partes del diseño que pueden quedar ilegibles en Gmail con modo oscuro si no hay protección. */
+    function darkModeRiskParts(design) {
+        const d = normalizeDesign(design || {});
+        if (d.darkMode && d.darkMode.protect) return [];
+        const parts = [];
+        if (d.sections?.content?.gradient) parts.push("el fondo del contenido");
+        if (d.sections?.footer?.gradient) parts.push("el fondo del footer");
+        if (d.fonts?.greeting?.gradient) parts.push("el texto del saludo");
+        if (d.fonts?.body?.gradient) parts.push("el texto del cuerpo");
+        if (d.fonts?.signature?.gradient) parts.push("el texto de la firma");
+        if (d.sections?.footer?.messageFont?.gradient) parts.push("el texto del footer");
+        return parts;
     }
 
     /** PIN Maestro: localStorage en este navegador (todos los proyectos). Migra valor antiguo de sessionStorage. */
@@ -552,12 +803,25 @@
             ["adm-bg-grad", "row-grad-bg"],
             ["adm-h-grad", "row-grad-h"],
             ["adm-c-grad", "row-grad-c"],
-            ["adm-f-grad", "row-grad-f"]
+            ["adm-f-grad", "row-grad-f"],
+            ["adm-tg-g", "row-tgrad-g"],
+            ["adm-tg-b", "row-tgrad-b"],
+            ["adm-tg-s", "row-tgrad-s"],
+            ["adm-tg-f", "row-tgrad-f"]
         ].forEach(([chkId, rowId]) => {
             const row = document.getElementById(rowId);
             const chk = document.getElementById(chkId);
             if (row) row.hidden = !chk?.checked;
         });
+    }
+
+    /** Gradiente de texto de una tipografía (sufijo g, b, s o f en los ids del formulario). */
+    function textGradFromForm(key) {
+        return {
+            gradient: Boolean(document.getElementById(`adm-tg-${key}`)?.checked),
+            color2: document.getElementById(`adm-color-${key}2`)?.value || "#ffffff",
+            orient: document.getElementById(`adm-tg-${key}-orient`)?.value || "linear-right"
+        };
     }
 
     function designFromAdminForm() {
@@ -597,28 +861,33 @@
                 8,
                 Math.min(40, Number(document.getElementById("adm-footer-msg-size")?.value) || 12)
             ),
-            color: document.getElementById("adm-color-f")?.value || "#cfd8dc"
+            color: document.getElementById("adm-color-f")?.value || "#cfd8dc",
+            ...textGradFromForm("f")
         };
         d.fonts.greeting = {
             family: document.getElementById("adm-font-g")?.value || "Georgia",
             size: Math.max(8, Math.min(40, Number(document.getElementById("adm-size-g")?.value) || 18)),
-            color: document.getElementById("adm-color-g")?.value || "#e8eaf6"
+            color: document.getElementById("adm-color-g")?.value || "#e8eaf6",
+            ...textGradFromForm("g")
         };
         d.fonts.body = {
             family: document.getElementById("adm-font-b")?.value || "Arial",
             size: Math.max(8, Math.min(40, Number(document.getElementById("adm-size-b")?.value) || 15)),
-            color: document.getElementById("adm-color-b")?.value || "#eceff1"
+            color: document.getElementById("adm-color-b")?.value || "#eceff1",
+            ...textGradFromForm("b")
         };
         d.fonts.signature = {
             family: document.getElementById("adm-font-s")?.value || "Georgia",
             size: Math.max(8, Math.min(40, Number(document.getElementById("adm-size-s")?.value) || 14)),
-            color: document.getElementById("adm-color-s")?.value || "#b39ddb"
+            color: document.getElementById("adm-color-s")?.value || "#b39ddb",
+            ...textGradFromForm("s")
         };
         d.fonts.link = {
             color: document.getElementById("adm-color-link")?.value || "#80deea",
             visited: document.getElementById("adm-color-link-v")?.value || "#b39ddb"
         };
         d.fonts.footer = d.sections.footer.messageFont;
+        d.darkMode = { protect: Boolean(document.getElementById("adm-dark-protect")?.checked) };
         return d;
     }
 
@@ -675,12 +944,31 @@
         const lnk = d.fonts.link || { color: "#80deea", visited: "#b39ddb" };
         set("adm-color-link", lnk.color || "#80deea");
         set("adm-color-link-v", lnk.visited || "#b39ddb");
+        [
+            ["g", d.fonts.greeting],
+            ["b", d.fonts.body],
+            ["s", d.fonts.signature],
+            ["f", mf]
+        ].forEach(([key, font]) => {
+            set(`adm-tg-${key}`, font && font.gradient, "checked");
+            set(`adm-color-${key}2`, cssColor(font && font.color2, "#ffffff"));
+            set(`adm-tg-${key}-orient`, (font && font.orient) || "linear-right");
+        });
+        set("adm-dark-protect", d.darkMode && d.darkMode.protect, "checked");
         updateAdminGradientRows();
     }
 
-    function wirePreviewIframe(iframe, design, bodyHtml) {
+    /** simMode: "" (vista normal), "full" o "partial" — ver applyDarkModeSimulation. */
+    function wirePreviewIframe(iframe, design, bodyHtml, simMode) {
         if (!iframe) return;
         const doc = buildEmailDocument(design, bodyHtml);
+        iframe.onload = simMode
+            ? () => {
+                  try {
+                      applyDarkModeSimulation(iframe.contentDocument, simMode);
+                  } catch (e) {}
+              }
+            : null;
         iframe.srcdoc = doc;
     }
 
@@ -2108,11 +2396,7 @@
             const cfg = await api.postSender(resolved.sender_exec_url, resolved.secret, { action: "get_config" });
             const design = normalizeDesign((cfg.data && cfg.data.design) || cfg.design || {});
             applyDesignToForm(design);
-            wirePreviewIframe(
-                document.getElementById("adm-preview-frame"),
-                designFromAdminForm(),
-                "<p>Vista previa de prueba — texto fijo de transformación establecido.</p>"
-            );
+            refreshAdminPreview();
         }
 
         document.getElementById("angels-admin-pass-submit")?.addEventListener("click", async () => {
@@ -2152,7 +2436,7 @@
         admHH?.addEventListener("input", syncHLbl);
         admHH?.addEventListener("change", syncHLbl);
 
-        ["adm-bg-grad", "adm-h-grad", "adm-c-grad", "adm-f-grad"].forEach((id) => {
+        ["adm-bg-grad", "adm-h-grad", "adm-c-grad", "adm-f-grad", "adm-tg-g", "adm-tg-b", "adm-tg-s", "adm-tg-f"].forEach((id) => {
             document.getElementById(id)?.addEventListener("change", updateAdminGradientRows);
         });
 
@@ -2181,11 +2465,21 @@
         })();
 
         function refreshAdminPreview() {
+            const design = designFromAdminForm();
             wirePreviewIframe(
                 document.getElementById("adm-preview-frame"),
-                designFromAdminForm(),
-                "<p>Vista previa de prueba — texto fijo de transformación establecido.</p>"
+                design,
+                "<p>Vista previa de prueba — texto fijo de transformación establecido.</p>",
+                document.getElementById("adm-preview-mode")?.value || ""
             );
+            const warn = document.getElementById("adm-dark-warn");
+            if (warn) {
+                const parts = darkModeRiskParts(design);
+                warn.hidden = !parts.length;
+                warn.textContent = parts.length
+                    ? `⚠️ Este diseño usa gradiente en ${parts.join(", ")}. En Gmail con tema oscuro los gradientes no cambian de color, pero los textos y fondos sólidos sí, y el mensaje puede quedar ilegible. Activa la protección y revisa la simulación en la vista previa.`
+                    : "";
+            }
         }
         document
             .querySelectorAll(

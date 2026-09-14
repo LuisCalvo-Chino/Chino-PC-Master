@@ -373,6 +373,17 @@
                                             <select id="adm-font-g" class="angels-input"></select>
                                             <input type="number" id="adm-size-g" class="angels-input angels-input--narrow" min="8" max="40" value="18" title="Tamaño en px" />
                                             <input type="color" id="adm-color-g" value="#e8eaf6" title="Color del texto" />
+                                            <label class="angels-design-check"><input type="checkbox" id="adm-tg-g" /> Gradiente</label>
+                                        </div>
+                                        <div id="row-tgrad-g" class="angels-grad-fields" hidden>
+                                            <label>Color 2 <input type="color" id="adm-color-g2" value="#ffffff" /></label>
+                                            <label>Orientación
+                                                <select id="adm-tg-g-orient" class="angels-input">
+                                                    <option value="linear-right">Horizontal (izquierda → derecha)</option>
+                                                    <option value="linear-diag">Diagonal (135°)</option>
+                                                    <option value="linear-down">Vertical (arriba → abajo)</option>
+                                                </select>
+                                            </label>
                                         </div>
                                     </div>
                                     <div class="angels-typo-group">
@@ -381,6 +392,17 @@
                                             <select id="adm-font-b" class="angels-input"></select>
                                             <input type="number" id="adm-size-b" class="angels-input angels-input--narrow" min="8" max="40" value="15" title="Tamaño en px" />
                                             <input type="color" id="adm-color-b" value="#eceff1" title="Color del texto" />
+                                            <label class="angels-design-check"><input type="checkbox" id="adm-tg-b" /> Gradiente</label>
+                                        </div>
+                                        <div id="row-tgrad-b" class="angels-grad-fields" hidden>
+                                            <label>Color 2 <input type="color" id="adm-color-b2" value="#ffffff" /></label>
+                                            <label>Orientación
+                                                <select id="adm-tg-b-orient" class="angels-input">
+                                                    <option value="linear-right">Horizontal (izquierda → derecha)</option>
+                                                    <option value="linear-diag">Diagonal (135°)</option>
+                                                    <option value="linear-down">Vertical (arriba → abajo)</option>
+                                                </select>
+                                            </label>
                                         </div>
                                     </div>
                                     <div class="angels-typo-group">
@@ -389,6 +411,17 @@
                                             <select id="adm-font-s" class="angels-input"></select>
                                             <input type="number" id="adm-size-s" class="angels-input angels-input--narrow" min="8" max="40" value="14" title="Tamaño en px" />
                                             <input type="color" id="adm-color-s" value="#b39ddb" title="Color del texto" />
+                                            <label class="angels-design-check"><input type="checkbox" id="adm-tg-s" /> Gradiente</label>
+                                        </div>
+                                        <div id="row-tgrad-s" class="angels-grad-fields" hidden>
+                                            <label>Color 2 <input type="color" id="adm-color-s2" value="#ffffff" /></label>
+                                            <label>Orientación
+                                                <select id="adm-tg-s-orient" class="angels-input">
+                                                    <option value="linear-right">Horizontal (izquierda → derecha)</option>
+                                                    <option value="linear-diag">Diagonal (135°)</option>
+                                                    <option value="linear-down">Vertical (arriba → abajo)</option>
+                                                </select>
+                                            </label>
                                         </div>
                                     </div>
                                     <div class="angels-typo-group">
@@ -425,8 +458,27 @@
                                         <select id="adm-footer-msg-font" class="angels-input"></select>
                                         <input type="number" id="adm-footer-msg-size" class="angels-input angels-input--narrow" min="8" max="40" value="12" title="Tamaño en px" />
                                         <input type="color" id="adm-color-f" value="#cfd8dc" title="Color del texto" />
+                                        <label class="angels-design-check"><input type="checkbox" id="adm-tg-f" /> Gradiente</label>
+                                    </div>
+                                    <div id="row-tgrad-f" class="angels-grad-fields" hidden>
+                                        <label>Color 2 <input type="color" id="adm-color-f2" value="#ffffff" /></label>
+                                        <label>Orientación
+                                            <select id="adm-tg-f-orient" class="angels-input">
+                                                <option value="linear-right">Horizontal (izquierda → derecha)</option>
+                                                <option value="linear-diag">Diagonal (135°)</option>
+                                                <option value="linear-down">Vertical (arriba → abajo)</option>
+                                            </select>
+                                        </label>
                                     </div>
                                 </div>
+                                <p class="angels-hint angels-mt">El texto con gradiente se ve en la mayoría de apps de correo modernas. Donde no se puede (por ejemplo Outlook de escritorio, o la app de Gmail con una cuenta que no es de Google) el texto sale con su primer color.</p>
+                            </section>
+                            <section class="angels-design-section angels-glass">
+                                <h4 class="angels-design-section__title">6 · Modo oscuro</h4>
+                                <p class="angels-hint">Cuando quien recibe el correo usa tema oscuro, su app puede cambiar los colores del mensaje. Gmail cambia los textos y fondos sólidos, pero no los gradientes ni las imágenes, y así el texto puede quedar ilegible.</p>
+                                <label class="angels-design-check angels-mt"><input type="checkbox" id="adm-dark-protect" /> Proteger los colores del diseño en modo oscuro</label>
+                                <p class="angels-hint">Mantiene fondos y textos tal como los diseñaste en Gmail y en las apps compatibles. Revísalo con el selector de simulación de la vista previa y, antes de usarlo en el evento, envíate un correo de prueba.</p>
+                                <p class="angels-dark-warn" id="adm-dark-warn" hidden></p>
                             </section>
                             <button type="button" class="angels-btn angels-btn--primary angels-mt" id="adm-save-design">Guardar diseño</button>
                         </div>
@@ -435,6 +487,11 @@
                             <div class="angels-preview-box angels-glass" id="adm-preview-box">
                                 <div class="angels-preview-header">
                                     <span class="angels-preview-title">Vista Previa</span>
+                                    <select id="adm-preview-mode" class="angels-input angels-preview-mode" title="Simulación aproximada: la app real puede variar un poco">
+                                        <option value="">Vista normal</option>
+                                        <option value="full">Modo oscuro · Gmail iPhone</option>
+                                        <option value="partial">Modo oscuro · Gmail Android / Outlook</option>
+                                    </select>
                                     <button type="button" class="angels-btn angels-btn--sm" id="adm-download-html">Descarga HTML</button>
                                 </div>
                                 <iframe class="angels-preview-frame" id="adm-preview-frame" title="Vista previa email"></iframe>
@@ -587,9 +644,18 @@
                             <button type="button" class="angels-icon-btn" data-cmd="bold" title="Negrita"><b>B</b></button>
                             <button type="button" class="angels-icon-btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
                             <button type="button" class="angels-icon-btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
-                            <button type="button" class="angels-icon-btn" data-cmd="justifyLeft" title="Izq">⯇</button>
-                            <button type="button" class="angels-icon-btn" data-cmd="justifyCenter" title="Centro">≡</button>
-                            <button type="button" class="angels-icon-btn" data-cmd="justifyRight" title="Der">⯈</button>
+                            <button type="button" class="angels-icon-btn angels-icon-btn--align" data-cmd="justifyLeft" title="Alinear a la izquierda" aria-label="Alinear a la izquierda">
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.33h8M2 9.67h12M2 13h8" /></svg>
+                            </button>
+                            <button type="button" class="angels-icon-btn angels-icon-btn--align" data-cmd="justifyCenter" title="Centrar" aria-label="Centrar">
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.33h8M2 9.67h12M4 13h8" /></svg>
+                            </button>
+                            <button type="button" class="angels-icon-btn angels-icon-btn--align" data-cmd="justifyRight" title="Alinear a la derecha" aria-label="Alinear a la derecha">
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.33h8M2 9.67h12M6 13h8" /></svg>
+                            </button>
+                            <button type="button" class="angels-icon-btn angels-icon-btn--align" data-cmd="justifyFull" title="Justificar (márgenes rectos)" aria-label="Justificar">
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.33h12M2 9.67h12M2 13h8" /></svg>
+                            </button>
                             <button type="button" class="angels-icon-btn" id="usr-link-btn" title="Hipervínculo">🔗</button>
                             <button type="button" class="angels-icon-btn" id="usr-img-btn" title="Subir imagen (ImgBB)" aria-label="Subir imagen (ImgBB)">🖼</button>
                             <input type="file" id="usr-img-file" accept="image/*" hidden aria-hidden="true" tabindex="-1" />

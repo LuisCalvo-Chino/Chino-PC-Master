@@ -43,18 +43,40 @@ Entrada con enlace + contraseña propia del proyecto. La sesión queda desbloque
 ### 1.1 Diseñador de email con vista previa en vivo
 ![Diseño de email](angeles-capturas/07-organizador-diseno-email.png)
 
-Editor visual de la plantilla del correo, dividido en 5 bloques, con **vista previa en tiempo real**:
+Editor visual de la plantilla del correo, dividido en 6 bloques, con **vista previa en tiempo real**:
 
 1. **Asunto** del correo.
 2. **Fondo de la página** — color plano o gradiente (diagonal, vertical, horizontal o radial).
 3. **Header/banner** — color o gradiente, altura configurable (50–400 px) y **subida de imagen**
    por arrastrar‑y‑soltar; el banner queda alojado en Drive.
 4. **Contenido** — fondo propio y tipografía independiente para **saludo, cuerpo y firma**
-   (familia, tamaño en px y color), más color de **enlaces normales y visitados**.
-5. **Footer** — fondo, mensaje libre en texto o HTML y su propia tipografía.
+   (familia, tamaño en px y color plano o **gradiente de texto**), más color de **enlaces normales
+   y visitados**.
+5. **Footer** — fondo, mensaje libre en texto o HTML y su propia tipografía (también con gradiente).
+6. **Modo oscuro** — casilla **«Proteger los colores del diseño en modo oscuro»** (activada por
+   defecto en proyectos nuevos; los diseños guardados antes de existir la opción la conservan
+   apagada) y aviso si el diseño usa gradientes sin esa protección.
 
-Extras: botón **Descarga HTML** para exportar la plantilla renderizada y **Guardar diseño** para
-dejarla fija en el proyecto. Lo que el Capi ve es exactamente lo que recibirá el angelado.
+Extras: botón **Descarga HTML** para exportar la plantilla renderizada, **Guardar diseño** para
+dejarla fija en el proyecto y un selector en la vista previa para **simular el modo oscuro** de Gmail
+en iPhone y de Gmail en Android / Outlook. Lo que el Capi ve es exactamente lo que recibirá el angelado.
+
+> **Cómo se defiende el correo del modo oscuro.** Todo va dentro del HTML que se guarda al pulsar
+> «Enviar a cola»; el Emisor no cambia. Los mensajes que ya estaban en cola conservan su HTML anterior.
+>
+> - Siempre: el correo declara sus colores como definitivos (`color-scheme: light only`, lo respeta
+>   Apple Mail); cada sección lleva además un color sólido de respaldo (`bgcolor` +
+>   `background-color`) debajo del gradiente, para Outlook de escritorio, y reglas `[data-ogsc]` /
+>   `[data-ogsb]` que devuelven los colores originales en Outlook.com y sus apps.
+> - Con la protección activa: Gmail invierte colores sólidos pero no gradientes, así que cada fondo
+>   sólido se pinta también como un gradiente de un solo color y cada texto como un gradiente
+>   recortado a la forma de las letras (`background-clip: text`). Estas reglas se aplican con
+>   `u + .body` (solo Gmail) y dentro de `@supports` (resto de apps que sepan recortar); donde no
+>   aplican, el texto conserva su color sólido en línea. Los emojis van en `<span class="cpm-emoji">`
+>   con relleno propio: sin eso, el recorte los pintaría como siluetas de un solo color.
+> - Sin cobertura garantizada: la app de Gmail con cuentas que no son de Google (ignora los
+>   `<style>`) y Gmail en Android, donde el recorte de texto se ha reportado inconsistente. Conviene
+>   enviarse un correo de prueba antes de activar la protección en un evento.
 
 ### 1.2 Ángeles y Angelados
 ![Tabla de ángeles](angeles-capturas/08-organizador-tabla-angeles.png)
@@ -111,8 +133,9 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
   marcado (`✅ mensaje en cola` / `✅ mensaje enviado`), pero **no se puede seleccionar**: se ve que
   ese envío está completo en lugar de dejar intentarlo y devolver un error.
 - Campo de **saludo** personalizado (con aviso si se deja vacío).
-- **Editor enriquecido**: negrita, cursiva, subrayado, alineación izquierda/centro/derecha,
-  **inserción de hipervínculos** con texto visible y URL, e **inserción de imágenes**.
+- **Editor enriquecido**: negrita, cursiva, subrayado, alineación izquierda/centro/derecha/
+  **justificada** (márgenes rectos, como en Word), **inserción de hipervínculos** con texto visible
+  y URL, e **inserción de imágenes**.
 - **Vista previa en vivo** del correo final, con el diseño exacto que configuró el Capi.
 - **Descarga HTML** del mensaje.
 - **Enviar a cola**: el mensaje queda guardado como pendiente, listo para el envío programado.

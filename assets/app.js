@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "36"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "37"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -925,7 +925,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.body.appendChild(s);
             }
             appendScript("angels-api-script", "assets/angels-api.js?v=2", () => {
-                appendScript("angels-app-script", "assets/angels-app.js?v=38", resolve);
+                appendScript("angels-app-script", "assets/angels-app.js?v=39", resolve);
             });
             let ticks = 0;
             const timer = window.setInterval(() => {

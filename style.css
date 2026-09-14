@@ -3529,6 +3529,11 @@ main {
     border-top: 1px dashed rgba(255, 255, 255, 0.12);
 }
 
+/* [hidden] debe ganar a display:flex: «Fondo 2 / Orientación» solo con «Gradiente» marcado. */
+.angels-grad-fields[hidden] {
+    display: none;
+}
+
 .angels-input--narrow {
     width: 4.2rem;
     display: inline-block;
@@ -3906,6 +3911,24 @@ main {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.angels-preview-mode {
+    width: auto;
+    max-width: 55%;
+    margin: 0 0.5rem;
+    padding: 4px 8px;
+    font-size: 0.78rem;
+}
+
+.angels-dark-warn {
+    margin: 0.5rem 0 0 0;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 171, 64, 0.45);
+    background: rgba(255, 171, 64, 0.1);
+    color: #ffcc80;
+    font-size: 0.85rem;
+}
+
 .angels-preview-title {
     font-size: 0.8rem;
     color: #80deea;
@@ -4039,6 +4062,23 @@ main {
     color: #e0e0e0;
     padding: 6px 10px;
     cursor: pointer;
+}
+
+/* Alineación: iconos de líneas (como en Word) para distinguir izquierda, centro, derecha y justificar. */
+.angels-icon-btn--align {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.angels-icon-btn--align svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
 }
 
 .angels-disclaimer {

@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-09T15:30:00-06:00",
+    "actualizado": "2026-09-14T16:55:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,51 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-09-14-angeles-justificar-modo-oscuro",
+            "fecha": "2026-09-14T16:55:00-06:00",
+            "producto": "angeles",
+            "titulo": "Texto justificado, gradientes en el texto y correos que resisten el modo oscuro",
+            "resumen": "Salido de lo que pidieron los equipos: el mensaje ya se puede justificar como en Word, y el correo conserva sus colores aunque quien lo lee tenga el tema oscuro activado.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Botón «Justificar» en el editor de «Redactar»: el texto queda con márgenes rectos a ambos lados, como la justificación en bloque de Word, y así llega en el correo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Gradiente en el texto: el saludo, el cuerpo, la firma y el mensaje del footer pueden llevar un gradiente, con segundo color y orientación. Donde una app de correo no lo soporta, el texto sale con su primer color."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Nueva sección «Modo oscuro» en «Diseño email»: la protección mantiene los colores del diseño cuando quien lee usa tema oscuro en Gmail y otras apps. Viene activada en los proyectos nuevos; en los que ya existen se enciende con una casilla."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "La vista previa del Capi puede simular el modo oscuro de Gmail en iPhone y de Gmail en Android / Outlook, y el diseño avisa si usa gradientes sin protección."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Con el tema oscuro activado, el texto de un correo con fondo en gradiente podía volverse blanco sobre un fondo claro y quedar ilegible. Con la protección encendida, el mensaje se ve como se diseñó."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Todos los correos nuevos le piden a Apple Mail y a Outlook que respeten sus colores, y Outlook de escritorio ya no deja en blanco las secciones con gradiente."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Los botones de alineación del editor ahora son iconos de líneas (izquierda, centro, derecha y justificado) con su nombre al pasar el mouse."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "En «Diseño email», «Fondo 2» y «Orientación» ya solo aparecen al marcar «Gradiente»."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Los mensajes que ya estaban en cola salen tal como se guardaron; las mejoras aplican a todo lo que se envíe a cola desde ahora. No hace falta actualizar nada en Google."
+                }
+            ]
+        },
         {
             "id": "2026-09-09-parches",
             "fecha": "2026-09-09T15:30:00-06:00",
