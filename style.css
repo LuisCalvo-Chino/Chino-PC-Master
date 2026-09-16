@@ -3684,6 +3684,14 @@ main {
     color: rgba(224, 230, 255, 0.9);
 }
 
+.angels-notice__detail {
+    margin: 0.75rem 0 0;
+    font-size: 0.7rem;
+    line-height: 1.45;
+    color: rgba(224, 230, 255, 0.55);
+    word-break: break-word;
+}
+
 .angels-notice .angels-modal__actions {
     justify-content: center;
 }

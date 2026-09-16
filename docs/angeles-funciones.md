@@ -146,6 +146,13 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
   interacción (no hay forma de enviar dos veces). Al terminar aparece un aviso de confirmación y,
   al pulsar **Aceptar**, la app se recarga y aterriza en **«Status semanal»** para ver el mensaje
   ya en cola. Si algo falla, el aviso lo explica y no se pierde lo redactado.
+- **Confirmación verificada.** En Apps Script el mensaje se guarda antes de que Google entregue la
+  respuesta (redirección a `script.googleusercontent.com`); si esa entrega falla —pasa en pestañas
+  privadas o de incógnito— llega HTML aunque el guardado se hizo. Ante una respuesta ilegible (HTML,
+  vacía, red o tiempo agotado) la app muestra «Comprobando tu mensaje…», consulta
+  `user_week_status` y decide: en cola → éxito normal; no está → «Tu mensaje no se guardó»; sin
+  respuesta → «No pudimos confirmar el envío» y abre «Status semanal». El guardado no se reenvía
+  solo (`noRetry`) y los avisos llevan una línea de detalle técnico.
 - Aviso de anonimato visible en el propio editor.
 
 ### 2.2 Respuestas

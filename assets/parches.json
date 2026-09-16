@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-16T00:20:00-06:00",
+    "actualizado": "2026-09-16T12:22:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,39 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-09-16-angeles-confirmacion-envio",
+            "fecha": "2026-09-16T12:22:00-06:00",
+            "producto": "angeles",
+            "titulo": "«Enviar a cola» ya no da falsas alarmas en pestañas privadas",
+            "resumen": "Un Ángel veía «No se pudo enviar a cola» aunque su mensaje sí había quedado guardado. Ahora la app comprueba el estado real antes de avisar y el mensaje dice lo que de verdad pasó.",
+            "cambios": [
+                {
+                    "tipo": "corregido",
+                    "texto": "Desde una pestaña privada o de incógnito, Google a veces no entrega la confirmación aunque el mensaje ya se guardó. Antes eso se mostraba como error; ahora la app revisa el estado de la semana y, si el mensaje está en cola, lo confirma como un envío normal."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Pantalla «Comprobando tu mensaje…» mientras se verifica, sin posibilidad de enviar dos veces."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Avisos claros para cada caso: «Tu mensaje no se guardó» (con lo escrito intacto y la sugerencia de reintentar o usar una pestaña normal) o «No pudimos confirmar el envío», que lleva directo a «Status semanal» para revisarlo."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Los avisos de error muestran una línea de detalle técnico, para que el soporte sepa qué respondió Google sin pedir capturas extra."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Si la conexión fallaba después de guardar, la app reenviaba el mensaje por su cuenta y podía terminar en un confuso «ya se ha alojado el mensaje semanal». Ese reenvío automático ya no ocurre al guardar."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "El cambio es solo del sitio: no hace falta actualizar ni volver a publicar el Emisor en Google."
+                }
+            ]
+        },
         {
             "id": "2026-09-16-angeles-pagina-al-dia",
             "fecha": "2026-09-16T00:20:00-06:00",

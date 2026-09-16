@@ -16,6 +16,34 @@
     }
 
     /**
+     * Tipos de fallo (err.kind), para que cada pantalla decida qué decir:
+     * - "server": el Web App respondió JSON con un error propio (la acción NO se completó, o se rechazó).
+     * - "html" | "empty" | "invalid" | "network" | "timeout": no llegó una respuesta legible. En Apps
+     *   Script la acción puede haberse ejecutado igual: doPost corre entero y luego Google redirige a
+     *   script.googleusercontent.com para entregar el resultado; si ese segundo tramo falla (p. ej.
+     *   página de verificación de Google en pestañas privadas / Private Relay) llega HTML.
+     */
+    function apiError(kind, message, detail) {
+        const err = new Error(message);
+        err.kind = kind;
+        if (detail) err.detail = detail;
+        return err;
+    }
+
+    /** Título de la página HTML recibida, para el «detalle técnico». */
+    function htmlTitle(text) {
+        const m = String(text || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        const t = m ? m[1].replace(/\s+/g, " ").trim() : "";
+        return t.slice(0, 120);
+    }
+
+    /** true si el fallo deja en duda si la acción se ejecutó en el servidor. */
+    function isUnconfirmedError(err) {
+        const k = err && err.kind;
+        return k === "html" || k === "empty" || k === "invalid" || k === "network" || k === "timeout";
+    }
+
+    /**
      * Solo text/plain y form-urlencoded: suelen evitar preflight CORS.
      * No usar application/json aquí: dispara OPTIONS y muchos despliegues GAS fallan en el 3.er intento.
      */
@@ -33,27 +61,30 @@
         const rawText = await response.text();
         const trimmed = rawText.trim();
         if (!trimmed) {
-            throw new Error("Respuesta vacía del servidor.");
+            throw apiError("empty", "Respuesta vacía del servidor.", `HTTP ${response.status}`);
         }
         if (looksLikeHtmlResponse(trimmed)) {
-            throw new Error(
-                "El Web App respondió HTML en lugar de JSON. Revisa la implementación y el despliegue."
+            const title = htmlTitle(trimmed);
+            throw apiError(
+                "html",
+                "Google devolvió una página web en lugar de la respuesta de la app. Suele ser pasajero; si se repite, revisa la implementación y el despliegue del Web App.",
+                `HTTP ${response.status}` + (title ? ` · «${title}»` : "")
             );
         }
         let result;
         try {
             result = JSON.parse(trimmed);
         } catch (e) {
-            throw new Error("Respuesta no JSON desde Apps Script.");
+            throw apiError("invalid", "Respuesta no JSON desde Apps Script.", `HTTP ${response.status}`);
         }
         if (!response.ok) {
-            throw new Error(result.message || result.msg || `Error HTTP ${response.status}`);
+            throw apiError("server", result.message || result.msg || `Error HTTP ${response.status}`);
         }
         if (result.status && result.status !== "SUCCESS") {
-            throw new Error(result.message || result.msg || "Operación no completada.");
+            throw apiError("server", result.message || result.msg || "Operación no completada.");
         }
         if (result.ok === false) {
-            throw new Error(result.message || result.msg || "Operación no completada.");
+            throw apiError("server", result.message || result.msg || "Operación no completada.");
         }
         return result;
     }
@@ -61,6 +92,8 @@
     /**
      * @param {object} [opts]
      * @param {number} [opts.timeoutMs] tiempo máximo de espera (p. ej. borrado con Drive)
+     * @param {boolean} [opts.noRetry] no reenviar con otro formato si falla la red: para acciones que
+     *   guardan datos, donde el primer envío pudo llegar aunque la respuesta se perdiera.
      */
     async function postToUrl(url, payload, extraHeaders, opts) {
         if (!url) {
@@ -76,10 +109,12 @@
         const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
         const rawPayload = JSON.stringify(payload);
         const baseHeaders = Object.assign({}, extraHeaders || {});
-        const attempts = buildAttempts(rawPayload).map((a) => ({
-            headers: Object.assign({}, baseHeaders, a.headers),
-            body: a.body
-        }));
+        const attempts = buildAttempts(rawPayload)
+            .slice(0, opts && opts.noRetry ? 1 : undefined)
+            .map((a) => ({
+                headers: Object.assign({}, baseHeaders, a.headers),
+                body: a.body
+            }));
 
         let lastNetworkErr = null;
         try {
@@ -98,7 +133,8 @@
                     return await parseGasJson(response);
                 } catch (err) {
                     if (err?.name === "AbortError") {
-                        throw new Error(
+                        throw apiError(
+                            "timeout",
                             timeoutMs >= 60000
                                 ? "Tiempo de espera agotado (operación larga). Vuelve a intentar o revisa permisos Drive en el Maestro."
                                 : "Tiempo de espera agotado."
@@ -118,12 +154,14 @@
         }
         if (lastNetworkErr instanceof TypeError) {
             const hint = lastNetworkErr.message ? ` Detalle técnico: ${lastNetworkErr.message}` : "";
-            throw new Error(
+            throw apiError(
+                "network",
                 "No se pudo conectar al Web App (red, bloqueo o CORS). Comprueba la URL del Maestro (/exec), el despliegue «Cualquier usuario» y que la página sea https si el script también lo es." +
-                    hint
+                    hint,
+                lastNetworkErr.message || ""
             );
         }
-        throw lastNetworkErr || new Error("No se pudo conectar.");
+        throw lastNetworkErr || apiError("network", "No se pudo conectar.");
     }
 
     /**
@@ -150,6 +188,7 @@
     window.CPMAngelsApi = {
         masterUrl,
         postMaster,
-        postSender
+        postSender,
+        isUnconfirmedError
     };
 })();

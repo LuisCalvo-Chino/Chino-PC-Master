@@ -736,12 +736,17 @@
         const icon = document.getElementById("angels-notice-icon");
         const title = document.getElementById("angels-notice-title");
         const text = document.getElementById("angels-notice-text");
+        const detail = document.getElementById("angels-notice-detail");
         const btn = document.getElementById("angels-notice-accept");
         const isError = o.variant === "error";
         el.classList.toggle("angels-notice--error", isError);
         if (icon) icon.textContent = o.icon || (isError ? "⚠️" : "✅");
         if (title) title.textContent = o.title || (isError ? "No se pudo completar" : "Listo");
         if (text) text.textContent = o.text || "";
+        if (detail) {
+            detail.textContent = o.detail ? `Detalle técnico: ${o.detail}` : "";
+            detail.hidden = !o.detail;
+        }
         if (btn) btn.textContent = o.acceptLabel || "Aceptar";
         el.hidden = false;
         return new Promise((resolve) => {
@@ -2278,6 +2283,55 @@
            «Enviar a cola» no pueda dispararse dos veces, y el resultado se confirma en modal. */
         let userSaveInFlight = false;
 
+        const isUnconfirmedError = (err) =>
+            Boolean(api.isUnconfirmedError && api.isUnconfirmedError(err));
+
+        /**
+         * Tras un fallo sin respuesta legible, pregunta al Emisor si el mensaje del Ángel ya está en la
+         * semana actual. true = guardado · false = no está · null = no se pudo comprobar.
+         * Si el fallo fue por tiempo agotado, el guardado puede seguir en curso: se reintenta el «no está».
+         */
+        async function checkUserMessageSaved(row, cause) {
+            const wait = (ms) => new Promise((r) => window.setTimeout(r, ms));
+            const angel = String(row.nombre_angel || "");
+            let answer = null;
+            for (let i = 0; i < 3; i++) {
+                if (i) await wait(cause && cause.kind === "timeout" ? 4000 : 1500);
+                try {
+                    const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
+                        action: "user_week_status",
+                        week: ""
+                    });
+                    const data = res.data || res;
+                    const rows = data.rows || [];
+                    absorbWeekStatusRows(rows, data.requested_week, data.current_week);
+                    const hit = rows.find((r) => String(r.angel || "") === angel);
+                    const st = String((hit && hit.status) || "MISSING").toUpperCase();
+                    if (st !== "MISSING") return true;
+                    answer = false;
+                    if (!(cause && cause.kind === "timeout")) return false;
+                } catch (err) {
+                    /* se reintenta; si nunca responde, queda en «no se pudo comprobar» */
+                }
+            }
+            return answer;
+        }
+
+        async function finishUserSaveOk(row) {
+            setBusyOverlay(false);
+            if (ed) ed.innerHTML = "";
+            updateUserPreview();
+            await showNoticeModal({
+                title: "Mensaje en cola",
+                text:
+                    "Tu mensaje para " +
+                    row.nombre_angelado +
+                    " quedó guardado correctamente y está en cola para el envío programado. Al aceptar recargaremos la página y te llevaremos a «Status semanal» para que veas su estado."
+            });
+            setPendingTab("user", hash, "status");
+            window.location.reload();
+        }
+
         document.getElementById("usr-save-msg")?.addEventListener("click", async () => {
             if (userSaveInFlight) return;
             if (!resolved) {
@@ -2313,6 +2367,8 @@
                 "Enviando a cola…",
                 "Estamos guardando tu mensaje en el sistema. Puede tardar unos segundos: no cierres ni recargues esta ventana."
             );
+            let row = null;
+            let saveAttempted = false;
             try {
                 await refreshUserDesignFromServer({ force: true });
                 const ix = Number(sel.value);
@@ -2324,36 +2380,71 @@
                     list = resList.data?.angeles || resList.angeles || [];
                     angelesList = list;
                 }
-                const row = list[ix];
+                row = list[ix];
                 if (!row) throw new Error("Selecciona un Ángel antes de enviar.");
                 const html = buildEmailDocument(userDesignForPreview(), ed?.innerHTML || "");
-                await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                    action: "user_save_message",
-                    nombre_angel: row.nombre_angel,
-                    nombre_angelado: row.nombre_angelado,
-                    email_angelado: row.email_angelado,
-                    html_mensaje: html
-                });
-                setBusyOverlay(false);
-                if (ed) ed.innerHTML = "";
-                updateUserPreview();
-                await showNoticeModal({
-                    title: "Mensaje en cola",
-                    text:
-                        "Tu mensaje para " +
-                        row.nombre_angelado +
-                        " quedó guardado correctamente y está en cola para el envío programado. Al aceptar recargaremos la página y te llevaremos a «Status semanal» para que veas su estado."
-                });
-                setPendingTab("user", hash, "status");
-                window.location.reload();
+                saveAttempted = true;
+                /* Sin reintento automático: si el primer envío llegó y se perdió la respuesta,
+                   un segundo envío solo traería «ya se ha alojado el mensaje semanal». */
+                await api.postSender(
+                    resolved.sender_exec_url,
+                    resolved.secret,
+                    {
+                        action: "user_save_message",
+                        nombre_angel: row.nombre_angel,
+                        nombre_angelado: row.nombre_angelado,
+                        email_angelado: row.email_angelado,
+                        html_mensaje: html
+                    },
+                    { noRetry: true }
+                );
+                await finishUserSaveOk(row);
             } catch (e) {
+                /* En Apps Script el guardado ocurre antes de que Google entregue la respuesta; si esa
+                   entrega falla (p. ej. pestañas privadas o de incógnito), el mensaje puede estar en
+                   cola aunque aquí llegue un error. Se comprueba el estado real antes de avisar. */
+                if (saveAttempted && row && isUnconfirmedError(e)) {
+                    setBusyOverlay(
+                        true,
+                        "Comprobando tu mensaje…",
+                        "Google no devolvió la confirmación. Estamos revisando si tu mensaje quedó en cola; no cierres esta ventana."
+                    );
+                    const saved = await checkUserMessageSaved(row, e);
+                    if (saved === true) {
+                        await finishUserSaveOk(row);
+                        return;
+                    }
+                    setBusyOverlay(false);
+                    if (saved === false) {
+                        await showNoticeModal({
+                            variant: "error",
+                            title: "Tu mensaje no se guardó",
+                            text:
+                                "La conexión con Google se interrumpió y el mensaje no quedó en cola. Lo que escribiste sigue aquí: espera un minuto y vuelve a pulsar «Enviar a cola». Si estás en una pestaña privada o de incógnito y se repite, abre el enlace en una pestaña normal.",
+                            detail: e.detail || ""
+                        });
+                    } else {
+                        await showNoticeModal({
+                            variant: "error",
+                            title: "No pudimos confirmar el envío",
+                            text:
+                                "Google no devolvió la confirmación y tampoco pudimos comprobar el estado de tu mensaje. Antes de volver a enviarlo, revisa «Status semanal»: si tu Ángel aparece como 📧 Envío pendiente, ya está en cola. Lo que escribiste sigue aquí.",
+                            detail: e.detail || "",
+                            acceptLabel: "Ver Status semanal"
+                        });
+                        showUserTab("status");
+                        void loadUserTabData("status");
+                    }
+                    return;
+                }
                 setBusyOverlay(false);
                 /* Si el rechazo fue porque ya había mensaje, el selector debe reflejarlo al volver. */
                 void refreshUserAngelLocks({ force: true });
                 await showNoticeModal({
                     variant: "error",
                     title: "No se pudo enviar a cola",
-                    text: e.message || "Error al guardar el mensaje. Vuelve a intentarlo en unos minutos."
+                    text: e.message || "Error al guardar el mensaje. Vuelve a intentarlo en unos minutos.",
+                    detail: e.detail || ""
                 });
             } finally {
                 userSaveInFlight = false;
