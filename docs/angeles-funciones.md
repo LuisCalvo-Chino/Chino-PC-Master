@@ -103,6 +103,7 @@ Vista central para revisar, sin salir del panel, qué escribió cada quien:
   lo dice explícitamente.
 - **Selector de semana** para revisar semanas anteriores sin cambiar de pestaña; al cambiar de
   semana se recarga el mensaje del Ángel que estuviera seleccionado.
+- **Refrescar** para releer los estados sin recargar el panel.
 - **Descarga HTML** del mensaje que se está viendo.
 - En móvil, la Vista Previa es un desplegable, igual que en «Diseño de email» y «Redactar».
 
@@ -132,6 +133,8 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
 - El Ángel que **ya tiene su mensaje de la semana** aparece en la lista en tono verde apagado y
   marcado (`✅ mensaje en cola` / `✅ mensaje enviado`), pero **no se puede seleccionar**: se ve que
   ese envío está completo en lugar de dejar intentarlo y devolver un error.
+- Debajo del selector, una nota lista **quiénes ya cumplieron esta semana**; si están todos, avisa que
+  no queda nada por redactar y remite a «Status semanal».
 - Campo de **saludo** personalizado (con aviso si se deja vacío).
 - **Editor enriquecido**: negrita, cursiva, subrayado, alineación izquierda/centro/derecha/
   **justificada** (márgenes rectos, como en Word), **inserción de hipervínculos** con texto visible

@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-14T16:55:00-06:00",
+    "actualizado": "2026-09-16T00:20:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,39 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-09-16-angeles-pagina-al-dia",
+            "fecha": "2026-09-16T00:20:00-06:00",
+            "producto": "sitio",
+            "titulo": "La página de Ángeles Secretos se pone al día",
+            "resumen": "El catálogo público de la herramienta ya cuenta todo lo que se ganó en los últimos parches, y ahora abre con un resumen de novedades.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Bloque «Lo último» al inicio de la página, con las novedades de los parches recientes y un enlace directo a esta bitácora."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Apartado propio sobre el modo oscuro: qué hace la casilla de protección, las dos simulaciones de la vista previa, el aviso de gradientes y la recomendación de enviarse un correo de prueba."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Se documenta que «Guardar tabla» bloquea la pantalla, confirma cuántas filas quedaron guardadas y relee la hoja para no duplicar filas ni correos."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Se documenta la lista de quiénes ya cumplieron en la semana, el botón «Refrescar» de «Mensajes» y de «Mantenimiento», y que los selectores solo ofrecen semanas reales."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "El apartado del editor detalla la alineación justificada, los hipervínculos con texto visible y la subida de imágenes; el de móvil aclara que la vista previa flotante también está en «Diseño email» y «Mensajes»."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "«Por qué se usa» suma la tarjeta «No se descolora en modo oscuro»."
+                }
+            ]
+        },
         {
             "id": "2026-09-14-angeles-justificar-modo-oscuro",
             "fecha": "2026-09-14T16:55:00-06:00",
