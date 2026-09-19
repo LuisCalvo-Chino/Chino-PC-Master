@@ -925,7 +925,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.body.appendChild(s);
             }
             appendScript("angels-api-script", "assets/angels-api.js?v=3", () => {
-                appendScript("angels-app-script", "assets/angels-app.js?v=40", resolve);
+                appendScript("angels-app-script", "assets/angels-app.js?v=41", resolve);
             });
             let ticks = 0;
             const timer = window.setInterval(() => {

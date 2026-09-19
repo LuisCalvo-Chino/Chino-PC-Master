@@ -4,7 +4,7 @@
  */
 (function () {
     const MASTER_PIN_KEY = "cpm_angels_master_pin";
-    const EMISOR_SCRIPT_ASSET = "assets/gas-angels-emisor-Código.js.txt?v=1";
+    const EMISOR_SCRIPT_ASSET = "assets/gas-angels-emisor-Código.js.txt?v=2";
     /** Evita doble envío si hubiera varios listeners en «Guardar» edición. */
     let angelsEditSaveLocked = false;
     let angelsEditSetupLocked = false;
@@ -55,6 +55,102 @@
             .replace(/&/g, "&amp;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
+    }
+
+    /* ——— Respuestas: solo el texto que escribió el angelado, nunca el HTML del correo ——— */
+
+    const REPLY_BLOCK_TAGS = new Set([
+        "ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "CENTER", "DD", "DIV", "DL", "DT", "FOOTER",
+        "FORM", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HR", "LI", "OL", "P", "PRE",
+        "SECTION", "TABLE", "TBODY", "TD", "TH", "THEAD", "TR", "UL"
+    ]);
+
+    /** Texto visible de un nodo, con salto de línea donde el correo tenía bloques o <br>. */
+    function replyNodeText(node) {
+        let out = "";
+        const walk = (n) => {
+            if (n.nodeType === 3) {
+                out += n.nodeValue.replace(/\s+/g, " ");
+                return;
+            }
+            if (n.nodeType !== 1) return;
+            if (n.tagName === "BR") {
+                out += "\n";
+                return;
+            }
+            /* Un bloque abre y cierra línea, pero dos <div> seguidos no dejan una línea en blanco. */
+            const block = REPLY_BLOCK_TAGS.has(n.tagName);
+            if (block && out && !out.endsWith("\n")) out += "\n";
+            n.childNodes.forEach(walk);
+            if (block && !out.endsWith("\n")) out += "\n";
+        };
+        walk(node);
+        return out;
+    }
+
+    /** Del HTML del correo quita estilos y el mensaje citado (Gmail, Outlook, Yahoo, Apple, Thunderbird). */
+    function replyTextFromHtml(html) {
+        const doc = new DOMParser().parseFromString(String(html || ""), "text/html");
+        doc.querySelectorAll(
+            "script, style, head, title, img, .gmail_quote, .gmail_attr, blockquote, .yahoo_quoted, [id^='yahoo_quoted'], .moz-cite-prefix"
+        ).forEach((el) => el.remove());
+        /* Outlook: todo lo que sigue a la cabecera «De: … Enviado: …» es el mensaje original. */
+        ["#divRplyFwdMsg", "#appendonsend", "#mail-editor-reference-message-container"].forEach((sel) => {
+            const mark = doc.querySelector(sel);
+            if (!mark) return;
+            for (let el = mark; el && el !== doc.body; el = el.parentNode) {
+                while (el.nextSibling) el.nextSibling.remove();
+            }
+            mark.remove();
+        });
+        return doc.body ? replyNodeText(doc.body) : "";
+    }
+
+    /** Corta en la cabecera de la cita («El … escribió:», «On … wrote:», «De: … Enviado:») y quita líneas «>». */
+    function stripQuotedReplyText(text) {
+        const lines = String(text || "")
+            .replace(/\r\n?/g, "\n")
+            .split("\n")
+            .map((l) => l.trim());
+        const quoteHead = /(escribi[óo]|wrote|a écrit|schrieb|escreveu)\s*:\s*$/i;
+        const out = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const next = lines[i + 1] || "";
+            /* Gmail parte a veces la cabecera en dos líneas («… <correo@\nx.com> escribió:»). */
+            if (/^(El|On|Le|Am|Em)\s/i.test(line) && (quoteHead.test(line) || quoteHead.test(`${line} ${next}`))) {
+                break;
+            }
+            /* Marcadores de imagen de la versión en texto («[image: foto.png]»). */
+            if (/^\[(image|imagen)\s*:[^\]]*\]$/i.test(line)) continue;
+            if (/^-{2,}\s*(original message|mensaje original|forwarded message|mensaje reenviado)/i.test(line)) break;
+            if (/^_{8,}$/.test(line)) break;
+            if (/^(De|From)\s*:/i.test(line) && /^(Enviado|Sent|Fecha|Date)\s*:/i.test(next)) break;
+            if (/^>/.test(line)) continue;
+            out.push(line);
+        }
+        return out
+            .join("\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    /** Lo que respondió el angelado como texto simple; si el HTML no deja nada, usa la versión en texto. */
+    function replyPlainText(it) {
+        const fromHtml = it && it.html ? stripQuotedReplyText(replyTextFromHtml(it.html)) : "";
+        return fromHtml || stripQuotedReplyText(it && it.text);
+    }
+
+    function formatReplyDate(iso) {
+        const d = iso ? new Date(iso) : null;
+        if (!d || isNaN(d.getTime())) return "";
+        return d.toLocaleString("es-CR", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            hour: "numeric",
+            minute: "2-digit"
+        });
     }
 
     /** «W3» → 3. W0 es interna (fechas previas al inicio) y nunca se ofrece en los selectores. */
@@ -2040,17 +2136,25 @@
             const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
                 action: "fetch_inbox_replies"
             });
-            const items = res.data?.items || res.items || [];
+            const items = (res.data?.items || res.items || []).slice();
             const acc = document.getElementById("usr-replies-acc");
             if (!acc) return;
-            acc.innerHTML = items
-                .map(
-                    (it) =>
-                        `<details class="angels-acc-item"><summary>${esc(
+            /* Más reciente primero (el Emisor anterior no manda fecha y conserva su orden). */
+            items.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+            acc.innerHTML =
+                items
+                    .map((it) => {
+                        const when = formatReplyDate(it.date);
+                        const body = replyPlainText(it);
+                        const meta = when ? `<p class="angels-reply-meta">Recibida el ${esc(when)}</p>` : "";
+                        const text = body
+                            ? `<div class="angels-reply-text">${esc(body)}</div>`
+                            : '<p class="angels-reply-meta">La respuesta no trae texto (puede ser solo una imagen o un adjunto).</p>';
+                        return `<details class="angels-acc-item"><summary>${esc(
                             formatReplySummaryTitle(it)
-                        )}</summary><div class="angels-acc-body">${it.html || esc(it.text || "")}</div></details>`
-                )
-                .join("") || "<p>Sin respuestas esta semana.</p>";
+                        )}</summary><div class="angels-acc-body">${meta}${text}</div></details>`;
+                    })
+                    .join("") || "<p>Todavía no hay respuestas.</p>";
         }
 
         async function refreshBuddies() {

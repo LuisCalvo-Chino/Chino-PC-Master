@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-16T12:22:00-06:00",
+    "actualizado": "2026-09-19T02:45:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,35 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-09-19-angeles-respuestas-legibles",
+            "fecha": "2026-09-19T02:45:00-06:00",
+            "producto": "angeles",
+            "titulo": "Respuestas fáciles de leer y en la semana correcta",
+            "resumen": "La pestaña «Respuestas» ahora muestra solo lo que escribió el angelado, en letra blanca sobre el fondo oscuro, y cada respuesta queda en la semana del mensaje que está contestando.",
+            "cambios": [
+                {
+                    "tipo": "mejorado",
+                    "texto": "Cada respuesta se muestra como texto simple: sin los colores, tablas e imágenes del correo, y sin el mensaje original que el correo copia debajo. Se conservan los saltos de línea de quien escribió."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "El texto de las respuestas se veía oscuro o con formatos extraños sobre el fondo de la plataforma. Ahora siempre va en blanco y se lee sin esfuerzo."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "Las respuestas que llegaban de jueves a martes se marcaban con la semana siguiente (por ejemplo, contestar el jueves a la Semana 2 aparecía como Semana 3). Ahora cada respuesta toma la semana del último mensaje que recibió el angelado; si no hay registro, cuenta de miércoles a martes."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Debajo de cada respuesta aparece el día y la hora en que llegó, y la más reciente se muestra arriba."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "La semana correcta y la fecha requieren actualizar el Emisor: copia el código nuevo desde el Maestro, pégalo en Apps Script y publica una nueva versión del Web App. El texto limpio en blanco funciona desde ya, sin tocar el Emisor."
+                }
+            ]
+        },
         {
             "id": "2026-09-16-angeles-confirmacion-envio",
             "fecha": "2026-09-16T12:22:00-06:00",

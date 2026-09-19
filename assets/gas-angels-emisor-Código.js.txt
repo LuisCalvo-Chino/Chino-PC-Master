@@ -1,7 +1,7 @@
 /**
  * Ángeles — Apps Script Emisor (hojas locales, cola de envío, Gmail).
  * Script Properties: SPREADSHEET_ID, PROJECT_SECRET, ADMIN_SALT, ADMIN_PASS_HASH, FECHA_INICIO_ISO, QUEUE_SLEEP_MS (opcional, ms entre envíos; default 2000)
- * Semanas: jueves 00:00 → miércoles fin de día (zona del script). W1 = semana que contiene FECHA_INICIO_ISO. Envío automático: activador semanal **miércoles** en el editor de Google apuntando a **processPendingQueue** (función pública; las que terminan en _ no suelen listarse en el menú Ejecutar).
+ * Semanas: jueves 00:00 → miércoles fin de día (zona del script). W1 = semana que contiene FECHA_INICIO_ISO. Respuestas: se marcan con la semana del último envío al angelado (o, sin registro, del miércoles anterior: miércoles → martes). Envío automático: activador semanal **miércoles** en el editor de Google apuntando a **processPendingQueue** (función pública; las que terminan en _ no suelen listarse en el menú Ejecutar).
  * Tras crear proyecto en Maestro, ejecuta acción setup_project con los datos devueltos (una vez).
  *
  * Copia sincronizada desde ChinoPCMasterAppScripts/fuentes-apps-script/angels_sender/Código.js
@@ -684,15 +684,63 @@ function handleUserWeekStatus_(data) {
   return { status: "SUCCESS", data: { rows: out, current_week: currentWk, requested_week: wk } };
 }
 
+/**
+ * Semana a la que responde un correo recibido el día `date` cuando no hay envío registrado:
+ * los mensajes salen el miércoles (último día de su semana jueves→miércoles), así que todo lo que
+ * llega de ese miércoles al martes siguiente contesta a la semana de ese miércoles.
+ */
+function computeReplyWeekKeyForDate_(date) {
+  initSheets_();
+  const tz = Session.getScriptTimeZone();
+  const startIso = String(getProp_("FECHA_INICIO_ISO") || "").trim();
+  if (!startIso) return "W0";
+  const start = parseStartIsoToLocalParts_(startIso, tz);
+  if (!start) return "W0";
+  const dt = date instanceof Date ? date : new Date(date);
+  if (isNaN(dt.getTime())) return "W0";
+  const y = Number(Utilities.formatDate(dt, tz, "yyyy"));
+  const mo = Number(Utilities.formatDate(dt, tz, "MM"));
+  const d = Number(Utilities.formatDate(dt, tz, "dd"));
+  const idx = ymdToDayIndex_(y, mo, d);
+  const daysSinceWed = (dowFromYmd_(y, mo, d) - 3 + 7) % 7;
+  // El jueves que abre la semana del miércoles anterior (o del mismo día si es miércoles).
+  const wedThu = idx - daysSinceWed - 6;
+  const startThu = thursdayDayIndexForCalendar_(start.y, start.mo, start.d);
+  const n = 1 + Math.floor((wedThu - startThu) / 7);
+  if (n < 1) return "W0";
+  return "W" + n;
+}
+
+/** Envíos registrados en «Enviados», por correo del angelado: [{ week, at (ms) }]. */
+function readSentByEmail_() {
+  initSheets_();
+  const v = getSs_().getSheetByName("Enviados").getDataRange().getValues();
+  const out = {};
+  for (let r = 1; r < v.length; r++) {
+    const email = String(v[r][3] || "").trim().toLowerCase();
+    const week = String(v[r][0] || "").trim();
+    const at = new Date(v[r][5]).getTime();
+    if (!email || !week || isNaN(at)) continue;
+    (out[email] = out[email] || []).push({ week: week, at: at });
+  }
+  return out;
+}
+
+/**
+ * Respuestas de los angelados en la bandeja de entrada. Cada una se marca con la semana del último
+ * mensaje que el angelado recibió antes de contestar (hoja «Enviados»); si no hay registro, con la
+ * semana del miércoles de envío anterior (miércoles → martes).
+ */
 function handleFetchInboxReplies_() {
-  const emails = readAngelesRows_()
+  const angeles = readAngelesRows_();
+  const emails = angeles
     .map(function (r) {
       return String(r.email_angelado || "").trim().toLowerCase();
     })
     .filter(Boolean);
+  const sentByEmail = readSentByEmail_();
   const threads = GmailApp.getInboxThreads(0, 30);
   const items = [];
-  const angeles = readAngelesRows_();
   threads.forEach(function (th) {
     const msgs = th.getMessages();
     msgs.forEach(function (m) {
@@ -705,20 +753,35 @@ function handleFetchInboxReplies_() {
       let angeladoName = "";
       let angelName = "";
       angeles.forEach(function (r) {
-        if (String(r.email_angelado || "").toLowerCase() === matchEmail) {
+        if (String(r.email_angelado || "").trim().toLowerCase() === matchEmail) {
           angeladoName = r.nombre_angelado;
           angelName = r.nombre_angel;
         }
       });
-      const title = "Respuesta de " + angeladoName + " a " + angelName;
-      const week = computeWeekKeyForDate_(m.getDate());
+      const date = m.getDate();
+      const at = date.getTime();
+      let week = "";
+      let lastSent = -1;
+      (sentByEmail[matchEmail] || []).forEach(function (s) {
+        if (s.at <= at && s.at > lastSent) {
+          lastSent = s.at;
+          week = s.week;
+        }
+      });
+      if (!week) week = computeReplyWeekKeyForDate_(date);
       items.push({
         week: week,
-        title: title,
+        date: date.toISOString(),
+        angel: angelName,
+        angelado: angeladoName,
+        title: "Respuesta de " + angeladoName + " a " + angelName,
         text: m.getPlainBody(),
         html: m.getBody()
       });
     });
+  });
+  items.sort(function (a, b) {
+    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
   });
   return { status: "SUCCESS", data: { items: items } };
 }

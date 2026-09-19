@@ -4117,6 +4117,25 @@ main {
     font-size: 0.85rem;
 }
 
+/* Respuestas: solo el texto del angelado, siempre legible sobre el fondo oscuro. */
+.angels-reply-meta {
+    margin: 0 0 0.45rem;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.angels-reply-text {
+    color: #fff;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 0.65rem 0.8rem;
+    border-left: 3px solid rgba(0, 229, 255, 0.55);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
 .angels-simple-list {
     list-style: none;
     padding: 0;

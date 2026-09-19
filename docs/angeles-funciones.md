@@ -158,8 +158,16 @@ Sin registro, sin contraseña: se abre el enlace y ya está. Cuatro pestañas.
 ### 2.2 Respuestas
 ![Respuestas](angeles-capturas/11-participante-respuestas.png)
 
-Bandeja en acordeón con las respuestas recibidas del angelado, agrupadas y rotuladas por semana.
-El hilo se mantiene sin romper el anonimato.
+Bandeja en acordeón con las respuestas recibidas del angelado, rotuladas por semana y con la más
+reciente arriba. El hilo se mantiene sin romper el anonimato.
+
+- **Solo texto.** Nunca se inserta el HTML del correo: se extrae el texto que escribió el angelado
+  (sin estilos, imágenes ni el mensaje citado de Gmail, Outlook, Yahoo, Apple o Thunderbird) y se
+  muestra en blanco, respetando sus saltos de línea. Debajo del título va la fecha de recepción.
+- **Semana correcta.** Cada respuesta se marca con la semana del último mensaje que el angelado
+  recibió antes de contestar (hoja «Enviados»). Si no hay registro, cuenta de miércoles a martes:
+  lo que llega del miércoles de envío al martes siguiente responde a la semana de ese miércoles.
+  Requiere el Emisor actualizado; con uno anterior se ve la semana jueves→miércoles de antes.
 
 ### 2.3 Asignaciones
 ![Asignaciones](angeles-capturas/12-participante-asignaciones.png)
