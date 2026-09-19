@@ -167,7 +167,10 @@ reciente arriba. El hilo se mantiene sin romper el anonimato.
 - **Semana correcta.** Cada respuesta se marca con la semana del último mensaje que el angelado
   recibió antes de contestar (hoja «Enviados»). Si no hay registro, cuenta de miércoles a martes:
   lo que llega del miércoles de envío al martes siguiente responde a la semana de ese miércoles.
-  Requiere el Emisor actualizado; con uno anterior se ve la semana jueves→miércoles de antes.
+  Con un Emisor anterior (no manda la fecha de la respuesta), el sitio lee la fecha del mensaje del
+  Ángel citado en la respuesta («El mié, 16 sept 2026… escribió:», «Enviado: miércoles, 16 de
+  septiembre de 2026») y la ubica respecto a la semana en curso; si no hay cita, queda la semana
+  que mande el Emisor.
 
 ### 2.3 Asignaciones
 ![Asignaciones](angeles-capturas/12-participante-asignaciones.png)

@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-19T02:45:00-06:00",
+    "actualizado": "2026-09-19T10:30:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,23 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-09-19-angeles-semana-respuestas-sin-emisor",
+            "fecha": "2026-09-19T10:30:00-06:00",
+            "producto": "angeles",
+            "titulo": "La semana de cada respuesta ya sale bien sin actualizar el Emisor",
+            "resumen": "Las respuestas a la Semana 2 seguían apareciendo como Semana 3 en los proyectos con el Emisor anterior. Ahora el sitio mismo lo corrige.",
+            "cambios": [
+                {
+                    "tipo": "corregido",
+                    "texto": "Cada respuesta toma la semana del mensaje del Ángel que está contestando, usando la fecha que el correo trae citada («El mié, 16 sept 2026… escribió:»). Funciona con Gmail, iPhone y Outlook, en español o inglés."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Ya no hace falta volver a publicar el Emisor para ver la semana correcta. Si se actualiza, además aparece el día y la hora en que llegó cada respuesta."
+                }
+            ]
+        },
         {
             "id": "2026-09-19-angeles-respuestas-legibles",
             "fecha": "2026-09-19T02:45:00-06:00",

@@ -141,6 +141,80 @@
         return fromHtml || stripQuotedReplyText(it && it.text);
     }
 
+    const REPLY_MONTHS = {
+        ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6, jul: 7,
+        ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12
+    };
+
+    /** «16 sept 2026», «16 de septiembre de 2026», «Sep 16, 2026» o «16/9/2026» → { y, m, d }. */
+    function parseQuotedDate(s) {
+        const str = String(s || "");
+        let m = str.match(/\b(\d{1,2})\s+(?:de\s+)?([a-záéíóú]{3,})\.?,?\s+(?:de\s+)?(20\d{2})\b/i);
+        if (m && REPLY_MONTHS[m[2].slice(0, 3).toLowerCase()]) {
+            return { y: Number(m[3]), m: REPLY_MONTHS[m[2].slice(0, 3).toLowerCase()], d: Number(m[1]) };
+        }
+        m = str.match(/\b([a-z]{3,})\.?\s+(\d{1,2}),?\s+(20\d{2})\b/i);
+        if (m && REPLY_MONTHS[m[1].slice(0, 3).toLowerCase()]) {
+            return { y: Number(m[3]), m: REPLY_MONTHS[m[1].slice(0, 3).toLowerCase()], d: Number(m[2]) };
+        }
+        m = str.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/);
+        if (m) return { y: Number(m[3]), m: Number(m[2]), d: Number(m[1]) };
+        return null;
+    }
+
+    /**
+     * Fecha del mensaje del Ángel que el angelado está contestando, leída de la cabecera de la cita
+     * («El mié, 16 sept 2026 a las 20:05, … escribió:» o «Enviado: miércoles, 16 de septiembre de 2026»).
+     */
+    function quotedSendDate(it) {
+        let full = "";
+        if (it && it.html) {
+            const doc = new DOMParser().parseFromString(String(it.html), "text/html");
+            doc.querySelectorAll("script, style, head, title").forEach((el) => el.remove());
+            full = doc.body ? replyNodeText(doc.body) : "";
+        }
+        full += `\n${(it && it.text) || ""}`;
+        const lines = full.split("\n").map((l) => l.trim());
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const two = `${line} ${lines[i + 1] || ""}`;
+            if (/^(El|On|Le|Am|Em)\s/i.test(line) && /(escribi[óo]|wrote|a écrit|schrieb|escreveu)\s*:/i.test(two)) {
+                const d = parseQuotedDate(two);
+                if (d) return d;
+            }
+            if (/^(Enviado|Sent|Fecha|Date)\s*:/i.test(line)) {
+                const d = parseQuotedDate(line);
+                if (d) return d;
+            }
+        }
+        return null;
+    }
+
+    /** Índice del jueves que abre la semana jueves→miércoles del día dado (mismo modelo que el Emisor). */
+    function thursdayIndex(y, m, d) {
+        const idx = Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+        const dow = (idx + 4) % 7;
+        return idx - ((dow - 4 + 7) % 7);
+    }
+
+    /**
+     * Semana a la que contesta una respuesta. El Emisor actual ya la calcula (y manda `date`); con un
+     * Emisor anterior se toma la semana del envío citado, relativa a la semana en curso.
+     */
+    function replyWeekKey(it, currentWeek) {
+        if (it && it.date) return it.week;
+        const cur = weekNumFromKey(currentWeek);
+        const sent = cur >= 1 ? quotedSendDate(it) : null;
+        if (!sent) return it && it.week;
+        const now = new Date();
+        const weeksAgo = Math.round(
+            (thursdayIndex(now.getFullYear(), now.getMonth() + 1, now.getDate()) - thursdayIndex(sent.y, sent.m, sent.d)) / 7
+        );
+        if (weeksAgo < 0) return it.week;
+        const n = cur - weeksAgo;
+        return n >= 1 ? `W${n}` : "W0";
+    }
+
     function formatReplyDate(iso) {
         const d = iso ? new Date(iso) : null;
         if (!d || isNaN(d.getTime())) return "";
@@ -2133,10 +2207,18 @@
 
         async function refreshReplies() {
             if (!resolved) return;
-            const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                action: "fetch_inbox_replies"
-            });
-            const items = (res.data?.items || res.items || []).slice();
+            /* La semana en curso sirve para ubicar el envío citado cuando el Emisor no manda fecha. */
+            const [res, statusRes] = await Promise.all([
+                api.postSender(resolved.sender_exec_url, resolved.secret, { action: "fetch_inbox_replies" }),
+                api
+                    .postSender(resolved.sender_exec_url, resolved.secret, { action: "user_week_status", week: "" })
+                    .catch(() => null)
+            ]);
+            const currentWeek = statusRes?.data?.current_week || statusRes?.current_week || "";
+            const items = (res.data?.items || res.items || []).map((it) => ({
+                ...it,
+                week: replyWeekKey(it, currentWeek)
+            }));
             const acc = document.getElementById("usr-replies-acc");
             if (!acc) return;
             /* Más reciente primero (el Emisor anterior no manda fecha y conserva su orden). */
