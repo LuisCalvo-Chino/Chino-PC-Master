@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-07T01:58:00-06:00",
+    "actualizado": "2026-10-07T02:49:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -35,55 +35,124 @@
     ],
     "parches": [
         {
-            "id": "2026-10-07-sitio",
-            "fecha": "2026-10-07T01:58:00-06:00",
-            "producto": "sitio",
-            "titulo": "Nueva página de Servicios, Inicio renovado y contacto por WhatsApp, Instagram o Messenger",
-            "resumen": "«Soluciones» ahora se llama «Servicios» y explica, sin palabras técnicas, todo lo que puedo hacer por usted. El Inicio invita a explorar y a seguirme en redes, con chat directo por WhatsApp, Instagram o Messenger, y el sitio estrena ícono propio y una tarjeta de presentación al compartir el enlace.",
+            "id": "2026-10-07-sitio-rifa",
+            "fecha": "2026-10-07T02:49:00-06:00",
+            "producto": [
+                "sitio",
+                "rifa"
+            ],
+            "titulo": "Servicios, Inicio renovado y Rifas Digitales más fáciles de usar",
+            "resumen": "«Soluciones» ahora se llama «Servicios» y el Inicio invita a explorar y a escribir por WhatsApp, Instagram o Messenger. Las rifas se manejan ahora desde el teléfono con un asistente, la lista de quién debe y la imagen y el mensaje listos para compartir.",
             "cambios": [
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "17 servicios ordenados en cuatro grupos: Computadoras, Redes e internet, Negocios y aplicaciones, y Asesoría. Cada uno empieza con la pregunta que usted ya se hace y dice qué incluye."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Botón «Solicitar» en cada servicio que abre WhatsApp con el mensaje listo, y una sección que explica cómo trabajo, paso a paso."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Ícono propio con los audífonos de la marca: en la pestaña del navegador, en favoritos y al agregar la página a la pantalla de inicio del celular."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Al compartir el enlace en WhatsApp, Facebook, X, LinkedIn, Telegram o mensajes directos de Instagram aparece una tarjeta con el logo, los servicios principales y el WhatsApp."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "En la bienvenida del Inicio, «Escríbame por» con tres botones que abren el chat directo: WhatsApp, Instagram y Facebook Messenger."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Sección «Sígame y escríbame» al final del Inicio, con una tarjeta para WhatsApp, Instagram (@chino_pcmaster) y Facebook (Chino PC Master): un botón para seguir y otro para enviar mensaje."
                 },
                 {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "Página «Rifas Digitales» con el instructivo completo para quien organiza una rifa: primeros pasos, anotar ventas, cobrar, compartir y crear el acceso directo en el teléfono."
+                },
+                {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "Inicio renovado: botones para ver los servicios o escribir por WhatsApp, una sección «¿Qué le está pasando?» que lleva directo a la solución de cada problema, las razones para confiar en mí y algunos trabajos que ya funcionan."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "Desde Inicio y desde el pie de página se llega directo a cada grupo de servicios."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "«Parches y Noticias» ahora reúne en un solo parche todo lo que cambió en un mismo día. Si ese día se tocaron varias áreas, la tarjeta las muestra por separado y los filtros por aplicación siguen funcionando."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "En el celular las tres redes caben en una sola fila, sin tapar la invitación a explorar."
                 },
                 {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "En el pie de página, «Todas las WebApps» se reemplaza por «Rifas Digitales». Las herramientas privadas se abren desde el menú al iniciar sesión."
+                },
+                {
                     "tipo": "nota",
+                    "producto": "sitio",
                     "texto": "Los enlaces viejos a «Soluciones» siguen funcionando y llevan a la página nueva."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Asistente de primera vez: al abrir el enlace de la rifa, unas pocas pantallas piden el nombre, los premios, el precio y el sorteo, el SINPE y el WhatsApp, y el estilo de la imagen."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "La rifa ahora se maneja en cuatro secciones pensadas para el teléfono: Números, Compradores, Compartir y Ajustes, con un resumen de lo vendido, lo recaudado y lo que falta por cobrar."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Anotar una venta en dos toques: se eligen uno o varios números y se marca si quedan apartados o pagados. Si la persona ya compró antes, su teléfono se completa solo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Compradores: quién debe y quién pagó, «Marcar pagado» y recordatorio o confirmación de pago por WhatsApp con el mensaje listo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Compartir: la imagen con seis estilos de un toque y un mensaje que se arma solo con los premios, el precio y los números libres. Se envían juntos a WhatsApp."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Acceso directo en iPhone y Android: la rifa queda en la pantalla de inicio con su nombre y abre directo, con los pasos según cada teléfono."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Archivado automático: cada rifa puede tener una fecha de vencimiento. Pasada esa fecha su enlace deja de funcionar, y desde el panel de administración se puede reactivar con otra fecha o sin fecha, o eliminar."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "rifa",
+                    "texto": "La imagen para compartir queda centrada y equilibrada, sin el espacio vacío que quedaba bajo los números."
+                },
+                {
+                    "tipo": "nota",
+                    "producto": "rifa",
+                    "texto": "El editor detallado de la imagen (colores, letras y logo) sigue disponible en «Compartir → Personalizar a fondo»."
                 }
             ]
         },

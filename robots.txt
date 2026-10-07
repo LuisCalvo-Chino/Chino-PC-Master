@@ -3,6 +3,7 @@
 # no son páginas independientes y no deben indexarse por separado.
 User-agent: *
 Disallow: /angeles-secretos.html
+Disallow: /rifas-digitales.html
 Disallow: /angels.html
 Disallow: /rifa.html
 Disallow: /admin.html

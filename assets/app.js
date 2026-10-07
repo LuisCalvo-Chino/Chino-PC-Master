@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "canje",
         "angels",
         "angeles-secretos",
+        "rifas-digitales",
         "parches",
         "terminos",
         "privacidad"
@@ -35,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "webapps",
         "canje",
         "angeles-secretos",
+        "rifas-digitales",
         "parches",
         "terminos",
         "privacidad"

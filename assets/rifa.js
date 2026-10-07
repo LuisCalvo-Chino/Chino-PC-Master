@@ -1,5 +1,10 @@
 /**
- * Sistema de Rifa multi-proyecto — hub (#rifa) + link admin (#r/<hash>)
+ * Sistema de Rifa multi-proyecto — hub (#rifa) + rifa de quien la organiza (#r/<hash>)
+ *
+ * El link #r/<hash> es una mini app pensada para el teléfono: asistente de primera vez,
+ * números, compradores, compartir (imagen + mensaje) y ajustes. El estilo elegido, el
+ * asistente y el mensaje se guardan dentro de banner_json, así no hace falta tocar el
+ * Apps Script para guardarlos.
  */
 (function () {
     const MASTER_PIN_KEY = "cpm_rifa_master_pin";
@@ -36,6 +41,16 @@
         "whatsapp",
         "sinpe"
     ];
+
+    // Título y manifest del sitio: la rifa los cambia para su acceso directo y se restauran al salir
+    const SITIO_TITULO = document.title;
+    const SITIO_MANIFEST = document.querySelector('link[rel="manifest"]')?.getAttribute("href") || "site.webmanifest";
+
+    function restaurarSitio() {
+        document.title = SITIO_TITULO;
+        const link = document.querySelector('link[rel="manifest"]');
+        if (link) link.setAttribute("href", SITIO_MANIFEST);
+    }
 
     let showMessage = (msg) => console.log(msg);
     let navigateHome = () => {
@@ -272,6 +287,8 @@
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
     const ICON_ARCHIVE =
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.54 5.23 19.15 3.55A1.99 1.99 0 0 0 17.56 3H6.44c-.62 0-1.2.29-1.59.76L3.46 5.23C3.17 5.57 3 6.01 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.49-.17-.93-.46-1.27zM12 17.5 6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>';
+    const ICON_CALENDAR =
+        '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2zm12 8H5v9h14v-9zM5 6v2h14V6H5z"/></svg>';
     const ICON_TRASH =
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 
@@ -337,6 +354,10 @@
     }
 
     /* ========== HUB ========== */
+    let hubProjects = [];
+    let hubArchiveSupported = false;
+    let hubListView = "activas";
+
     function showHubPane(view) {
         document.querySelectorAll(".hub-nav-btn[data-hub-view]").forEach((b) => {
             b.classList.toggle("is-active", b.getAttribute("data-hub-view") === view);
@@ -348,12 +369,156 @@
         if (view === "lista") void loadProjectsTable();
     }
 
+    function showHubList(view) {
+        hubListView = view === "archivadas" ? "archivadas" : "activas";
+        document.querySelectorAll("[data-hub-list]").forEach((b) => {
+            const on = b.getAttribute("data-hub-list") === hubListView;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-selected", String(on));
+        });
+        document.querySelectorAll("[data-hub-list-pane]").forEach((p) => {
+            p.hidden = p.getAttribute("data-hub-list-pane") !== hubListView;
+        });
+        const warn = $("rifa-hub-archive-warning");
+        if (warn) warn.hidden = !(hubListView === "archivadas" && !hubArchiveSupported && hubProjects.length);
+    }
+
     function syncPremioFields(selectId, attr) {
         const n = Number($(selectId)?.value) || 1;
         document.querySelectorAll(`[${attr}]`).forEach((el) => {
             const idx = Number(el.getAttribute(attr));
             el.hidden = idx > n;
         });
+    }
+
+    function hoyIso() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function sumarDias(iso, dias) {
+        const f = String(iso || "").slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return "";
+        const [y, m, d] = f.split("-").map(Number);
+        const dt = new Date(y, m - 1, d + Number(dias || 0));
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    }
+
+    /** Fecha de archivado elegida en «Nueva rifa»: "" = sin fecha. */
+    function fechaArchivoNueva() {
+        const modo = $("rifa-new-archivo-modo")?.value || "7";
+        if (modo === "none") return "";
+        if (modo === "custom") return String($("rifa-new-archivo")?.value || "").slice(0, 10);
+        return sumarDias($("rifa-new-fecha")?.value, Number(modo));
+    }
+
+    function syncNuevaArchivo() {
+        const modo = $("rifa-new-archivo-modo")?.value || "7";
+        const input = $("rifa-new-archivo");
+        if (input) input.hidden = modo !== "custom";
+        const hint = $("rifa-new-archivo-hint");
+        if (!hint) return;
+        if (modo === "none") {
+            hint.textContent = "Quedará activa hasta que la archives a mano.";
+            return;
+        }
+        const f = fechaArchivoNueva();
+        hint.textContent = f
+            ? `Se archiva al terminar el ${formatFechaLargaEs(f).toLowerCase()}.`
+            : modo === "custom"
+              ? "Elige la fecha."
+              : "Elige primero la fecha del sorteo.";
+    }
+
+    function sorteoCorto(p) {
+        const mod = p.modalidad === "RNG" ? "App" : p.modalidad === "Loteria Nacional" ? "Lotería" : p.modalidad || "";
+        return `${mod}${p.fecha_sorteo ? " · " + p.fecha_sorteo : ""}`;
+    }
+
+    function premiosCorto(p) {
+        return [p.premio_1, p.premio_2, p.premio_3]
+            .filter(Boolean)
+            .slice(0, p.cantidad_premios || 1)
+            .join(" · ");
+    }
+
+    function renderHubTables() {
+        const tbody = $("rifa-projects-tbody");
+        const tArch = $("rifa-archived-tbody");
+        const activas = hubProjects.filter((p) => p.activo && !p.vencida);
+        const archivadas = hubProjects.filter((p) => !p.activo || p.vencida);
+        const cA = $("rifa-count-activas");
+        const cR = $("rifa-count-archivadas");
+        if (cA) cA.textContent = String(activas.length);
+        if (cR) cR.textContent = hubArchiveSupported ? String(archivadas.length) : "";
+
+        if (tbody) {
+            if (!activas.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="rifa-muted">Aún no hay rifas activas. Usa + Nuevo.</td></tr>';
+            } else {
+                tbody.innerHTML = "";
+                activas.forEach((p) => {
+                    const tr = document.createElement("tr");
+                    const link = adminLink(p.hash_admin);
+                    const vig = p.fecha_archivo
+                        ? `<span class="rifa-vig">${escapeHtml(p.fecha_archivo)}</span>`
+                        : '<span class="rifa-muted">Sin fecha</span>';
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(p.sheet_name)}</strong><br/><span class="rifa-muted">${escapeHtml(p.nombre_display || "")}</span></td>
+                        <td>${escapeHtml(premiosCorto(p))}</td>
+                        <td>${escapeHtml(sorteoCorto(p))}</td>
+                        <td>${escapeHtml(p.precio)}</td>
+                        <td>
+                            <div class="rifa-link-actions">
+                                ${vig}
+                                ${hubArchiveSupported ? `<button type="button" class="rifa-icon-btn" data-vigencia-id="${escapeAttr(p.project_id)}" title="Cambiar fecha de archivado" aria-label="Cambiar fecha de archivado">${ICON_CALENDAR}</button>` : ""}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="rifa-link-actions">
+                                <a class="rifa-icon-btn rifa-icon-btn--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" data-external="1" title="Abrir la rifa en otra pestaña" aria-label="Abrir rifa">${ICON_OPEN}</a>
+                                <button type="button" class="rifa-icon-btn" data-copy-link="${escapeAttr(link)}" title="Copiar link" aria-label="Copiar link">${ICON_COPY}</button>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="rifa-link-actions">
+                                <button type="button" class="rifa-icon-btn rifa-icon-btn--warn" data-archive-id="${escapeAttr(p.project_id)}" title="Archivar ahora" aria-label="Archivar">${ICON_ARCHIVE}</button>
+                                <button type="button" class="rifa-icon-btn rifa-icon-btn--danger" data-del-id="${escapeAttr(p.project_id)}" title="Eliminar permanentemente" aria-label="Eliminar">${ICON_TRASH}</button>
+                            </div>
+                        </td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        if (tArch) {
+            if (!hubArchiveSupported) {
+                tArch.innerHTML = '<tr><td colspan="5" class="rifa-muted">Disponible con la versión 2 del Apps Script.</td></tr>';
+            } else if (!archivadas.length) {
+                tArch.innerHTML = '<tr><td colspan="5" class="rifa-muted">No hay rifas archivadas.</td></tr>';
+            } else {
+                tArch.innerHTML = "";
+                archivadas.forEach((p) => {
+                    const tr = document.createElement("tr");
+                    const motivo = p.fecha_archivo
+                        ? `Venció el ${escapeHtml(p.fecha_archivo)}`
+                        : "Archivada a mano";
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(p.sheet_name)}</strong><br/><span class="rifa-muted">${escapeHtml(p.nombre_display || "")}</span></td>
+                        <td>${escapeHtml(premiosCorto(p))}</td>
+                        <td>${escapeHtml(sorteoCorto(p))}</td>
+                        <td>${motivo}</td>
+                        <td>
+                            <div class="rifa-link-actions">
+                                <button type="button" class="rifa-btn rifa-btn--sm rifa-btn--primary" data-reactivate-id="${escapeAttr(p.project_id)}">Reactivar</button>
+                                <button type="button" class="rifa-icon-btn rifa-icon-btn--danger" data-del-id="${escapeAttr(p.project_id)}" title="Eliminar permanentemente" aria-label="Eliminar">${ICON_TRASH}</button>
+                            </div>
+                        </td>`;
+                    tArch.appendChild(tr);
+                });
+            }
+        }
+        showHubList(hubListView);
     }
 
     async function loadProjectsTable() {
@@ -367,42 +532,11 @@
         }
         tbody.innerHTML = '<tr><td colspan="7" class="rifa-muted">Cargando…</td></tr>';
         try {
-            const res = await api.post({ action: "super_list_projects", masterPin: pin });
-            const rows = res.data?.projects || res.projects || [];
-            if (!rows.length) {
-                tbody.innerHTML =
-                    '<tr><td colspan="7" class="rifa-muted">Aún no hay proyectos. Usa + Nuevo.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = "";
-            rows.forEach((p) => {
-                const tr = document.createElement("tr");
-                const premios = [p.premio_1, p.premio_2, p.premio_3]
-                    .filter(Boolean)
-                    .slice(0, p.cantidad_premios || 1)
-                    .join(" · ");
-                const link = adminLink(p.hash_admin);
-                tr.innerHTML = `
-                    <td><strong>${escapeHtml(p.sheet_name)}</strong><br/><span class="rifa-muted">${escapeHtml(p.nombre_display || "")}</span></td>
-                    <td>${escapeHtml(premios)}</td>
-                    <td>${escapeHtml(p.modalidad)}</td>
-                    <td>${escapeHtml(p.fecha_sorteo)}</td>
-                    <td>${escapeHtml(p.precio)}</td>
-                    <td>
-                        <div class="rifa-link-actions">
-                            <a class="rifa-icon-btn rifa-icon-btn--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" data-external="1" title="Abrir admin en otra pestaña" aria-label="Abrir admin">${ICON_OPEN}</a>
-                            <button type="button" class="rifa-icon-btn" data-copy-link="${escapeAttr(link)}" title="Copiar link" aria-label="Copiar link">${ICON_COPY}</button>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="rifa-link-actions">
-                            <button type="button" class="rifa-icon-btn rifa-icon-btn--warn" data-archive-id="${escapeAttr(p.project_id)}" title="Desactivar (archivar)" aria-label="Desactivar">${ICON_ARCHIVE}</button>
-                            <button type="button" class="rifa-icon-btn rifa-icon-btn--danger" data-del-id="${escapeAttr(p.project_id)}" title="Eliminar permanentemente" aria-label="Eliminar">${ICON_TRASH}</button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
+            const res = await api.post({ action: "super_list_projects", masterPin: pin, include_inactive: true });
+            hubProjects = res.data?.projects || res.projects || [];
+            // La versión 1 del Apps Script ignora include_inactive y no informa archive_supported
+            hubArchiveSupported = !!res.data?.archive_supported;
+            renderHubTables();
         } catch (e) {
             tbody.innerHTML = `<tr><td colspan="7" class="rifa-error">${escapeHtml(e.message || String(e))}</td></tr>`;
         }
@@ -420,18 +554,59 @@
         return escapeHtml(s).replace(/'/g, "&#39;");
     }
 
+    /** Diálogo «Vigencia»: devuelve la fecha elegida ("" = sin fecha) o null si se cancela. */
+    function pedirVigencia(project, titulo) {
+        const dlg = $("rifa-vigencia-dialog");
+        if (!dlg || typeof dlg.showModal !== "function") {
+            const v = window.prompt(
+                `${titulo}\nFecha de archivado (AAAA-MM-DD) o vacío para sin fecha:`,
+                project.fecha_archivo || ""
+            );
+            return Promise.resolve(v == null ? null : v.trim());
+        }
+        $("rifa-vigencia-title").textContent = titulo;
+        $("rifa-vigencia-desc").textContent = `${project.nombre_display || project.sheet_name} · sorteo ${project.fecha_sorteo || "—"}`;
+        const fecha = $("rifa-vig-fecha");
+        const sugerida =
+            project.fecha_archivo && project.fecha_archivo >= hoyIso()
+                ? project.fecha_archivo
+                : sumarDias(project.fecha_sorteo >= hoyIso() ? project.fecha_sorteo : hoyIso(), 7);
+        fecha.value = sugerida;
+        fecha.min = hoyIso();
+        const radios = dlg.querySelectorAll('input[name="rifa-vig-modo"]');
+        radios.forEach((r) => (r.checked = r.value === (project.fecha_archivo || titulo.startsWith("Reactivar") ? "fecha" : "none")));
+        return new Promise((resolve) => {
+            dlg.addEventListener(
+                "close",
+                () => {
+                    if (dlg.returnValue !== "ok") return resolve(null);
+                    const modo = dlg.querySelector('input[name="rifa-vig-modo"]:checked')?.value || "fecha";
+                    resolve(modo === "none" ? "" : String(fecha.value || "").slice(0, 10));
+                },
+                { once: true }
+            );
+            dlg.returnValue = "";
+            dlg.showModal();
+        });
+    }
+
     function initHub() {
+        restaurarSitio();
         $("rifa-hub").hidden = false;
         $("rifa-admin").hidden = true;
         document.body.classList.remove("cpm-rifa-standalone");
         const pinEl = $("rifa-master-pin");
         if (pinEl) pinEl.value = getMasterPin();
+        const pinActual = () => getMasterPin() || pinEl?.value || "";
 
         document.querySelectorAll("[data-hub-view]").forEach((btn) => {
             btn.addEventListener("click", () => {
                 const v = btn.getAttribute("data-hub-view");
                 if (v) showHubPane(v);
             });
+        });
+        document.querySelectorAll("[data-hub-list]").forEach((btn) => {
+            btn.addEventListener("click", () => showHubList(btn.getAttribute("data-hub-list")));
         });
 
         $("rifa-master-pin-save")?.addEventListener("click", () => {
@@ -447,15 +622,21 @@
         const syncNewFecha = () => {
             const hint = $("rifa-new-fecha-hint");
             if (hint) hint.textContent = fechaHint($("rifa-new-modalidad")?.value);
+            syncNuevaArchivo();
         };
         $("rifa-new-modalidad")?.addEventListener("change", syncNewFecha);
+        $("rifa-new-fecha")?.addEventListener("change", syncNuevaArchivo);
+        $("rifa-new-archivo-modo")?.addEventListener("change", syncNuevaArchivo);
+        $("rifa-new-archivo")?.addEventListener("change", syncNuevaArchivo);
+        const archivoInput = $("rifa-new-archivo");
+        if (archivoInput) archivoInput.min = hoyIso();
         syncNewFecha();
         syncPremioFields("rifa-new-premios-n", "data-premio-field");
         wirePrecioInput($("rifa-new-precio"));
 
         $("rifa-new-form")?.addEventListener("submit", async (ev) => {
             ev.preventDefault();
-            const pin = getMasterPin() || pinEl?.value || "";
+            const pin = pinActual();
             if (!pin) {
                 showMessage("Guarda la Llave Maestra antes de crear.", "error");
                 return;
@@ -465,6 +646,15 @@
             const err = validateFechaModalidad(modalidad, fecha);
             if (err) {
                 showMessage(err, "error");
+                return;
+            }
+            const fechaArchivo = fechaArchivoNueva();
+            if ($("rifa-new-archivo-modo")?.value === "custom" && !fechaArchivo) {
+                showMessage("Elige la fecha de archivado o cambia la opción.", "error");
+                return;
+            }
+            if (fechaArchivo && fechaArchivo < hoyIso()) {
+                showMessage("La fecha de archivado no puede estar en el pasado.", "error");
                 return;
             }
             const cantidad = Number($("rifa-new-premios-n").value) || 1;
@@ -479,6 +669,7 @@
                 premio_3: cantidad >= 3 ? $("rifa-new-premio3").value.trim() : "",
                 modalidad,
                 fecha_sorteo: fecha,
+                fecha_archivo: fechaArchivo,
                 sinpe: $("rifa-new-sinpe").value.trim(),
                 whatsapp: $("rifa-new-whatsapp").value.trim(),
                 precio: formatColonPrice($("rifa-new-precio").value.trim())
@@ -489,13 +680,19 @@
                 const res = await api.post(payload, { timeoutMs: 45000 });
                 const hash = res.data?.hash_admin || res.data?.project?.hash_admin;
                 const link = adminLink(hash);
+                const nombre = payload.nombre_display || payload.sheet_name;
+                const envio = `¡Hola! Aquí está el enlace para manejar su rifa «${nombre}»:\n${link}\n\nLa primera vez que lo abra, un asistente le guía paso a paso. Guárdelo bien: es la llave de su rifa, no lo comparta con los compradores.`;
+                const archivoTxt = fechaArchivo
+                    ? `Se archiva al terminar el ${formatFechaLargaEs(fechaArchivo).toLowerCase()}.`
+                    : "Sin fecha de archivado.";
                 const box = $("rifa-new-result");
                 if (box) {
                     box.hidden = false;
-                    box.innerHTML = `Proyecto creado. Link administrador:<br/><code class="rifa-admin-link-text">${escapeHtml(link)}</code>
+                    box.innerHTML = `Proyecto creado. ${escapeHtml(archivoTxt)}<br/>Link para quien organiza:<br/><code class="rifa-admin-link-text">${escapeHtml(link)}</code>
                         <div class="rifa-link-actions rifa-mt">
-                            <a class="rifa-icon-btn rifa-icon-btn--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" data-external="1" title="Abrir admin" aria-label="Abrir admin">${ICON_OPEN}</a>
+                            <a class="rifa-icon-btn rifa-icon-btn--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" data-external="1" title="Abrir la rifa" aria-label="Abrir la rifa">${ICON_OPEN}</a>
                             <button type="button" class="rifa-icon-btn" data-copy-link="${escapeAttr(link)}" title="Copiar link" aria-label="Copiar link">${ICON_COPY}</button>
+                            <a class="rifa-btn rifa-btn--sm rifa-btn--primary" href="https://wa.me/?text=${encodeURIComponent(envio)}" target="_blank" rel="noopener noreferrer" data-external="1">Enviar por WhatsApp</a>
                         </div>`;
                 }
                 showMessage("Rifa creada correctamente.", "success");
@@ -509,32 +706,74 @@
             }
         });
 
-        $("rifa-projects-tbody")?.addEventListener("click", async (ev) => {
+        const onTableClick = async (ev) => {
             const copyBtn = ev.target.closest("[data-copy-link]");
             if (copyBtn) {
                 ev.preventDefault();
                 await copyText(copyBtn.getAttribute("data-copy-link"));
                 return;
             }
+            const findP = (id) => hubProjects.find((p) => p.project_id === id) || { project_id: id };
+
+            const vigBtn = ev.target.closest("[data-vigencia-id]");
+            if (vigBtn) {
+                const p = findP(vigBtn.getAttribute("data-vigencia-id"));
+                const fecha = await pedirVigencia(p, "Cambiar fecha de archivado");
+                if (fecha == null) return;
+                try {
+                    await api.post({
+                        action: "super_update_project",
+                        masterPin: pinActual(),
+                        project_id: p.project_id,
+                        fecha_archivo: fecha
+                    });
+                    showMessage(fecha ? `Se archivará al terminar el ${fecha}.` : "La rifa quedó sin fecha de archivado.", "success");
+                    void loadProjectsTable();
+                } catch (e) {
+                    showMessage(e.message || String(e), "error");
+                }
+                return;
+            }
+
+            const reBtn = ev.target.closest("[data-reactivate-id]");
+            if (reBtn) {
+                const p = findP(reBtn.getAttribute("data-reactivate-id"));
+                const fecha = await pedirVigencia(p, "Reactivar rifa");
+                if (fecha == null) return;
+                try {
+                    await api.post({
+                        action: "super_reactivate_project",
+                        masterPin: pinActual(),
+                        project_id: p.project_id,
+                        fecha_archivo: fecha
+                    });
+                    showMessage("Rifa reactivada: su link vuelve a funcionar.", "success");
+                    showHubList("activas");
+                    void loadProjectsTable();
+                } catch (e) {
+                    showMessage(e.message || String(e), "error");
+                }
+                return;
+            }
+
             const archiveBtn = ev.target.closest("[data-archive-id]");
             if (archiveBtn) {
                 const id = archiveBtn.getAttribute("data-archive-id");
                 if (
                     !confirm(
-                        "¿Desactivar esta rifa?\nSe marcará como inactiva (activo = FALSE). La hoja de números se conserva y podrás eliminarla después."
+                        "¿Archivar esta rifa ahora?\nSu link deja de funcionar. Los números se conservan y la podrás reactivar o eliminar desde «Archivadas»."
                     )
                 ) {
                     return;
                 }
-                const pin = getMasterPin() || pinEl?.value || "";
                 try {
                     await api.post({
                         action: "super_delete_project",
-                        masterPin: pin,
+                        masterPin: pinActual(),
                         project_id: id,
                         hard: false
                     });
-                    showMessage("Rifa desactivada.", "success");
+                    showMessage("Rifa archivada.", "success");
                     void loadProjectsTable();
                 } catch (e) {
                     showMessage(e.message || String(e), "error");
@@ -551,11 +790,10 @@
                 ) {
                     return;
                 }
-                const pin = getMasterPin() || pinEl?.value || "";
                 try {
                     await api.post({
                         action: "super_delete_project",
-                        masterPin: pin,
+                        masterPin: pinActual(),
                         project_id: id,
                         hard: true
                     });
@@ -565,7 +803,9 @@
                     showMessage(e.message || String(e), "error");
                 }
             }
-        });
+        };
+        $("rifa-projects-tbody")?.addEventListener("click", onTableClick);
+        $("rifa-archived-tbody")?.addEventListener("click", onTableClick);
 
         $("rifa-new-result")?.addEventListener("click", async (ev) => {
             const copyBtn = ev.target.closest("[data-copy-link]");
@@ -578,100 +818,8 @@
         finalizeSplash(true);
     }
 
-    /* ========== ADMIN ========== */
-    function showAdTab(name) {
-        document.querySelectorAll(".rifa-tab").forEach((t) => {
-            t.classList.toggle("is-active", t.getAttribute("data-adtab") === name);
-        });
-        document.querySelectorAll(".rifa-adpanel").forEach((p) => {
-            const match = p.getAttribute("data-adpanel") === name;
-            p.hidden = !match;
-            p.classList.toggle("is-active", match);
-        });
-        if (name === "banner") refreshBannerPreview();
-        if (name === "lista") renderLista();
-    }
 
-    function renderGrid() {
-        const grid = $("rifa-numbers-grid");
-        if (!grid) return;
-        grid.innerHTML = "";
-        for (let i = 0; i < 100; i++) {
-            const n = String(i).padStart(2, "0");
-            const info = datos[n] || { estado: "Disponible" };
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "number-btn rifa-num-btn";
-            btn.dataset.num = n;
-            btn.textContent = n;
-            btn.classList.add("estado-" + String(info.estado || "Disponible").toLowerCase());
-            if (seleccion.has(n)) btn.classList.add("selected");
-            if (info.nombre) btn.title = info.nombre;
-            btn.addEventListener("click", () => toggleSelect(n));
-            grid.appendChild(btn);
-        }
-        updateStatsUI();
-        syncSelectPanel();
-    }
-
-    function toggleSelect(n) {
-        if (seleccion.has(n)) seleccion.delete(n);
-        else seleccion.add(n);
-        renderGrid();
-    }
-
-    function syncSelectPanel() {
-        const panel = $("rifa-select-panel");
-        if (!panel) return;
-        const count = seleccion.size;
-        panel.hidden = count === 0;
-        const c = $("rifa-sel-count");
-        if (c) c.textContent = String(count);
-        if (count === 1) {
-            const n = [...seleccion][0];
-            const info = datos[n];
-            if (info) {
-                $("rifa-sel-nombre").value = info.nombre || "";
-                $("rifa-sel-tel").value = info.telefono || "";
-                $("rifa-sel-contacto").value = info.contacto || "";
-                $("rifa-sel-estado").value =
-                    info.estado === "Disponible" ? "Reservado" : info.estado || "Reservado";
-            }
-        }
-    }
-
-    async function guardarSeleccion() {
-        const estado = $("rifa-sel-estado").value;
-        const nombre = $("rifa-sel-nombre").value.trim();
-        const telefono = $("rifa-sel-tel").value.trim();
-        const contacto = $("rifa-sel-contacto").value.trim();
-        if ((estado === "Reservado" || estado === "Pagado") && !nombre) {
-            showMessage("El nombre es obligatorio.", "error");
-            return;
-        }
-        const listaCambios = [...seleccion].map((num) => ({
-            num,
-            estado,
-            nombre: estado === "Disponible" ? "" : nombre,
-            telefono: estado === "Disponible" ? "" : telefono,
-            contacto: estado === "Disponible" ? "" : contacto
-        }));
-        try {
-            const res = await api.post({
-                action: "update_numbers",
-                hash: adminHash,
-                listaCambios
-            });
-            datos = numerosFromApi(res.data?.numeros);
-            seleccion.clear();
-            renderGrid();
-            renderLista();
-            showMessage("Números actualizados.", "success");
-        } catch (e) {
-            showMessage(e.message || String(e), "error");
-        }
-    }
-
+    /* ---------- Tabla completa, CSV ---------- */
     function renderLista() {
         const tbody = $("rifa-lista-tbody");
         if (!tbody) return;
@@ -681,9 +829,7 @@
             const info = datos[n] || { estado: "Disponible", nombre: "", telefono: "", contacto: "" };
             const tr = document.createElement("tr");
             tr.dataset.num = n;
-            if (seleccion.has(n)) tr.classList.add("is-selected");
             tr.innerHTML = `
-                <td><input type="checkbox" class="rifa-lista-check" data-num="${n}" ${seleccion.has(n) ? "checked" : ""} /></td>
                 <td>${n}</td>
                 <td>
                     <select class="rifa-input rifa-lista-estado" data-num="${n}">
@@ -745,25 +891,7 @@
         URL.revokeObjectURL(a.href);
     }
 
-    function fillConfigForm() {
-        if (!project) return;
-        $("cfg-premios-n").value = String(project.cantidad_premios || 1);
-        $("cfg-premio1").value = project.premio_1 || "";
-        $("cfg-premio2").value = project.premio_2 || "";
-        $("cfg-premio3").value = project.premio_3 || "";
-        $("cfg-modalidad").value = project.modalidad || "Chances";
-        $("cfg-fecha").value = (project.fecha_sorteo || "").slice(0, 10);
-        $("cfg-whatsapp").value = project.whatsapp || "";
-        $("cfg-sinpe").value = project.sinpe || "";
-        $("cfg-precio").value = formatColonPrice(project.precio || "");
-        syncPremioFields("cfg-premios-n", "data-cfg-premio");
-        const hint = $("cfg-fecha-hint");
-        if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
-        const rngTab = $("rifa-tab-rng");
-        if (rngTab) rngTab.hidden = project.modalidad !== "RNG";
-        wirePrecioInput($("cfg-precio"));
-    }
-
+    /* ---------- Imagen de la rifa (afiche 1080×1920) ---------- */
     function syncIconUploadPanels() {
         const pairs = [
             ["bn-i-wa", "whatsapp"],
@@ -967,7 +1095,7 @@
         return "3er Premio";
     }
 
-    function buildBannerHtml(b, forCapture) {
+    function buildBannerHtml(b, forCapture, previewScale) {
         const bg = b.bg.gradient
             ? `linear-gradient(${b.bg.orient}, ${b.bg.color1}, ${b.bg.color2})`
             : b.bg.color1;
@@ -1043,11 +1171,11 @@
         const baseFont = tTitulo.font || b.font || "Inter, sans-serif";
 
         // Cuadrícula fija 10×10 dentro del ancho útil (1080 - padding)
-        const bannerInner = `<div data-rifa-banner-root="1" style="width:1080px;height:1920px;background:${bg};font-family:${escapeAttr(baseFont)};display:flex;flex-direction:column;align-items:stretch;padding:40px 40px 48px;box-sizing:border-box;color:#fff;overflow:hidden;">
+        const bannerInner = `<div data-rifa-banner-root="1" style="width:1080px;height:1920px;background:${bg};font-family:${escapeAttr(baseFont)};display:flex;flex-direction:column;align-items:stretch;justify-content:center;padding:40px 40px 48px;box-sizing:border-box;color:#fff;overflow:hidden;">
             <div style="flex:0 0 auto;display:flex;justify-content:center;margin-bottom:16px;">${headHtml}</div>
             <div style="flex:0 0 auto;margin-bottom:12px;">${premiosHtml}</div>
             <div style="flex:0 0 auto;width:100%;max-width:1000px;margin:12px auto 20px;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr));gap:6px;aspect-ratio:1/1;align-self:center;">${cells}</div>
-            <div style="flex:1 1 auto;"></div>
+            <div style="flex:0 0 28px;"></div>
             <div style="flex:0 0 auto;text-align:center;">
                 <div style="font-family:${escapeAttr(tPrecio.font)};color:${b.textColors.costo};font-size:${tPrecio.size}px;font-weight:700;margin:8px 0;">${escapeHtml(precioTxt)}</div>
                 <div style="font-family:${escapeAttr(tMod.font)};color:${b.textColors.modalidadFecha};font-size:${tMod.size}px;margin:8px 0;line-height:1.25;">${escapeHtml(modFecha)}</div>
@@ -1058,7 +1186,7 @@
 
         if (forCapture) return bannerInner;
 
-        const scale = 0.35;
+        const scale = previewScale || 0.35;
         const w = Math.round(1080 * scale);
         const h = Math.round(1920 * scale);
         return `<div style="width:${w}px;height:${h}px;overflow:hidden;position:relative;flex-shrink:0;">
@@ -1070,7 +1198,11 @@
         const stage = $("rifa-banner-stage");
         if (!stage) return;
         const b = readBannerFromForm();
-        stage.innerHTML = buildBannerHtml(b, false);
+        const ancho = stage.parentElement?.clientWidth || 0;
+        // En el teléfono la vista previa no debe empujar el mensaje fuera de la pantalla
+        const altoMax = window.innerWidth <= 768 ? 400 : 640;
+        const scale = ancho ? Math.max(0.15, Math.min(0.32, (ancho - 2) / 1080, altoMax / 1920)) : 0.3;
+        stage.innerHTML = buildBannerHtml(b, false, scale);
         stage.style.width = "auto";
         stage.style.height = "auto";
         stage.style.overflow = "visible";
@@ -1182,19 +1314,19 @@
         ov.className = "rifa-banner-result";
         ov.setAttribute("data-object-url", url);
         ov.innerHTML = `
-            <div class="rifa-banner-result__box" role="dialog" aria-modal="true" aria-label="Banner generado">
-                <p class="rifa-banner-result__hint">Banner listo. ${
+            <div class="rifa-banner-result__box" role="dialog" aria-modal="true" aria-label="Imagen de la rifa">
+                <p class="rifa-banner-result__hint">Imagen lista. ${
                     canShareFile
-                        ? "Pulsa <strong>Guardar imagen</strong> para enviarlo a tu galería"
-                        : "Mantén presionada la imagen para guardarla"
-                }, o descárgalo como archivo.</p>
+                        ? "Toque <strong>Guardar o compartir</strong> para mandarla a su galería o a WhatsApp"
+                        : "Mantenga presionada la imagen para guardarla"
+                }, o descárguela como archivo.</p>
                 <div class="rifa-banner-result__imgwrap">
                     <img class="rifa-banner-result__img" alt="Banner de la rifa" src="${escapeAttr(url)}" />
                 </div>
                 <div class="rifa-banner-result__actions">
                     ${
                         canShareFile
-                            ? '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share">Guardar imagen</button>'
+                            ? '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share">Guardar o compartir</button>'
                             : ""
                     }
                     <button type="button" class="rifa-btn" data-act="download">Descargar archivo</button>
@@ -1223,7 +1355,7 @@
                 } catch (e) {
                     if (e?.name !== "AbortError") {
                         showMessage(
-                            "No se pudo compartir. Mantén presionada la imagen para guardarla.",
+                            "No se pudo compartir. Mantenga presionada la imagen para guardarla.",
                             "error"
                         );
                     }
@@ -1234,21 +1366,28 @@
         document.body.appendChild(ov);
     }
 
-    async function descargarBannerJpg() {
-        if (bannerBusy) return;
+    function nombreArchivoImagen() {
+        const base = String(project?.nombre_display || project?.sheet_name || "rifa")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-Za-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+        return `Rifa_${base || "numeros"}.jpg`;
+    }
+
+    /** Dibuja el afiche a 1080×1920 fuera de pantalla y lo devuelve como JPG. */
+    async function generarBannerBlob() {
+        if (bannerBusy) throw new Error("La imagen ya se está generando.");
         const root = $("rifa-capture-root");
-        if (!root) return;
-        const b = readBannerFromForm();
-        root.innerHTML = buildBannerHtml(b, true);
+        if (!root) throw new Error("No se pudo preparar la imagen.");
+        root.innerHTML = buildBannerHtml(readBannerFromForm(), true);
         root.style.cssText =
             "position:fixed;left:-10000px;top:0;width:1080px;height:1920px;overflow:visible;z-index:-1;pointer-events:none;";
-        const target =
-            root.querySelector("[data-rifa-banner-root]") || root.firstElementChild;
-        if (!target) return;
+        const target = root.querySelector("[data-rifa-banner-root]") || root.firstElementChild;
         bannerBusy = true;
-        const buttons = Array.from(document.querySelectorAll(".rifa-btn-banner-dl"));
+        const buttons = Array.from(document.querySelectorAll(".rifa-btn-banner-dl, #rf-share-both"));
         buttons.forEach((btn) => (btn.disabled = true));
-        showMessage("Generando banner…", "info");
+        showMessage("Creando la imagen…", "info");
         try {
             const html2canvas = await loadHtml2Canvas();
             const canvas = await html2canvas(target, {
@@ -1262,20 +1401,27 @@
                 backgroundColor: null,
                 logging: false
             });
-            const blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
-            const filename = `Rifa_${project?.sheet_name || "banner"}.jpg`;
-            if (isMobileLike()) {
-                openBannerResult(blob, filename);
-            } else {
-                downloadBlob(blob, filename);
-                showMessage("Banner JPG descargado.", "success");
-            }
-        } catch (e) {
-            showMessage(e.message || String(e), "error");
+            return await canvasToBlob(canvas, "image/jpeg", 0.92);
         } finally {
             buttons.forEach((btn) => (btn.disabled = false));
             bannerBusy = false;
             root.innerHTML = "";
+        }
+    }
+
+    async function descargarBannerJpg() {
+        if (bannerBusy) return;
+        try {
+            const blob = await generarBannerBlob();
+            const filename = nombreArchivoImagen();
+            if (isMobileLike()) {
+                openBannerResult(blob, filename);
+            } else {
+                downloadBlob(blob, filename);
+                showMessage("Imagen descargada.", "success");
+            }
+        } catch (e) {
+            showMessage(e.message || String(e), "error");
         }
     }
 
@@ -1339,83 +1485,1071 @@
         if (btn) btn.disabled = false;
     }
 
+    /* ========== RIFA DE QUIEN LA ORGANIZA (#r/<hash>) ========== */
+
+    /** Estilos listos para la imagen: un toque y queda armonizada. */
+    const THEMES = [
+        { id: "claro", nombre: "Claro", bg: ["#F7F7F7", "#E4E4E4", "to bottom"], text: "#1F1F1F", sub: "#4A4A4A", disp: ["#1F1F1F", "#FFFFFF"], tom: ["#9A9A9A", "#D2D2D2"] },
+        { id: "noche", nombre: "Noche", bg: ["#0B1D3A", "#16161A", "to bottom"], text: "#FFFFFF", sub: "#A9C7FF", disp: ["#0B1D3A", "#FFFFFF"], tom: ["#5A6B85", "#1E2B44"] },
+        { id: "navidad", nombre: "Navidad", bg: ["#B3121D", "#0F5132", "to bottom"], text: "#FFFFFF", sub: "#FFE9A8", disp: ["#B3121D", "#FFFFFF"], tom: ["#7FA58D", "#0B3D26"] },
+        { id: "fiesta", nombre: "Fiesta", bg: ["#7B2FF7", "#F107A3", "135deg"], text: "#FFFFFF", sub: "#FFE3F6", disp: ["#7B2FF7", "#FFFFFF"], tom: ["#E9B8F0", "#8E2A9E"] },
+        { id: "oceano", nombre: "Océano", bg: ["#00B4DB", "#005F86", "to bottom"], text: "#FFFFFF", sub: "#E0F7FF", disp: ["#005F86", "#FFFFFF"], tom: ["#8CCBE0", "#00506F"] },
+        { id: "dorado", nombre: "Dorado", bg: ["#141414", "#3A2F12", "to bottom"], text: "#F5D77A", sub: "#E8E0C8", disp: ["#141414", "#F5D77A"], tom: ["#6E6346", "#2B2616"] }
+    ];
+
+    const MSG_DEFAULTS = {
+        saludo: "¡Hola! Les comparto mi rifa 🎉",
+        despedida: "¡Gracias por apoyar! 🙏",
+        incluir: { premios: true, precio: true, sorteo: true, libres: true, vendidos: false, pago: true, contacto: true }
+    };
+
+    /** Lo que guardamos dentro de banner_json además del diseño: estilo, asistente y mensaje. */
+    let bannerExtras = {};
+    let filtroNumeros = "todos";
+    let filtroCompradores = "todos";
+    let sheetEstado = "Reservado";
+    let msgTocado = false;
+    let wzStep = 0;
+    let wzPremios = 1;
+    let wzTheme = "claro";
+    let adminWired = false;
+
+    function extrasDe(raw) {
+        const r = raw && typeof raw === "object" ? raw : {};
+        return {
+            theme: typeof r.theme === "string" ? r.theme : "",
+            setup: r.setup && typeof r.setup === "object" ? r.setup : null,
+            mensaje: r.mensaje && typeof r.mensaje === "object" ? r.mensaje : null
+        };
+    }
+
+    /** Guarda el diseño sin perder estilo/asistente/mensaje. */
+    async function guardarBanner(banner, extrasNuevos) {
+        bannerExtras = Object.assign({}, bannerExtras, extrasNuevos || {});
+        const completo = Object.assign({}, banner, bannerExtras);
+        const res = await api.post({ action: "update_banner", hash: adminHash, banner: completo });
+        project = res.data?.project || project;
+        if (project) project.banner = completo;
+        return completo;
+    }
+
+    function aplicarTema(base, themeId) {
+        const t = THEMES.find((x) => x.id === themeId) || THEMES[0];
+        const b = mergeBanner(base);
+        b.bg = { color1: t.bg[0], color2: t.bg[1], gradient: t.bg[0] !== t.bg[1], orient: t.bg[2] };
+        b.textColors = {
+            titulo: t.text,
+            premio1: t.text,
+            premio2: t.sub,
+            premio3: t.sub,
+            costo: t.text,
+            modalidadFecha: t.sub,
+            whatsapp: t.text,
+            sinpe: t.text
+        };
+        b.numberColors = { disponibleText: t.disp[0], disponibleBg: t.disp[1], tomadoText: t.tom[0], tomadoBg: t.tom[1] };
+        return b;
+    }
+
+    function themeSwatches(containerId, current, onPick) {
+        const box = $(containerId);
+        if (!box) return;
+        box.innerHTML = THEMES.map((t) => {
+            const bg = t.bg[0] === t.bg[1] ? t.bg[0] : `linear-gradient(${t.bg[2]}, ${t.bg[0]}, ${t.bg[1]})`;
+            return `<button type="button" class="rf-theme${t.id === current ? " is-active" : ""}" data-theme="${t.id}" role="radio" aria-checked="${t.id === current}">
+                <span class="rf-theme__swatch" style="background:${bg}"><span style="background:${t.disp[1]};color:${t.disp[0]}">07</span><span style="background:${t.tom[1]};color:${t.tom[0]}">ø</span></span>
+                <span class="rf-theme__name">${escapeHtml(t.nombre)}</span>
+            </button>`;
+        }).join("");
+        box.onclick = (ev) => {
+            const btn = ev.target.closest("[data-theme]");
+            if (!btn) return;
+            box.querySelectorAll("[data-theme]").forEach((b) => {
+                const on = b === btn;
+                b.classList.toggle("is-active", on);
+                b.setAttribute("aria-checked", String(on));
+            });
+            onPick(btn.getAttribute("data-theme"));
+        };
+    }
+
+    /* ---------- Datos derivados ---------- */
+    function precioNumero() {
+        const d = String(project?.precio || "").replace(/[^\d]/g, "");
+        return d ? Number(d) : 0;
+    }
+
+    function colones(n) {
+        return "₡" + String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    }
+
+    function claveNombre(s) {
+        return String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    }
+
+    function compradores() {
+        const map = new Map();
+        for (let i = 0; i < 100; i++) {
+            const n = String(i).padStart(2, "0");
+            const info = datos[n];
+            if (!info || info.estado === "Disponible" || !info.nombre) continue;
+            const k = claveNombre(info.nombre);
+            if (!map.has(k)) map.set(k, { nombre: info.nombre.trim(), telefono: "", contacto: "", nums: [] });
+            const g = map.get(k);
+            if (!g.telefono && info.telefono) g.telefono = info.telefono;
+            if (!g.contacto && info.contacto) g.contacto = info.contacto;
+            g.nums.push({ n, estado: info.estado });
+        }
+        return [...map.values()].map((g) => {
+            const apartados = g.nums.filter((x) => x.estado === "Reservado").map((x) => x.n);
+            const pagados = g.nums.filter((x) => x.estado === "Pagado").map((x) => x.n);
+            return Object.assign(g, { apartados, pagados, debe: apartados.length * precioNumero() });
+        });
+    }
+
+    function numerosLibres() {
+        const out = [];
+        for (let i = 0; i < 100; i++) {
+            const n = String(i).padStart(2, "0");
+            if ((datos[n]?.estado || "Disponible") === "Disponible") out.push(n);
+        }
+        return out;
+    }
+
+    function numerosVendidos() {
+        const out = [];
+        for (let i = 0; i < 100; i++) {
+            const n = String(i).padStart(2, "0");
+            if ((datos[n]?.estado || "Disponible") !== "Disponible") out.push(n);
+        }
+        return out;
+    }
+
+    function listaNumerosTexto(nums) {
+        if (nums.length <= 3) return nums.join(", ").replace(/, ([^,]*)$/, " y $1");
+        return nums.join(", ");
+    }
+
+    /** Números agrupados por decena, para que el mensaje se lea fácil en WhatsApp. */
+    function numerosEnFilas(nums) {
+        const filas = [];
+        for (let d = 0; d < 10; d++) {
+            const fila = nums.filter((n) => n.charAt(0) === String(d));
+            if (fila.length) filas.push(fila.join("  "));
+        }
+        return filas.join("\n");
+    }
+
+    function telefonoWa(tel) {
+        let d = String(tel || "").replace(/[^\d]/g, "");
+        if (!d) return "";
+        if (d.length === 8) d = "506" + d;
+        return d.length >= 10 ? d : "";
+    }
+
+    function tituloRifa() {
+        return project?.nombre_display || project?.sheet_name || "Rifa";
+    }
+
+    function textoSorteo() {
+        const f = formatFechaLargaEs(project?.fecha_sorteo || "");
+        if (!f) return "";
+        const fl = f.charAt(0).toLowerCase() + f.slice(1);
+        if (project?.modalidad === "Chances") return `Juega con los Chances del ${fl}, 7:30 p.m.`;
+        if (project?.modalidad === "Loteria Nacional") return `Juega con la Lotería Nacional del ${fl}, 7:30 p.m.`;
+        return `Sorteo el ${fl}`;
+    }
+
+    /* ---------- Resumen ---------- */
+    function renderSummary() {
+        const s = countStats();
+        updateStatsUI();
+        const sold = s.reservado + s.pagado;
+        const soldEl = $("rf-sold");
+        if (soldEl) soldEl.textContent = String(sold);
+        const p = $("rf-progress-paid");
+        const r = $("rf-progress-res");
+        if (p) p.style.width = `${s.pagado}%`;
+        if (r) r.style.width = `${s.reservado}%`;
+        const precio = precioNumero();
+        const money = $("rf-money");
+        if (money) money.hidden = !precio;
+        if (precio) {
+            $("rf-money-paid").textContent = colones(s.pagado * precio);
+            $("rf-money-due").textContent = colones(s.reservado * precio);
+        }
+    }
+
+    /* ---------- Pestañas ---------- */
+    function showAdTab(name) {
+        document.querySelectorAll(".rf-tab").forEach((t) => {
+            const on = t.getAttribute("data-adtab") === name;
+            t.classList.toggle("is-active", on);
+            if (on) t.setAttribute("aria-current", "page");
+            else t.removeAttribute("aria-current");
+        });
+        document.querySelectorAll(".rifa-adpanel").forEach((p) => {
+            const match = p.getAttribute("data-adpanel") === name;
+            p.hidden = !match;
+            p.classList.toggle("is-active", match);
+        });
+        if (name !== "numeros") limpiarSeleccion();
+        if (name === "compartir") {
+            refreshBannerPreview();
+            renderMensaje();
+        }
+        if (name === "compradores") renderCompradores();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    /* ---------- Números ---------- */
+    function coincideFiltro(n, info) {
+        const e = info.estado || "Disponible";
+        if (filtroNumeros === "libres" && e !== "Disponible") return false;
+        if (filtroNumeros === "apartados" && e !== "Reservado") return false;
+        if (filtroNumeros === "pagados" && e !== "Pagado") return false;
+        const q = claveNombre($("rf-search")?.value);
+        if (q && !n.includes(q) && !claveNombre(info.nombre).includes(q)) return false;
+        return true;
+    }
+
+    function renderGrid() {
+        const grid = $("rifa-numbers-grid");
+        if (!grid) return;
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < 100; i++) {
+            const n = String(i).padStart(2, "0");
+            const info = datos[n] || { estado: "Disponible", nombre: "" };
+            const estado = info.estado || "Disponible";
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "rf-num estado-" + estado.toLowerCase();
+            btn.dataset.num = n;
+            if (seleccion.has(n)) btn.classList.add("is-selected");
+            if (!coincideFiltro(n, info)) btn.classList.add("is-dim");
+            const quien = info.nombre ? info.nombre.trim().split(/\s+/)[0] : "";
+            btn.innerHTML = `<span class="rf-num__n">${n}</span>${quien ? `<span class="rf-num__who">${escapeHtml(quien)}</span>` : ""}`;
+            const estadoTxt = estado === "Pagado" ? "pagado" : estado === "Reservado" ? "apartado" : "libre";
+            btn.setAttribute("aria-label", `${n}, ${estadoTxt}${info.nombre ? " por " + info.nombre : ""}`);
+            btn.setAttribute("aria-pressed", String(seleccion.has(n)));
+            frag.appendChild(btn);
+        }
+        grid.replaceChildren(frag);
+        renderSummary();
+        syncSelbar();
+    }
+
+    function toggleSelect(n) {
+        if (seleccion.has(n)) seleccion.delete(n);
+        else seleccion.add(n);
+        renderGrid();
+    }
+
+    function limpiarSeleccion() {
+        if (!seleccion.size) return;
+        seleccion.clear();
+        renderGrid();
+        renderLista();
+    }
+
+    function syncSelbar() {
+        const bar = $("rf-selbar");
+        if (!bar) return;
+        const nums = [...seleccion].sort();
+        bar.hidden = nums.length === 0;
+        document.body.classList.toggle("rf-has-selbar", nums.length > 0);
+        if (!nums.length) return;
+        $("rf-selbar-count").textContent = nums.length === 1 ? "1 número" : `${nums.length} números`;
+        $("rf-selbar-nums").textContent = nums.length <= 8 ? nums.join(" · ") : nums.slice(0, 8).join(" · ") + " …";
+        const todosLibres = nums.every((n) => (datos[n]?.estado || "Disponible") === "Disponible");
+        $("rf-selbar-go").textContent = todosLibres ? "Anotar comprador" : "Ver / cambiar";
+    }
+
+    /* ---------- Hoja «Anotar comprador» ---------- */
+    function setSheetEstado(e) {
+        sheetEstado = e;
+        document.querySelectorAll(".rf-estado__opt").forEach((b) => {
+            const on = b.getAttribute("data-estado") === e;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-checked", String(on));
+        });
+        const fields = $("rf-sheet-fields");
+        if (fields) fields.hidden = e === "Disponible";
+        const save = $("rifa-sel-guardar");
+        if (save) {
+            save.textContent = e === "Disponible" ? "Liberar" : "Guardar";
+            save.classList.toggle("rifa-btn--danger", e === "Disponible");
+        }
+    }
+
+    function openModal(id) {
+        const m = $(id);
+        if (!m) return;
+        m.hidden = false;
+        document.body.classList.add("rf-modal-open");
+        const first = m.querySelector("input:not([type=hidden]):not([hidden]), button");
+        if (first && window.matchMedia("(min-width: 769px)").matches) first.focus();
+    }
+
+    function closeModal(id) {
+        const m = $(id);
+        if (!m) return;
+        m.hidden = true;
+        if (!document.querySelector(".rf-modal:not([hidden]), .rf-wizard:not([hidden])")) {
+            document.body.classList.remove("rf-modal-open");
+        }
+    }
+
+    function abrirHoja() {
+        const nums = [...seleccion].sort();
+        if (!nums.length) return;
+        $("rf-sheet-title").textContent =
+            nums.length === 1 ? `Número ${nums[0]}` : `Números ${listaNumerosTexto(nums)}`;
+        const tomados = nums.filter((n) => (datos[n]?.estado || "Disponible") !== "Disponible");
+        const cur = $("rf-sheet-current");
+        if (cur) {
+            cur.hidden = !tomados.length;
+            cur.innerHTML = tomados
+                .map((n) => {
+                    const d = datos[n];
+                    const e = d.estado === "Pagado" ? "pagado" : "apartado";
+                    return `<div><span class="rf-dot rf-dot--${e}"></span><strong>${n}</strong> — ${escapeHtml(d.nombre)} <small>(${e})</small></div>`;
+                })
+                .join("");
+        }
+        // Prellenar si todos los tomados son de la misma persona
+        const nombres = new Set(tomados.map((n) => claveNombre(datos[n].nombre)));
+        const ref = tomados.length && nombres.size === 1 ? datos[tomados[0]] : null;
+        $("rifa-sel-nombre").value = ref ? ref.nombre : "";
+        $("rifa-sel-tel").value = ref ? ref.telefono : "";
+        $("rifa-sel-contacto").value = ref ? ref.contacto : "";
+        const estados = new Set(tomados.map((n) => datos[n].estado));
+        setSheetEstado(tomados.length === nums.length && estados.size === 1 ? [...estados][0] : "Reservado");
+        // Autocompletar con compradores existentes
+        const dl = $("rf-buyers-datalist");
+        if (dl) dl.innerHTML = compradores().map((g) => `<option value="${escapeAttr(g.nombre)}"></option>`).join("");
+        openModal("rf-sheet");
+    }
+
+    async function guardarSeleccion() {
+        const estado = sheetEstado;
+        const nombre = $("rifa-sel-nombre").value.trim();
+        const telefono = $("rifa-sel-tel").value.trim();
+        const contacto = $("rifa-sel-contacto").value.trim();
+        const nums = [...seleccion].sort();
+        if (!nums.length) return;
+        if (estado !== "Disponible" && !nombre) {
+            showMessage("Escriba el nombre de quien compra.", "error");
+            $("rifa-sel-nombre").focus();
+            return;
+        }
+        if (estado === "Disponible") {
+            const tomados = nums.filter((n) => (datos[n]?.estado || "Disponible") !== "Disponible");
+            if (tomados.length && !confirm(`¿Liberar ${listaNumerosTexto(tomados)}? Se borra el comprador de ${tomados.length === 1 ? "ese número" : "esos números"}.`)) {
+                return;
+            }
+        }
+        const listaCambios = nums.map((num) => ({
+            num,
+            estado,
+            nombre: estado === "Disponible" ? "" : nombre,
+            telefono: estado === "Disponible" ? "" : telefono,
+            contacto: estado === "Disponible" ? "" : contacto
+        }));
+        const uno = nums.length === 1;
+        const estadoTxt = { Pagado: ["pagado", "pagados"], Reservado: ["apartado", "apartados"], Disponible: ["libre", "libres"] }[estado];
+        const okMsg = uno
+            ? `El número ${nums[0]} quedó ${estadoTxt[0]}.`
+            : `Los números ${listaNumerosTexto(nums)} quedaron ${estadoTxt[1]}.`;
+        await enviarCambios(listaCambios, "rifa-sel-guardar", okMsg);
+        closeModal("rf-sheet");
+        seleccion.clear();
+        renderGrid();
+    }
+
+    async function enviarCambios(listaCambios, btnId, mensajeOk) {
+        const btn = btnId ? $(btnId) : null;
+        if (btn) btn.disabled = true;
+        try {
+            const res = await api.post({ action: "update_numbers", hash: adminHash, listaCambios });
+            datos = numerosFromApi(res.data?.numeros);
+            renderGrid();
+            renderLista();
+            renderCompradores();
+            if (!$("rf-share-preview")?.closest("[hidden]")) {
+                refreshBannerPreview();
+                renderMensaje();
+            }
+            showMessage(typeof mensajeOk === "function" ? mensajeOk() : mensajeOk || "Guardado.", "success");
+        } catch (e) {
+            showMessage(e.message || String(e), "error");
+            throw e;
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /* ---------- Compradores ---------- */
+    function renderCompradores() {
+        const box = $("rf-buyers-list");
+        if (!box) return;
+        const q = claveNombre($("rf-buyer-search")?.value);
+        let lista = compradores();
+        if (filtroCompradores === "deben") lista = lista.filter((g) => g.apartados.length);
+        if (filtroCompradores === "pagaron") lista = lista.filter((g) => !g.apartados.length);
+        if (q) lista = lista.filter((g) => claveNombre(g.nombre).includes(q) || g.nums.some((x) => x.n.includes(q)));
+        lista.sort((a, b) => b.apartados.length - a.apartados.length || a.nombre.localeCompare(b.nombre, "es"));
+
+        if (!lista.length) {
+            const vacio = compradores().length
+                ? "Nadie coincide con ese filtro."
+                : "Todavía no hay compradores. Vaya a «Números», toque un número y anote a quien lo compra.";
+            box.innerHTML = `<p class="rf-empty">${vacio}</p>`;
+            return;
+        }
+        const precio = precioNumero();
+        box.innerHTML = lista
+            .map((g) => {
+                const chips = g.nums
+                    .map((x) => `<span class="rf-chipnum estado-${x.estado.toLowerCase()}">${x.n}</span>`)
+                    .join("");
+                const debe = g.apartados.length;
+                const estadoTxt = debe
+                    ? `<span class="rf-buyer__due">Debe ${precio ? colones(g.debe) + " · " : ""}${debe} ${debe === 1 ? "número" : "números"}</span>`
+                    : '<span class="rf-buyer__ok">✓ Pagó todo</span>';
+                const wa = telefonoWa(g.telefono);
+                const key = escapeAttr(claveNombre(g.nombre));
+                return `<article class="rf-buyer${debe ? " is-due" : ""}">
+                    <div class="rf-buyer__head">
+                        <div>
+                            <h3>${escapeHtml(g.nombre)}</h3>
+                            <p>${g.telefono ? escapeHtml(g.telefono) : "Sin teléfono"}${g.contacto ? " · " + escapeHtml(g.contacto) : ""}</p>
+                        </div>
+                        ${estadoTxt}
+                    </div>
+                    <div class="rf-buyer__nums">${chips}</div>
+                    <div class="rf-buyer__actions">
+                        ${debe ? `<button type="button" class="rifa-btn rifa-btn--sm rifa-btn--primary" data-buyer-pay="${key}">Marcar pagado</button>` : ""}
+                        ${wa ? `<button type="button" class="rifa-btn rifa-btn--sm" data-buyer-wa="${key}">${debe ? "Recordar pago" : "Confirmar pago"} por WhatsApp</button>` : ""}
+                        <button type="button" class="rifa-btn rifa-btn--sm" data-buyer-edit="${key}">Editar</button>
+                    </div>
+                </article>`;
+            })
+            .join("");
+    }
+
+    function compradorPorClave(k) {
+        return compradores().find((g) => claveNombre(g.nombre) === k);
+    }
+
+    function mensajeComprador(g) {
+        const nombre = g.nombre.split(/\s+/)[0];
+        if (g.apartados.length) {
+            const nums = listaNumerosTexto(g.apartados);
+            const plural = g.apartados.length > 1;
+            const total = precioNumero() ? ` Total: ${colones(g.debe)}.` : "";
+            const sinpe = project?.sinpe ? ` Puede pagar por SINPE Móvil al ${project.sinpe}.` : "";
+            return `¡Hola ${nombre}! Le recuerdo que tiene ${plural ? "apartados los números" : "apartado el número"} ${nums} de la rifa «${tituloRifa()}».${total}${sinpe} ¡Muchas gracias!`;
+        }
+        const nums = listaNumerosTexto(g.pagados);
+        const sorteo = textoSorteo();
+        return `¡Hola ${nombre}! Confirmo su pago de ${g.pagados.length > 1 ? "los números" : "el número"} ${nums} de la rifa «${tituloRifa()}».${sorteo ? " " + sorteo + "." : ""} ¡Mucha suerte! 🍀`;
+    }
+
+    /* ---------- Compartir: mensaje ---------- */
+    function opcionesMensaje() {
+        const incluir = {};
+        document.querySelectorAll("[data-msg]").forEach((c) => {
+            incluir[c.getAttribute("data-msg")] = c.checked;
+        });
+        return {
+            saludo: $("rf-msg-saludo")?.value.trim() || "",
+            despedida: $("rf-msg-despedida")?.value.trim() || "",
+            incluir
+        };
+    }
+
+    function construirMensaje(o) {
+        const L = [];
+        const inc = o.incluir;
+        if (o.saludo) L.push(o.saludo, "");
+        L.push(`🎟️ *${tituloRifa()}*`);
+        if (inc.premios) {
+            const premios = [project?.premio_1, project?.premio_2, project?.premio_3].slice(0, project?.cantidad_premios || 1);
+            const medallas = ["🥇", "🥈", "🥉"];
+            premios.forEach((p, i) => {
+                if (p) L.push(`${medallas[i]} ${premios.length > 1 ? premioLabel(i + 1) + ": " : "Premio: "}${p}`);
+            });
+        }
+        if (inc.precio && project?.precio) L.push(`💵 Cada número: ${formatColonPrice(project.precio)}`);
+        if (inc.sorteo && textoSorteo()) L.push(`📅 ${textoSorteo()}`);
+        if (inc.libres) {
+            const libres = numerosLibres();
+            L.push("");
+            if (libres.length) {
+                L.push(`✅ *Números disponibles (${libres.length}):*`);
+                L.push(numerosEnFilas(libres));
+            } else {
+                L.push("🎉 *¡Todos los números están vendidos!*");
+            }
+        }
+        if (inc.vendidos) {
+            const v = numerosVendidos();
+            if (v.length) {
+                L.push("");
+                L.push(`❌ *Ya vendidos (${v.length}):*`);
+                L.push(numerosEnFilas(v));
+            }
+        }
+        const pie = [];
+        if (inc.pago && project?.sinpe) pie.push(`📲 Pago por SINPE Móvil: ${project.sinpe}`);
+        if (inc.contacto && project?.whatsapp) pie.push(`💬 Aparte su número por WhatsApp: ${project.whatsapp}`);
+        if (pie.length) L.push("", ...pie);
+        if (o.despedida) L.push("", o.despedida);
+        return L.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+
+    function renderMensaje(forzar) {
+        const ta = $("rf-msg-text");
+        if (!ta) return;
+        if (msgTocado && !forzar) return;
+        ta.value = construirMensaje(opcionesMensaje());
+        msgTocado = false;
+    }
+
+    function cargarOpcionesMensaje() {
+        const m = Object.assign({}, MSG_DEFAULTS, bannerExtras.mensaje || {});
+        const incluir = Object.assign({}, MSG_DEFAULTS.incluir, m.incluir || {});
+        $("rf-msg-saludo").value = m.saludo != null ? m.saludo : MSG_DEFAULTS.saludo;
+        $("rf-msg-despedida").value = m.despedida != null ? m.despedida : MSG_DEFAULTS.despedida;
+        document.querySelectorAll("[data-msg]").forEach((c) => {
+            c.checked = !!incluir[c.getAttribute("data-msg")];
+        });
+    }
+
+    async function copiarTexto(text, okMsg) {
+        try {
+            await navigator.clipboard.writeText(text);
+            if (okMsg) showMessage(okMsg, "success");
+            return true;
+        } catch (e) {
+            window.prompt("Copie el mensaje:", text);
+            return false;
+        }
+    }
+
+    async function compartirImagenYMensaje() {
+        const btn = $("rf-share-both");
+        const text = $("rf-msg-text")?.value || "";
+        if (btn) btn.disabled = true;
+        try {
+            const blob = await generarBannerBlob();
+            const filename = nombreArchivoImagen();
+            let file = null;
+            try {
+                file = new File([blob], filename, { type: "image/jpeg" });
+            } catch (e) {
+                file = null;
+            }
+            if (file && navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+                // Algunas apps solo toman la imagen: dejamos el texto copiado para pegarlo.
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch (e) {
+                    /* sin permiso de portapapeles: no pasa nada */
+                }
+                try {
+                    await navigator.share({ files: [file], text, title: tituloRifa() });
+                    showMessage("Listo. Si el mensaje no aparece junto a la imagen, péguelo en el chat: ya está copiado.", "success");
+                } catch (e) {
+                    if (e?.name !== "AbortError") throw e;
+                }
+            } else {
+                downloadBlob(blob, filename);
+                await copiarTexto(text);
+                showMessage("Imagen descargada y mensaje copiado. Adjunte la imagen en el chat y pegue el mensaje.", "success");
+            }
+        } catch (e) {
+            showMessage(e.message || String(e), "error");
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /* ---------- Acceso directo (iPhone / Android) ---------- */
+    function plataforma() {
+        const ua = navigator.userAgent || "";
+        const iOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+        const android = /Android/i.test(ua);
+        const inApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
+        const safari = iOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//i.test(ua) && !inApp;
+        const standalone =
+            (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+        return { iOS, android, inApp, safari, standalone };
+    }
+
+    const ICO_SHARE_IOS =
+        '<svg class="rf-ico-inline" viewBox="0 0 24 24" aria-label="Compartir"><path d="M12 3v12M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 11H5v9h14v-9h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    const ICO_MENU_ANDROID =
+        '<svg class="rf-ico-inline" viewBox="0 0 24 24" aria-label="Menú"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>';
+
+    function instruccionesInstalar() {
+        const p = plataforma();
+        const nombre = escapeHtml(tituloRifa());
+        if (p.standalone) {
+            return `<p class="rf-install-ok">✓ Ya está usando el acceso directo de «${nombre}». Ábralo desde su pantalla de inicio cada vez que lo necesite.</p>`;
+        }
+        const prompt = window.__cpmInstallPrompt;
+        if (prompt && !p.iOS) {
+            return `<p>Su teléfono permite instalarla con un toque:</p>
+                <button type="button" class="rifa-btn rifa-btn--primary rf-install-native" data-install-native>Agregar «${nombre}» a mi pantalla de inicio</button>`;
+        }
+        if (p.iOS) {
+            const aviso = !p.safari
+                ? `<p class="rf-install-warn">Primero abra este enlace en <strong>Safari</strong>: en el iPhone solo Safari puede crear el acceso directo. Si lo abrió desde WhatsApp, toque el enlace, elija «Abrir en Safari», o copie el enlace y péguelo en Safari.</p>
+                   <button type="button" class="rifa-btn" data-install-copy>Copiar el enlace</button>`
+                : "";
+            return `${aviso}<ol class="rf-install-list">
+                    <li>En Safari, toque el botón <strong>Compartir</strong> ${ICO_SHARE_IOS} (el cuadro con una flecha hacia arriba). Si no lo ve, toque primero el menú <strong>«⋯»</strong> de la barra de abajo.</li>
+                    <li>Deslice hacia abajo y toque <strong>«Agregar a inicio»</strong>.</li>
+                    <li>Toque <strong>«Agregar»</strong>. Aparecerá el ícono «${nombre}» en su pantalla.</li>
+                </ol>`;
+        }
+        if (p.android) {
+            const aviso = p.inApp
+                ? `<p class="rf-install-warn">Si abrió el enlace desde WhatsApp, Facebook o Instagram, toque ${ICO_MENU_ANDROID} y elija <strong>«Abrir en Chrome»</strong> antes de seguir.</p>`
+                : "";
+            return `${aviso}<ol class="rf-install-list">
+                    <li>En Chrome, toque el menú ${ICO_MENU_ANDROID} (arriba a la derecha).</li>
+                    <li>Toque <strong>«Agregar a la pantalla principal»</strong> o <strong>«Instalar app»</strong>.</li>
+                    <li>Confirme con <strong>«Agregar»</strong>. Aparecerá el ícono «${nombre}» en su pantalla.</li>
+                </ol>`;
+        }
+        return `<p>En la computadora, guarde esta página en <strong>favoritos</strong> (Ctrl + D, o ⌘ + D en Mac) para volver rápido.</p>
+            <p>Para el teléfono, envíese el enlace a usted mismo, ábralo allí y siga este mismo botón.</p>
+            <button type="button" class="rifa-btn" data-install-copy>Copiar el enlace</button>`;
+    }
+
+    function pintarInstalar(boxId) {
+        const box = $(boxId);
+        if (box) box.innerHTML = instruccionesInstalar();
+    }
+
+    async function onInstalarClick(ev) {
+        if (ev.target.closest("[data-install-copy]")) {
+            await copiarTexto(window.location.href, "Enlace copiado.");
+            return;
+        }
+        if (ev.target.closest("[data-install-native]")) {
+            const prompt = window.__cpmInstallPrompt;
+            if (!prompt) return;
+            prompt.prompt();
+            try {
+                const r = await prompt.userChoice;
+                if (r?.outcome === "accepted") showMessage("¡Listo! Ya tiene la rifa en su pantalla de inicio.", "success");
+            } catch (e) {
+                /* ignore */
+            }
+            window.__cpmInstallPrompt = null;
+        }
+    }
+
+    /**
+     * El acceso directo debe abrir ESTA rifa, no la portada del sitio:
+     * manifest propio con start_url = enlace de la rifa y nombre de la rifa.
+     */
+    function prepararAccesoDirecto() {
+        const nombre = tituloRifa();
+        const base = new URL("./", window.location.href).href;
+        const manifest = {
+            name: `Rifa · ${nombre}`,
+            short_name: nombre.length > 14 ? nombre.slice(0, 14).trim() : nombre,
+            description: "Administración de la rifa: números, compradores y compartir.",
+            lang: "es",
+            start_url: window.location.href,
+            scope: base,
+            display: "standalone",
+            background_color: "#212121",
+            theme_color: "#212121",
+            icons: [
+                { src: base + "imagenes/branding/icon-192.png", sizes: "192x192", type: "image/png" },
+                { src: base + "imagenes/branding/icon-512.png", sizes: "512x512", type: "image/png" },
+                { src: base + "imagenes/branding/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+            ]
+        };
+        let link = document.querySelector('link[rel="manifest"]');
+        if (!link) {
+            link = document.createElement("link");
+            link.rel = "manifest";
+            document.head.appendChild(link);
+        }
+        link.href = "data:application/manifest+json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
+        const meta = (name, content) => {
+            let m = document.querySelector(`meta[name="${name}"]`);
+            if (!m) {
+                m = document.createElement("meta");
+                m.name = name;
+                document.head.appendChild(m);
+            }
+            m.content = content;
+        };
+        meta("apple-mobile-web-app-capable", "yes");
+        meta("mobile-web-app-capable", "yes");
+        meta("apple-mobile-web-app-title", nombre.slice(0, 20));
+        meta("apple-mobile-web-app-status-bar-style", "black-translucent");
+        document.title = `Rifa · ${nombre}`;
+    }
+
+    /* ---------- Ajustes ---------- */
+    function fillConfigForm() {
+        if (!project) return;
+        $("cfg-nombre").value = tituloRifa();
+        $("cfg-premios-n").value = String(project.cantidad_premios || 1);
+        $("cfg-premio1").value = project.premio_1 || "";
+        $("cfg-premio2").value = project.premio_2 || "";
+        $("cfg-premio3").value = project.premio_3 || "";
+        $("cfg-modalidad").value = project.modalidad || "Chances";
+        $("cfg-fecha").value = (project.fecha_sorteo || "").slice(0, 10);
+        $("cfg-whatsapp").value = project.whatsapp || "";
+        $("cfg-sinpe").value = project.sinpe || "";
+        $("cfg-precio").value = formatColonPrice(project.precio || "");
+        syncPremioFields("cfg-premios-n", "data-cfg-premio");
+        const hint = $("cfg-fecha-hint");
+        if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
+        const rngTab = $("rifa-tab-rng");
+        if (rngTab) rngTab.hidden = project.modalidad !== "RNG";
+        wirePrecioInput($("cfg-precio"));
+        const note = $("rf-archive-note");
+        if (note) {
+            note.hidden = !project.fecha_archivo;
+            if (project.fecha_archivo) {
+                note.textContent = `Este enlace funciona hasta el ${formatFechaLargaEs(project.fecha_archivo).toLowerCase()}. Después la rifa se archiva.`;
+            }
+        }
+        const title = $("rifa-admin-title");
+        if (title) title.textContent = tituloRifa();
+    }
+
+    async function guardarConfig(cfg, btn) {
+        if (btn) btn.disabled = true;
+        try {
+            const res = await api.post({ action: "update_config", hash: adminHash, config: cfg });
+            project = Object.assign({}, project, res.data?.project || cfg);
+            fillConfigForm();
+            prepararAccesoDirecto();
+            refreshBannerPreview();
+            renderMensaje(true);
+            renderSummary();
+            return true;
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /* ---------- Asistente de primera vez ---------- */
+    const WZ_LAST = 6;
+
+    function wzSyncPremios() {
+        document.querySelectorAll("#wz-premios-n [data-n]").forEach((b) => {
+            const on = Number(b.getAttribute("data-n")) === wzPremios;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-checked", String(on));
+        });
+        document.querySelectorAll("[data-wz-premio]").forEach((el) => {
+            el.hidden = Number(el.getAttribute("data-wz-premio")) > wzPremios;
+        });
+    }
+
+    function wzModalidad() {
+        return document.querySelector('input[name="wz-modalidad"]:checked')?.value || "Chances";
+    }
+
+    function wzSyncFecha() {
+        const hint = $("wz-fecha-hint");
+        if (!hint) return;
+        const f = $("wz-fecha").value;
+        const err = f ? validateFechaModalidad(wzModalidad(), f) : "";
+        hint.textContent = err || fechaHint(wzModalidad());
+        hint.classList.toggle("is-error", !!err);
+    }
+
+    /** Lo escrito en el asistente, con la forma que espera update_config. */
+    function wzCfg() {
+        return {
+            nombre_display: $("wz-nombre").value.trim(),
+            cantidad_premios: wzPremios,
+            premio_1: $("wz-premio1").value.trim(),
+            premio_2: wzPremios >= 2 ? $("wz-premio2").value.trim() : "",
+            premio_3: wzPremios >= 3 ? $("wz-premio3").value.trim() : "",
+            precio: formatColonPrice($("wz-precio").value.trim()),
+            modalidad: wzModalidad(),
+            fecha_sorteo: $("wz-fecha").value,
+            sinpe: $("wz-sinpe").value.trim(),
+            whatsapp: $("wz-whatsapp").value.trim()
+        };
+    }
+
+    function wzPreview() {
+        const box = $("wz-preview");
+        if (!box) return;
+        const cfg = wzCfg();
+        const b = aplicarTema(project?.banner, wzTheme);
+        b.head.title = cfg.nombre_display || tituloRifa();
+        // La vista previa usa los datos recién escritos, aunque todavía no se hayan guardado
+        const guardado = project;
+        project = Object.assign({}, project, cfg);
+        try {
+            box.innerHTML = buildBannerHtml(b, false, 0.2);
+        } finally {
+            project = guardado;
+        }
+    }
+
+    function wzFill() {
+        $("wz-nombre").value = project?.nombre_display && project.nombre_display !== project.sheet_name ? project.nombre_display : "";
+        wzPremios = Math.min(3, Math.max(1, Number(project?.cantidad_premios) || 1));
+        $("wz-premio1").value = project?.premio_1 && project.premio_1 !== "Premio" ? project.premio_1 : "";
+        $("wz-premio2").value = project?.premio_2 || "";
+        $("wz-premio3").value = project?.premio_3 || "";
+        $("wz-precio").value = project?.precio ? formatColonPrice(project.precio) : "";
+        const mod = project?.modalidad || "Chances";
+        document.querySelectorAll('input[name="wz-modalidad"]').forEach((r) => (r.checked = r.value === mod));
+        $("wz-fecha").value = (project?.fecha_sorteo || "").slice(0, 10);
+        $("wz-sinpe").value = project?.sinpe || "";
+        $("wz-whatsapp").value = project?.whatsapp || "";
+        wzTheme = bannerExtras.theme || "claro";
+        wirePrecioInput($("wz-precio"));
+        wzSyncPremios();
+        wzSyncFecha();
+        themeSwatches("wz-themes", wzTheme, (id) => {
+            wzTheme = id;
+            wzPreview();
+        });
+    }
+
+    function wzShow(step) {
+        wzStep = Math.max(0, Math.min(WZ_LAST, step));
+        document.querySelectorAll(".rf-wz-pane").forEach((p) => {
+            p.hidden = Number(p.getAttribute("data-wz")) !== wzStep;
+        });
+        $("rf-wz-bar").style.width = `${Math.round((wzStep / WZ_LAST) * 100)}%`;
+        $("rf-wz-step").textContent = wzStep === 0 ? "Bienvenida" : wzStep === WZ_LAST ? "¡Listo!" : `Paso ${wzStep} de ${WZ_LAST - 1}`;
+        $("rf-wz-back").hidden = wzStep === 0 || wzStep === WZ_LAST;
+        $("rf-wz-skip").hidden = wzStep !== 0;
+        $("rf-wz-next").textContent = wzStep === 0 ? "Empezar" : wzStep === WZ_LAST - 1 ? "Guardar y terminar" : wzStep === WZ_LAST ? "Ir a mis números" : "Siguiente";
+        $("rf-wz-error").textContent = "";
+        if (wzStep === 5) wzPreview();
+        if (wzStep === WZ_LAST) pintarInstalar("wz-install");
+        const pane = document.querySelector(`.rf-wz-pane[data-wz="${wzStep}"]`);
+        const input = pane?.querySelector("input:not([type=radio])");
+        if (input && window.matchMedia("(min-width: 769px)").matches) input.focus();
+        $("rf-wizard")?.querySelector(".rf-wizard__box")?.scrollTo?.(0, 0);
+    }
+
+    function wzValidar(step) {
+        const v = (id) => $(id)?.value.trim() || "";
+        if (step === 1 && v("wz-nombre").length < 2) return "Escriba el nombre de la rifa.";
+        if (step === 2) {
+            if (!v("wz-premio1")) return "Escriba el primer premio.";
+            if (wzPremios >= 2 && !v("wz-premio2")) return "Escriba el segundo premio o elija menos premios.";
+            if (wzPremios >= 3 && !v("wz-premio3")) return "Escriba el tercer premio o elija menos premios.";
+        }
+        if (step === 3) {
+            if (!v("wz-precio").replace(/[^\d]/g, "")) return "Escriba el precio de cada número.";
+            if (!v("wz-fecha")) return "Elija la fecha del sorteo.";
+            const err = validateFechaModalidad(wzModalidad(), v("wz-fecha"));
+            if (err) return err;
+        }
+        if (step === 4 && v("wz-sinpe").replace(/[^\d]/g, "").length < 8) return "Escriba el número de SINPE Móvil (8 dígitos).";
+        return "";
+    }
+
+    async function wzGuardar() {
+        const cfg = wzCfg();
+        await guardarConfig(cfg, $("rf-wz-next"));
+        const b = aplicarTema(project?.banner, wzTheme);
+        b.head = Object.assign({}, b.head, { mode: "text", title: cfg.nombre_display });
+        await guardarBanner(b, { theme: wzTheme, setup: { done: true, at: new Date().toISOString() } });
+        fillBannerForm();
+        themeSwatches("rf-themes", wzTheme, onThemeShare);
+        refreshBannerPreview();
+    }
+
+    async function wzSiguiente() {
+        if (wzStep === WZ_LAST) {
+            cerrarAsistente();
+            return;
+        }
+        const err = wzValidar(wzStep);
+        if (err) {
+            $("rf-wz-error").textContent = err;
+            return;
+        }
+        if (wzStep === WZ_LAST - 1) {
+            $("rf-wz-next").textContent = "Guardando…";
+            try {
+                await wzGuardar();
+            } catch (e) {
+                $("rf-wz-error").textContent = e.message || String(e);
+                $("rf-wz-next").textContent = "Guardar y terminar";
+                return;
+            }
+        }
+        wzShow(wzStep + 1);
+    }
+
+    function abrirAsistente() {
+        wzFill();
+        $("rf-wizard").hidden = false;
+        document.body.classList.add("rf-modal-open");
+        wzShow(0);
+    }
+
+    function cerrarAsistente() {
+        $("rf-wizard").hidden = true;
+        if (!document.querySelector(".rf-modal:not([hidden])")) document.body.classList.remove("rf-modal-open");
+        showAdTab("numeros");
+    }
+
+    async function saltarAsistente() {
+        cerrarAsistente();
+        if (bannerExtras.setup?.done) return;
+        try {
+            await guardarBanner(mergeBanner(project?.banner), { setup: { done: true, at: new Date().toISOString(), saltado: true } });
+        } catch (e) {
+            /* si no se pudo guardar, el asistente vuelve a ofrecerse la próxima vez */
+        }
+    }
+
+    /* ---------- Estilo desde «Compartir» ---------- */
+    let themeSaveTimer = 0;
+    function onThemeShare(id) {
+        const b = aplicarTema(readBannerFromForm(), id);
+        fillBannerForm(b);
+        refreshBannerPreview();
+        bannerExtras.theme = id;
+        clearTimeout(themeSaveTimer);
+        themeSaveTimer = setTimeout(async () => {
+            try {
+                await guardarBanner(readBannerFromForm(), { theme: id });
+                showMessage("Estilo guardado.", "success");
+            } catch (e) {
+                showMessage(e.message || String(e), "error");
+            }
+        }, 600);
+    }
+
     function wireAdminEvents() {
-        document.querySelectorAll(".rifa-tab").forEach((tab) => {
+        if (adminWired) return;
+        adminWired = true;
+
+        document.querySelectorAll(".rf-tab").forEach((tab) => {
             tab.addEventListener("click", () => showAdTab(tab.getAttribute("data-adtab")));
         });
 
-        $("rifa-sel-guardar")?.addEventListener("click", () => void guardarSeleccion());
-        $("rifa-sel-cancelar")?.addEventListener("click", () => {
-            seleccion.clear();
-            renderGrid();
+        // Números
+        $("rifa-numbers-grid")?.addEventListener("click", (ev) => {
+            const b = ev.target.closest("[data-num]");
+            if (b) toggleSelect(b.dataset.num);
         });
-        $("rifa-select-toggle")?.addEventListener("click", () => {
-            const body = $("rifa-select-body");
-            if (!body) return;
-            const open = body.hidden;
-            body.hidden = !open;
-            $("rifa-select-toggle").setAttribute("aria-expanded", String(open));
+        $("rf-search")?.addEventListener("input", renderGrid);
+        document.querySelectorAll("[data-filter]").forEach((chip) => {
+            chip.addEventListener("click", () => {
+                filtroNumeros = chip.getAttribute("data-filter");
+                document.querySelectorAll("[data-filter]").forEach((c) => c.classList.toggle("is-active", c === chip));
+                renderGrid();
+            });
+        });
+        $("rf-selbar-clear")?.addEventListener("click", limpiarSeleccion);
+        $("rf-selbar-go")?.addEventListener("click", abrirHoja);
+
+        // Hoja y modales
+        document.querySelectorAll(".rf-estado__opt").forEach((b) => {
+            b.addEventListener("click", () => setSheetEstado(b.getAttribute("data-estado")));
+        });
+        $("rifa-sel-guardar")?.addEventListener("click", () => void guardarSeleccion().catch(() => {}));
+        $("rifa-sel-nombre")?.addEventListener("change", () => {
+            const g = compradorPorClave(claveNombre($("rifa-sel-nombre").value));
+            if (g) {
+                if (!$("rifa-sel-tel").value) $("rifa-sel-tel").value = g.telefono;
+                if (!$("rifa-sel-contacto").value) $("rifa-sel-contacto").value = g.contacto;
+            }
+        });
+        document.querySelectorAll(".rf-modal").forEach((m) => {
+            m.addEventListener("click", (ev) => {
+                if (ev.target === m || ev.target.closest("[data-close]")) closeModal(m.id);
+            });
+        });
+        document.addEventListener("keydown", (ev) => {
+            if (ev.key !== "Escape") return;
+            const open = document.querySelector(".rf-modal:not([hidden])");
+            if (open) closeModal(open.id);
         });
 
-        document.querySelectorAll(".rifa-btn-banner-dl").forEach((btn) => {
-            btn.addEventListener("click", () => void descargarBannerJpg());
+        // Compradores
+        $("rf-buyer-search")?.addEventListener("input", renderCompradores);
+        document.querySelectorAll("[data-bfilter]").forEach((chip) => {
+            chip.addEventListener("click", () => {
+                filtroCompradores = chip.getAttribute("data-bfilter");
+                document.querySelectorAll("[data-bfilter]").forEach((c) => c.classList.toggle("is-active", c === chip));
+                renderCompradores();
+            });
         });
-
+        $("rf-buyers-list")?.addEventListener("click", async (ev) => {
+            const pay = ev.target.closest("[data-buyer-pay]");
+            const wa = ev.target.closest("[data-buyer-wa]");
+            const edit = ev.target.closest("[data-buyer-edit]");
+            const key = (pay || wa || edit)?.getAttribute(pay ? "data-buyer-pay" : wa ? "data-buyer-wa" : "data-buyer-edit");
+            const g = key ? compradorPorClave(key) : null;
+            if (!g) return;
+            if (pay) {
+                const cambios = g.apartados.map((n) => ({
+                    num: n,
+                    estado: "Pagado",
+                    nombre: datos[n].nombre,
+                    telefono: datos[n].telefono,
+                    contacto: datos[n].contacto
+                }));
+                pay.disabled = true;
+                await enviarCambios(cambios, null, `${g.nombre}: ${listaNumerosTexto(g.apartados)} ${g.apartados.length > 1 ? "quedaron pagados" : "quedó pagado"}.`).catch(() => {});
+            } else if (wa) {
+                window.open(`https://wa.me/${telefonoWa(g.telefono)}?text=${encodeURIComponent(mensajeComprador(g))}`, "_blank", "noopener");
+            } else if (edit) {
+                seleccion = new Set(g.nums.map((x) => x.n));
+                showAdTab("numeros");
+                seleccion = new Set(g.nums.map((x) => x.n));
+                renderGrid();
+                abrirHoja();
+            }
+        });
         $("rifa-csv-dl")?.addEventListener("click", descargarCsv);
         $("rifa-lista-guardar")?.addEventListener("click", () => void guardarListaCompleta());
 
-        $("rifa-lista-tbody")?.addEventListener("change", (ev) => {
-            const check = ev.target.closest(".rifa-lista-check");
-            if (check) {
-                const n = check.getAttribute("data-num");
-                if (check.checked) seleccion.add(n);
-                else seleccion.delete(n);
-                syncSelectPanel();
-            }
+        // Compartir
+        document.querySelectorAll(".rifa-btn-banner-dl").forEach((btn) => {
+            btn.addEventListener("click", () => void descargarBannerJpg());
         });
-
-        $("cfg-premios-n")?.addEventListener("change", () =>
-            syncPremioFields("cfg-premios-n", "data-cfg-premio")
-        );
-        $("cfg-modalidad")?.addEventListener("change", () => {
-            const hint = $("cfg-fecha-hint");
-            if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
+        ["rf-msg-saludo", "rf-msg-despedida"].forEach((id) => $(id)?.addEventListener("input", () => renderMensaje(true)));
+        document.querySelectorAll("[data-msg]").forEach((c) => c.addEventListener("change", () => renderMensaje(true)));
+        $("rf-msg-text")?.addEventListener("input", () => {
+            msgTocado = true;
         });
-
-        $("rifa-config-form")?.addEventListener("submit", async (ev) => {
-            ev.preventDefault();
-            const modalidad = $("cfg-modalidad").value;
-            const fecha = $("cfg-fecha").value;
-            const err = validateFechaModalidad(modalidad, fecha);
-            if (err) {
-                showMessage(err, "error");
-                return;
-            }
-            const cantidad = Number($("cfg-premios-n").value) || 1;
+        $("rf-msg-copy")?.addEventListener("click", () => void copiarTexto($("rf-msg-text").value, "Mensaje copiado. Péguelo en el chat o grupo."));
+        $("rf-msg-wa")?.addEventListener("click", () => {
+            window.open(`https://wa.me/?text=${encodeURIComponent($("rf-msg-text").value)}`, "_blank", "noopener");
+        });
+        $("rf-share-both")?.addEventListener("click", () => void compartirImagenYMensaje());
+        $("rf-msg-save")?.addEventListener("click", async () => {
+            const o = opcionesMensaje();
             try {
-                const res = await api.post({
-                    action: "update_config",
-                    hash: adminHash,
-                    config: {
-                        cantidad_premios: cantidad,
-                        premio_1: $("cfg-premio1").value.trim(),
-                        premio_2: cantidad >= 2 ? $("cfg-premio2").value.trim() : "",
-                        premio_3: cantidad >= 3 ? $("cfg-premio3").value.trim() : "",
-                        modalidad,
-                        fecha_sorteo: fecha,
-                        whatsapp: $("cfg-whatsapp").value.trim(),
-                        sinpe: $("cfg-sinpe").value.trim(),
-                        precio: formatColonPrice($("cfg-precio").value.trim())
-                    }
-                });
-                project = res.data?.project || project;
-                fillConfigForm();
-                showMessage("Configuración guardada.", "success");
+                await guardarBanner(readBannerFromForm(), { mensaje: o });
+                showMessage("Guardado: la próxima vez el mensaje empieza así.", "success");
             } catch (e) {
                 showMessage(e.message || String(e), "error");
             }
         });
 
+        // Diseño avanzado del afiche
         $("bn-head-mode")?.addEventListener("change", () => {
             const modeH = $("bn-head-mode")?.value;
             const sizeEl = $("bn-sz-titulo");
@@ -1436,7 +2570,6 @@
         });
         $("rifa-banner-form")?.addEventListener("input", () => refreshBannerPreview());
         $("rifa-banner-form")?.addEventListener("change", () => refreshBannerPreview());
-        wirePrecioInput($("cfg-precio"));
         syncIconUploadPanels();
 
         $("bn-logo-upload")?.addEventListener("click", async () => {
@@ -1458,20 +2591,8 @@
         document.querySelectorAll("[data-icon-upload]").forEach((btn) => {
             btn.addEventListener("click", async () => {
                 const kind = btn.getAttribute("data-icon-upload");
-                const fileEl = $(
-                    kind === "whatsapp"
-                        ? "bn-i-wa-file"
-                        : kind === "sinpe"
-                          ? "bn-i-sinpe-file"
-                          : "bn-i-tomado-file"
-                );
-                const urlEl = $(
-                    kind === "whatsapp"
-                        ? "bn-i-wa-url"
-                        : kind === "sinpe"
-                          ? "bn-i-sinpe-url"
-                          : "bn-i-tomado-url"
-                );
+                const fileEl = $(kind === "whatsapp" ? "bn-i-wa-file" : kind === "sinpe" ? "bn-i-sinpe-file" : "bn-i-tomado-file");
+                const urlEl = $(kind === "whatsapp" ? "bn-i-wa-url" : kind === "sinpe" ? "bn-i-sinpe-url" : "bn-i-tomado-url");
                 const file = fileEl?.files?.[0];
                 if (!file) {
                     showMessage("Selecciona una imagen.", "error");
@@ -1489,41 +2610,104 @@
         });
 
         $("rifa-banner-save")?.addEventListener("click", async () => {
-            const banner = readBannerFromForm();
             try {
-                const res = await api.post({
-                    action: "update_banner",
-                    hash: adminHash,
-                    banner
-                });
-                project = res.data?.project || project;
-                if (project) project.banner = banner;
-                showMessage("Diseño de banner guardado.", "success");
+                await guardarBanner(readBannerFromForm());
+                showMessage("Diseño de la imagen guardado.", "success");
             } catch (e) {
                 showMessage(e.message || String(e), "error");
             }
         });
 
         $("rifa-banner-reset")?.addEventListener("click", () => {
-            if (
-                !confirm(
-                    "¿Restablecer el banner a colores y estilos neutrales por defecto?\nNo se guarda hasta que pulses «Guardar diseño»."
-                )
-            ) {
-                return;
-            }
+            if (!confirm("¿Volver al diseño básico?\nNo se guarda hasta que toque «Guardar diseño».")) return;
             resetBannerToDefaults();
         });
 
-        $("rifa-preview-toggle")?.addEventListener("click", () => {
-            $("rifa-banner-preview-box")?.classList.toggle("is-open");
+        // Ajustes
+        $("cfg-premios-n")?.addEventListener("change", () => syncPremioFields("cfg-premios-n", "data-cfg-premio"));
+        $("cfg-modalidad")?.addEventListener("change", () => {
+            const hint = $("cfg-fecha-hint");
+            if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
+        });
+        $("rifa-config-form")?.addEventListener("submit", async (ev) => {
+            ev.preventDefault();
+            const modalidad = $("cfg-modalidad").value;
+            const fecha = $("cfg-fecha").value;
+            const err = validateFechaModalidad(modalidad, fecha);
+            if (err) {
+                showMessage(err, "error");
+                return;
+            }
+            if (!$("cfg-nombre").value.trim()) {
+                showMessage("La rifa necesita un nombre.", "error");
+                return;
+            }
+            const cantidad = Number($("cfg-premios-n").value) || 1;
+            try {
+                await guardarConfig(
+                    {
+                        nombre_display: $("cfg-nombre").value.trim(),
+                        cantidad_premios: cantidad,
+                        premio_1: $("cfg-premio1").value.trim(),
+                        premio_2: cantidad >= 2 ? $("cfg-premio2").value.trim() : "",
+                        premio_3: cantidad >= 3 ? $("cfg-premio3").value.trim() : "",
+                        modalidad,
+                        fecha_sorteo: fecha,
+                        whatsapp: $("cfg-whatsapp").value.trim(),
+                        sinpe: $("cfg-sinpe").value.trim(),
+                        precio: formatColonPrice($("cfg-precio").value.trim())
+                    },
+                    ev.submitter
+                );
+                showMessage("Datos de la rifa guardados.", "success");
+            } catch (e) {
+                showMessage(e.message || String(e), "error");
+            }
+        });
+        $("rf-install-open")?.addEventListener("click", () => {
+            pintarInstalar("rf-install-body");
+            openModal("rf-install");
+        });
+        $("rf-install-body")?.addEventListener("click", (ev) => void onInstalarClick(ev));
+        $("wz-install")?.addEventListener("click", (ev) => void onInstalarClick(ev));
+        $("rf-link-copy")?.addEventListener("click", () => void copiarTexto(window.location.href, "Enlace copiado. Guárdelo en un lugar seguro."));
+        $("rf-wizard-open")?.addEventListener("click", abrirAsistente);
+
+        // Asistente
+        $("rf-wz-next")?.addEventListener("click", () => void wzSiguiente());
+        $("rf-wz-back")?.addEventListener("click", () => wzShow(wzStep - 1));
+        $("rf-wz-skip")?.addEventListener("click", () => void saltarAsistente());
+        document.querySelectorAll("#wz-premios-n [data-n]").forEach((b) => {
+            b.addEventListener("click", () => {
+                wzPremios = Number(b.getAttribute("data-n")) || 1;
+                wzSyncPremios();
+            });
+        });
+        document.querySelectorAll('input[name="wz-modalidad"]').forEach((r) => r.addEventListener("change", wzSyncFecha));
+        $("wz-fecha")?.addEventListener("change", wzSyncFecha);
+        $("wz-nombre")?.addEventListener("input", () => {
+            if (wzStep === 5) wzPreview();
+        });
+        $("rf-wizard")?.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter" && ev.target.matches("input:not([type=radio])")) {
+                ev.preventDefault();
+                void wzSiguiente();
+            }
         });
 
+        // Sorteo
         $("rifa-rng-btn")?.addEventListener("click", () => void runRng());
+
+        // Al instalarse como app, el aviso del navegador ya no hace falta
+        window.addEventListener("beforeinstallprompt", (e) => {
+            e.preventDefault();
+            window.__cpmInstallPrompt = e;
+        });
 
         $("rifa-public-home-link")?.addEventListener("click", (ev) => {
             ev.preventDefault();
             document.body.classList.remove("cpm-rifa-standalone");
+            restaurarSitio();
             navigateHome();
         });
     }
@@ -1537,15 +2721,18 @@
             const res = await api.post({ action: "resolve_by_hash", hash: adminHash });
             project = res.data?.project;
             datos = numerosFromApi(res.data?.numeros);
-            const title = $("rifa-admin-title");
-            if (title) title.textContent = project?.nombre_display || project?.sheet_name || "Rifa";
+            bannerExtras = extrasDe(project?.banner);
+            prepararAccesoDirecto();
             fillConfigForm();
             fillBannerForm();
             wireAdminEvents();
+            themeSwatches("rf-themes", bannerExtras.theme || "", onThemeShare);
+            cargarOpcionesMensaje();
             renderGrid();
             renderLista();
-            showAdTab("cuadricula");
+            showAdTab("numeros");
             finalizeSplash(true);
+            if (!bannerExtras.setup?.done) abrirAsistente();
         } catch (e) {
             finalizeSplash(false);
             const splash = $("rifa-splash");

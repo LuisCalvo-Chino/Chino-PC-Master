@@ -38,15 +38,23 @@
         </header>
 
         <div id="rifa-hub-pane-lista" class="rifa-hub-pane" data-hub-pane="lista">
-            <div class="rifa-table-scroll">
+            <div class="rifa-hub-subtabs" role="tablist" aria-label="Estado de las rifas">
+                <button type="button" class="rifa-btn rifa-btn--toolbar is-active" data-hub-list="activas" role="tab" aria-selected="true">Activas <span class="rifa-count" id="rifa-count-activas"></span></button>
+                <button type="button" class="rifa-btn rifa-btn--toolbar" data-hub-list="archivadas" role="tab" aria-selected="false">Archivadas <span class="rifa-count" id="rifa-count-archivadas"></span></button>
+            </div>
+            <p id="rifa-hub-archive-warning" class="rifa-hub-warning" hidden>
+                Para ver y reactivar las rifas archivadas, publica la versión 2 del Apps Script
+                (<code>assets/gas-rifa-Código.js.txt</code>, pasos en <code>docs/rifa-implementacion.md</code>).
+            </p>
+            <div class="rifa-table-scroll" data-hub-list-pane="activas">
                 <table class="rifa-projects-table" id="rifa-projects-table">
                     <thead>
                         <tr>
                             <th>Hoja</th>
                             <th>Premios</th>
-                            <th>Modalidad</th>
-                            <th>Fecha</th>
+                            <th>Sorteo</th>
                             <th>Precio</th>
+                            <th>Se archiva</th>
                             <th>Link admin</th>
                             <th>Acciones</th>
                         </tr>
@@ -56,6 +64,36 @@
                     </tbody>
                 </table>
             </div>
+            <div class="rifa-table-scroll" data-hub-list-pane="archivadas" hidden>
+                <table class="rifa-projects-table" id="rifa-archived-table">
+                    <thead>
+                        <tr>
+                            <th>Hoja</th>
+                            <th>Premios</th>
+                            <th>Sorteo</th>
+                            <th>Archivada</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rifa-archived-tbody">
+                        <tr><td colspan="5" class="rifa-muted">No hay rifas archivadas.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <dialog id="rifa-vigencia-dialog" class="rifa-dialog" aria-labelledby="rifa-vigencia-title">
+                <form method="dialog" class="rifa-dialog__form" id="rifa-vigencia-form">
+                    <h3 id="rifa-vigencia-title" class="rifa-card-title">Vigencia de la rifa</h3>
+                    <p id="rifa-vigencia-desc" class="rifa-muted"></p>
+                    <label class="rifa-check"><input type="radio" name="rifa-vig-modo" value="fecha" checked /> Archivar al terminar el día</label>
+                    <input type="date" id="rifa-vig-fecha" class="rifa-input" aria-label="Fecha de archivado" />
+                    <label class="rifa-check"><input type="radio" name="rifa-vig-modo" value="none" /> Sin fecha (no se archiva sola)</label>
+                    <div class="rifa-form-actions">
+                        <button type="submit" class="rifa-btn rifa-btn--primary" value="ok" id="rifa-vig-ok">Guardar</button>
+                        <button type="submit" class="rifa-btn" value="cancel" formnovalidate>Cancelar</button>
+                    </div>
+                </form>
+            </dialog>
         </div>
 
         <div id="rifa-hub-pane-guia" class="rifa-hub-pane" data-hub-pane="guia" hidden>
@@ -72,7 +110,14 @@
                 <ul>
                     <li>Guarda la Llave Maestra en la barra superior.</li>
                     <li>Usa <strong>+ Nuevo</strong> para crear una rifa (se crea una hoja 00–99 y un link <code>#r/…</code>).</li>
-                    <li>Comparte el link administrador con quien gestiona la rifa (no requiere login del sitio).</li>
+                    <li>Comparte el link administrador con quien gestiona la rifa (no requiere login del sitio). La primera vez que lo abra, un asistente le guía paso a paso.</li>
+                    <li>El instructivo para quien organiza está en <a href="./#rifas-digitales" target="_blank" rel="noopener" data-external="1">Rifas Digitales</a>.</li>
+                </ul>
+                <h3>Archivado automático</h3>
+                <ul>
+                    <li>Al crear la rifa eliges cuándo se archiva. Al terminar ese día el link deja de funcionar.</li>
+                    <li>En <strong>Lista → Archivadas</strong> puedes reactivarla con otra fecha o sin fecha, o eliminarla para siempre.</li>
+                    <li>Ejecuta una vez <code>instalarArchivadoAutomatico</code> en el editor de Apps Script para que la hoja también se actualice sola cada noche.</li>
                 </ul>
                 <p class="rifa-muted">Documentación detallada: <code>docs/rifa-implementacion.md</code></p>
             </article>
@@ -153,6 +198,20 @@
                     <input type="text" id="rifa-new-whatsapp" class="rifa-input" maxlength="20" placeholder="8888-8888" />
                 </label>
 
+                <div class="rifa-field">
+                    <span class="rifa-field__label">Archivado automático</span>
+                    <span class="rifa-field__help">Al terminar ese día el link deja de funcionar y la rifa pasa a «Archivadas», donde la puedes reactivar o eliminar.</span>
+                    <select id="rifa-new-archivo-modo" class="rifa-input">
+                        <option value="7">Una semana después del sorteo</option>
+                        <option value="1">Un día después del sorteo</option>
+                        <option value="30">Un mes después del sorteo</option>
+                        <option value="custom">Elegir una fecha</option>
+                        <option value="none">Sin fecha (no se archiva sola)</option>
+                    </select>
+                    <input type="date" id="rifa-new-archivo" class="rifa-input" hidden aria-label="Fecha de archivado" />
+                    <span id="rifa-new-archivo-hint" class="rifa-field__hint" aria-live="polite"></span>
+                </div>
+
                 <label class="rifa-field">
                     <span class="rifa-field__label">Precio por número</span>
                     <span class="rifa-field__help">Costo de cada número (colones). Aparece en banners y afiches.</span>
@@ -168,154 +227,120 @@
         </div>
     </div>
 
-    <!-- ========== ADMIN (#r/hash) ========== -->
-    <div id="rifa-admin" class="rifa-admin rifa-reveal-layer" hidden>
-        <div class="rifa-public-bar" id="rifa-public-bar">
-            <a href="#" class="rifa-public-bar__brand" id="rifa-public-home-link">Chino PC Master</a>
-            <span class="rifa-public-bar__sep">·</span>
-            <span class="rifa-public-bar__tag" id="rifa-admin-title">Rifa</span>
-        </div>
+    <!-- ========== RIFA DE QUIEN LA ORGANIZA (#r/hash) ========== -->
+    <div id="rifa-admin" class="rifa-admin rf-app rifa-reveal-layer" hidden>
+        <header class="rf-top">
+            <a href="#" class="rf-top__brand tech-font" id="rifa-public-home-link">Chino PC Master</a>
+            <h1 class="rf-top__title" id="rifa-admin-title">Rifa</h1>
+            <a class="rf-top__help" href="./#rifas-digitales" target="_blank" rel="noopener" data-external="1" title="Cómo usar su rifa" aria-label="Ayuda: cómo usar su rifa">?</a>
+        </header>
 
-        <nav class="rifa-admin-tabs" aria-label="Secciones de la rifa">
-            <button type="button" class="rifa-tab is-active" data-adtab="cuadricula">Cuadrícula</button>
-            <button type="button" class="rifa-tab" data-adtab="lista">Lista</button>
-            <button type="button" class="rifa-tab" data-adtab="config">Config</button>
-            <button type="button" class="rifa-tab" data-adtab="banner">Banner</button>
-            <button type="button" class="rifa-tab" data-adtab="rng" id="rifa-tab-rng" hidden>Rifa</button>
+        <section class="rf-summary" aria-label="Resumen de la rifa">
+            <div class="rf-progress">
+                <p class="rf-progress__text"><strong id="rf-sold">0</strong> de 100 números vendidos</p>
+                <div class="rf-progress__bar" aria-hidden="true"><span class="rf-progress__paid" id="rf-progress-paid"></span><span class="rf-progress__res" id="rf-progress-res"></span></div>
+            </div>
+            <ul class="rf-legend">
+                <li><span class="rf-dot rf-dot--libre"></span>Libres <strong data-stat="disponible">0</strong></li>
+                <li><span class="rf-dot rf-dot--apartado"></span>Apartados <strong data-stat="reservado">0</strong></li>
+                <li><span class="rf-dot rf-dot--pagado"></span>Pagados <strong data-stat="pagado">0</strong></li>
+            </ul>
+            <div class="rf-money" id="rf-money" hidden>
+                <div><span>Recaudado</span><strong id="rf-money-paid">₡0</strong></div>
+                <div><span>Por cobrar</span><strong id="rf-money-due">₡0</strong></div>
+            </div>
+        </section>
+
+        <nav class="rf-tabs" aria-label="Secciones de la rifa">
+            <button type="button" class="rf-tab is-active" data-adtab="numeros"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Números</span></button>
+            <button type="button" class="rf-tab" data-adtab="compradores"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><span>Compradores</span></button>
+            <button type="button" class="rf-tab" data-adtab="compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg><span>Compartir</span></button>
+            <button type="button" class="rf-tab" data-adtab="ajustes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Ajustes</span></button>
+            <button type="button" class="rf-tab" data-adtab="sorteo" id="rifa-tab-rng" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/><circle cx="8.5" cy="15.5" r="1.2"/></svg><span>Sorteo</span></button>
         </nav>
 
-        <!-- Cuadrícula -->
-        <div class="rifa-adpanel is-active" data-adpanel="cuadricula">
-            <div class="rifa-toolbar-stats" id="rifa-stats-top">
-                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
-                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
+        <!-- Números -->
+        <div class="rifa-adpanel rf-panel is-active" data-adpanel="numeros">
+            <div class="rf-panel__head">
+                <h2>Números</h2>
+                <p>Toque uno o varios números y luego <strong>«Anotar comprador»</strong>. Para cambiar uno ya vendido, tóquelo igual.</p>
             </div>
-            <div class="rifa-grid-layout">
-                <div class="numbers-grid-wrapper">
-                    <div id="rifa-numbers-grid" class="numbers-grid rifa-numbers-grid"></div>
+            <div class="rf-tools">
+                <input type="search" id="rf-search" class="rifa-input rf-search" placeholder="Buscar por nombre o número" autocomplete="off" aria-label="Buscar por nombre o número" />
+                <div class="rf-filters" role="group" aria-label="Mostrar números">
+                    <button type="button" class="rf-chip is-active" data-filter="todos">Todos</button>
+                    <button type="button" class="rf-chip" data-filter="libres">Libres</button>
+                    <button type="button" class="rf-chip" data-filter="apartados">Apartados</button>
+                    <button type="button" class="rf-chip" data-filter="pagados">Pagados</button>
                 </div>
-                <aside id="rifa-select-panel" class="rifa-select-panel" hidden>
-                    <button type="button" class="rifa-select-panel__toggle" id="rifa-select-toggle" aria-expanded="true">Formulario</button>
-                    <div class="rifa-select-panel__body" id="rifa-select-body">
-                        <h4>Actualizar seleccionados (<span id="rifa-sel-count">0</span>)</h4>
-                        <label class="rifa-field">
-                            <span class="rifa-field__label">Nombre (obligatorio)</span>
-                            <input type="text" id="rifa-sel-nombre" class="rifa-input" placeholder="Nombre del comprador" />
-                        </label>
-                        <label class="rifa-field">
-                            <span class="rifa-field__label">Teléfono (opcional)</span>
-                            <input type="text" id="rifa-sel-tel" class="rifa-input" placeholder="8888-8888" />
-                        </label>
-                        <label class="rifa-field">
-                            <span class="rifa-field__label">Contacto / Instagram (opcional)</span>
-                            <input type="text" id="rifa-sel-contacto" class="rifa-input" placeholder="@usuario" />
-                        </label>
-                        <label class="rifa-field">
-                            <span class="rifa-field__label">Estado</span>
-                            <select id="rifa-sel-estado" class="rifa-input">
-                                <option value="Reservado">Reservado</option>
-                                <option value="Pagado">Pagado</option>
-                                <option value="Disponible">Disponible</option>
-                            </select>
-                        </label>
-                        <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-sel-guardar" style="width:100%">Guardar</button>
-                        <button type="button" class="rifa-btn" id="rifa-sel-cancelar" style="width:100%;margin-top:8px">Cancelar</button>
+            </div>
+            <div id="rifa-numbers-grid" class="rf-grid" role="group" aria-label="Números del 00 al 99"></div>
+        </div>
+
+        <!-- Compradores -->
+        <div class="rifa-adpanel rf-panel" data-adpanel="compradores" hidden>
+            <div class="rf-panel__head">
+                <h2>Compradores</h2>
+                <p>Quién apartó, quién ya pagó y cuánto falta por cobrar. Desde aquí le puede recordar el pago por WhatsApp.</p>
+            </div>
+            <div class="rf-tools">
+                <input type="search" id="rf-buyer-search" class="rifa-input rf-search" placeholder="Buscar comprador" autocomplete="off" aria-label="Buscar comprador" />
+                <div class="rf-filters" role="group" aria-label="Mostrar compradores">
+                    <button type="button" class="rf-chip is-active" data-bfilter="todos">Todos</button>
+                    <button type="button" class="rf-chip" data-bfilter="deben">Deben</button>
+                    <button type="button" class="rf-chip" data-bfilter="pagaron">Pagaron</button>
+                </div>
+            </div>
+            <div id="rf-buyers-list" class="rf-buyers"></div>
+
+            <details class="rf-advanced">
+                <summary>Tabla completa y descarga (avanzado)</summary>
+                <div class="rf-advanced__body">
+                    <p class="rifa-muted">Edite varios números a la vez directamente en la tabla. Los cambios se guardan al tocar «Guardar cambios».</p>
+                    <div class="rf-actions">
+                        <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-lista-guardar" disabled>Guardar cambios</button>
+                        <button type="button" class="rifa-btn" id="rifa-csv-dl">Descargar Excel (CSV)</button>
                     </div>
-                </aside>
-            </div>
-            <div class="rifa-toolbar-stats" id="rifa-stats-bottom">
-                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
-                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
-            </div>
+                    <div class="rifa-table-scroll">
+                        <table class="rifa-tabla rifa-lista-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>#</th>
+                                    <th>Estado</th>
+                                    <th>Nombre</th>
+                                    <th>Teléfono</th>
+                                    <th>Nota</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rifa-lista-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
         </div>
 
-        <!-- Lista -->
-        <div class="rifa-adpanel" data-adpanel="lista" hidden>
-            <div class="rifa-toolbar-stats rifa-lista-actions">
-                <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Generar Banner</button>
-                <span class="rifa-stat-chip rifa-stat-chip--disp">Disponibles <strong data-stat="disponible">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--res">Reservados <strong data-stat="reservado">0</strong></span>
-                <span class="rifa-stat-chip rifa-stat-chip--pag">Pagados <strong data-stat="pagado">0</strong></span>
-                <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-csv-dl">Descargar CSV</button>
-                <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-lista-guardar" disabled>Guardar cambios</button>
+        <!-- Compartir -->
+        <div class="rifa-adpanel rf-panel" data-adpanel="compartir" hidden>
+            <div class="rf-panel__head">
+                <h2>Compartir</h2>
+                <p>Prepare la imagen y el mensaje para enviarlos a sus contactos o grupos. Los dos se actualizan solos con los números vendidos.</p>
             </div>
-            <div class="rifa-table-scroll">
-                <table class="rifa-tabla rifa-lista-table">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>#</th>
-                            <th>Estado</th>
-                            <th>Nombre</th>
-                            <th>Teléfono</th>
-                            <th>Contacto</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rifa-lista-tbody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Config -->
-        <div class="rifa-adpanel rifa-adpanel--config" data-adpanel="config" hidden>
-            <form id="rifa-config-form" class="rifa-config-form" novalidate>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">Cantidad de premios</span>
-                    <select id="cfg-premios-n" class="rifa-input">
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                    </select>
-                </label>
-                <label class="rifa-field" data-cfg-premio="1">
-                    <span class="rifa-field__label">Premio 1</span>
-                    <input type="text" id="cfg-premio1" class="rifa-input" />
-                </label>
-                <label class="rifa-field" data-cfg-premio="2" hidden>
-                    <span class="rifa-field__label">Premio 2</span>
-                    <input type="text" id="cfg-premio2" class="rifa-input" />
-                </label>
-                <label class="rifa-field" data-cfg-premio="3" hidden>
-                    <span class="rifa-field__label">Premio 3</span>
-                    <input type="text" id="cfg-premio3" class="rifa-input" />
-                </label>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">Modalidad</span>
-                    <select id="cfg-modalidad" class="rifa-input">
-                        <option value="Chances">Chances</option>
-                        <option value="Loteria Nacional">Lotería Nacional</option>
-                        <option value="RNG">RNG del App</option>
-                    </select>
-                </label>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">Fecha del sorteo</span>
-                    <input type="date" id="cfg-fecha" class="rifa-input" />
-                    <span id="cfg-fecha-hint" class="rifa-field__hint"></span>
-                </label>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">WhatsApp</span>
-                    <input type="text" id="cfg-whatsapp" class="rifa-input" />
-                </label>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">SINPE</span>
-                    <input type="text" id="cfg-sinpe" class="rifa-input" />
-                </label>
-                <label class="rifa-field">
-                    <span class="rifa-field__label">Precio</span>
-                    <input type="text" id="cfg-precio" class="rifa-input rifa-input-precio" placeholder="₡2000" inputmode="numeric" />
-                </label>
-                <button type="submit" class="rifa-btn rifa-btn--primary">Guardar configuración</button>
-            </form>
-        </div>
-
-        <!-- Banner -->
-        <div class="rifa-adpanel" data-adpanel="banner" hidden>
-            <div class="rifa-banner-split">
-                <div class="rifa-banner-form-col">
+            <div class="rf-share">
+                <section class="rf-card rf-share__image" aria-labelledby="rf-share-img-title">
+                    <h3 id="rf-share-img-title"><span class="rf-step-num">1</span> Imagen con los números</h3>
+                    <p class="rf-card__sub">Muestra los premios, el precio y qué números siguen libres.</p>
+                    <div class="rf-share__preview" id="rf-share-preview">
+                        <div id="rifa-banner-stage" class="rifa-banner-stage" aria-hidden="true"></div>
+                    </div>
+                    <p class="rf-label">Estilo de la imagen</p>
+                    <div class="rf-themes" id="rf-themes" role="radiogroup" aria-label="Estilo de la imagen"></div>
+                    <div class="rf-actions">
+                        <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Descargar imagen</button>
+                    </div>
+                    <details class="rf-advanced" id="rf-banner-advanced">
+                        <summary>Personalizar a fondo (colores, letras y logo)</summary>
+                        <div class="rf-advanced__body">
                     <form id="rifa-banner-form" class="rifa-banner-form">
                         <h4>Fondo</h4>
                         <div class="rifa-form-row">
@@ -461,25 +486,277 @@
                         <div class="rifa-form-actions">
                             <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-banner-save">Guardar diseño</button>
                             <button type="button" class="rifa-btn" id="rifa-banner-reset" title="Restaurar colores, tipografía e iconos por defecto">Restablecer por defecto</button>
-                            <button type="button" class="rifa-btn rifa-btn--primary rifa-btn-banner-dl">Descargar JPG</button>
                         </div>
                     </form>
-                </div>
-                <div class="rifa-banner-preview-col">
-                    <button type="button" class="rifa-btn rifa-preview-toggle" id="rifa-preview-toggle">Vista previa</button>
-                    <div class="rifa-banner-preview-box" id="rifa-banner-preview-box">
-                        <div id="rifa-banner-stage" class="rifa-banner-stage" aria-hidden="true"></div>
+                        </div>
+                    </details>
+                </section>
+
+                <section class="rf-card rf-share__msg" aria-labelledby="rf-share-msg-title">
+                    <h3 id="rf-share-msg-title"><span class="rf-step-num">2</span> Mensaje</h3>
+                    <p class="rf-card__sub">Elija qué incluir. El texto de abajo se arma solo y lo puede corregir antes de enviarlo.</p>
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Saludo</span>
+                        <input type="text" id="rf-msg-saludo" class="rifa-input" maxlength="160" placeholder="¡Hola! Les comparto mi rifa 🎉" />
+                    </label>
+                    <div class="rf-checks" role="group" aria-label="Qué incluir en el mensaje">
+                        <label class="rf-check"><input type="checkbox" data-msg="premios" checked /> Premios</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="precio" checked /> Precio</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="sorteo" checked /> Fecha del sorteo</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="libres" checked /> Números libres</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="vendidos" /> Números vendidos</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="pago" checked /> Cómo pagar (SINPE)</label>
+                        <label class="rf-check"><input type="checkbox" data-msg="contacto" checked /> WhatsApp para apartar</label>
                     </div>
-                </div>
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Despedida</span>
+                        <input type="text" id="rf-msg-despedida" class="rifa-input" maxlength="160" placeholder="¡Gracias por apoyar! 🙏" />
+                    </label>
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Así se verá su mensaje</span>
+                        <textarea id="rf-msg-text" class="rifa-input rf-msg-text" rows="12" spellcheck="true"></textarea>
+                    </label>
+                    <div class="rf-actions rf-actions--stack">
+                        <button type="button" class="rifa-btn rifa-btn--primary" id="rf-share-both">Compartir imagen y mensaje</button>
+                        <button type="button" class="rifa-btn" id="rf-msg-wa">Enviar solo el mensaje por WhatsApp</button>
+                        <button type="button" class="rifa-btn" id="rf-msg-copy">Copiar mensaje</button>
+                    </div>
+                    <button type="button" class="rf-linkbtn" id="rf-msg-save">Guardar saludo, despedida y opciones para la próxima vez</button>
+                </section>
             </div>
         </div>
 
-        <!-- RNG -->
-        <div class="rifa-adpanel" data-adpanel="rng" hidden>
+        <!-- Ajustes -->
+        <div class="rifa-adpanel rf-panel" data-adpanel="ajustes" hidden>
+            <div class="rf-panel__head">
+                <h2>Ajustes</h2>
+                <p>Los datos de la rifa, el acceso directo en su teléfono y su enlace privado.</p>
+            </div>
+            <div class="rf-settings">
+                <section class="rf-card" aria-labelledby="rf-cfg-title">
+                    <h3 id="rf-cfg-title">Datos de la rifa</h3>
+                    <form id="rifa-config-form" class="rf-form" novalidate>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Nombre de la rifa</span>
+                            <input type="text" id="cfg-nombre" class="rifa-input" maxlength="60" />
+                        </label>
+                        <div class="rifa-field">
+                            <span class="rifa-field__label">Cantidad de premios</span>
+                            <select id="cfg-premios-n" class="rifa-input">
+                                <option value="1">1 premio</option>
+                                <option value="2">2 premios</option>
+                                <option value="3">3 premios</option>
+                            </select>
+                        </div>
+                        <label class="rifa-field" data-cfg-premio="1">
+                            <span class="rifa-field__label">1.er premio</span>
+                            <input type="text" id="cfg-premio1" class="rifa-input" maxlength="120" />
+                        </label>
+                        <label class="rifa-field" data-cfg-premio="2" hidden>
+                            <span class="rifa-field__label">2.º premio</span>
+                            <input type="text" id="cfg-premio2" class="rifa-input" maxlength="120" />
+                        </label>
+                        <label class="rifa-field" data-cfg-premio="3" hidden>
+                            <span class="rifa-field__label">3.er premio</span>
+                            <input type="text" id="cfg-premio3" class="rifa-input" maxlength="120" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Precio de cada número</span>
+                            <input type="text" id="cfg-precio" class="rifa-input rifa-input-precio" placeholder="₡1000" inputmode="numeric" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">¿Con qué juega el sorteo?</span>
+                            <select id="cfg-modalidad" class="rifa-input">
+                                <option value="Chances">Chances (martes o viernes)</option>
+                                <option value="Loteria Nacional">Lotería Nacional (domingo)</option>
+                                <option value="RNG">Sorteo en esta app (cualquier día)</option>
+                            </select>
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Fecha del sorteo</span>
+                            <input type="date" id="cfg-fecha" class="rifa-input" />
+                            <span id="cfg-fecha-hint" class="rifa-field__hint"></span>
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">Número de SINPE Móvil para pagos</span>
+                            <input type="text" id="cfg-sinpe" class="rifa-input" inputmode="tel" maxlength="20" />
+                        </label>
+                        <label class="rifa-field">
+                            <span class="rifa-field__label">WhatsApp para que le aparten números</span>
+                            <input type="text" id="cfg-whatsapp" class="rifa-input" inputmode="tel" maxlength="20" />
+                        </label>
+                        <button type="submit" class="rifa-btn rifa-btn--primary">Guardar cambios</button>
+                    </form>
+                </section>
+
+                <section class="rf-card" aria-labelledby="rf-inst-title">
+                    <h3 id="rf-inst-title">Acceso directo en su teléfono</h3>
+                    <p class="rf-card__sub">Ponga su rifa en la pantalla de inicio, como una app, para abrirla con un toque cada vez que venda un número.</p>
+                    <button type="button" class="rifa-btn rifa-btn--primary" id="rf-install-open">Agregar a mi pantalla de inicio</button>
+                </section>
+
+                <section class="rf-card" aria-labelledby="rf-link-title">
+                    <h3 id="rf-link-title">Su enlace privado</h3>
+                    <p class="rf-card__sub">Este enlace es la <strong>llave de su rifa</strong>: con él se pueden cambiar los números. No lo comparta con los compradores; a ellos envíeles la imagen y el mensaje de «Compartir».</p>
+                    <button type="button" class="rifa-btn" id="rf-link-copy">Copiar mi enlace</button>
+                    <p class="rf-card__note" id="rf-archive-note" hidden></p>
+                </section>
+
+                <section class="rf-card" aria-labelledby="rf-wz-again-title">
+                    <h3 id="rf-wz-again-title">Configuración guiada</h3>
+                    <p class="rf-card__sub">Vuelva a recorrer los pasos iniciales para revisar todos los datos de una vez.</p>
+                    <button type="button" class="rifa-btn" id="rf-wizard-open">Abrir el asistente</button>
+                </section>
+            </div>
+        </div>
+
+        <!-- Sorteo (solo modalidad «Sorteo en esta app») -->
+        <div class="rifa-adpanel rf-panel" data-adpanel="sorteo" hidden>
+            <div class="rf-panel__head">
+                <h2>Sorteo</h2>
+                <p>Toque el botón para sacar un número al azar entre el 00 y el 99. Un número que ya ganó no vuelve a salir.</p>
+            </div>
             <div class="rifa-rng">
                 <div id="rifa-rng-display" class="rifa-rng-display">--</div>
                 <button type="button" class="rifa-btn rifa-btn--primary rifa-btn--lg" id="rifa-rng-btn">Sortear número</button>
                 <ul id="rifa-rng-winners" class="rifa-rng-winners"></ul>
+            </div>
+        </div>
+
+        <!-- Barra de selección -->
+        <div id="rf-selbar" class="rf-selbar" hidden>
+            <button type="button" class="rf-selbar__clear" id="rf-selbar-clear" aria-label="Quitar selección" title="Quitar selección">×</button>
+            <div class="rf-selbar__info"><strong id="rf-selbar-count">0</strong><span id="rf-selbar-nums"></span></div>
+            <button type="button" class="rifa-btn rifa-btn--primary" id="rf-selbar-go">Anotar comprador</button>
+        </div>
+
+        <!-- Hoja: anotar comprador -->
+        <div id="rf-sheet" class="rf-modal" hidden>
+            <div class="rf-modal__box" role="dialog" aria-modal="true" aria-labelledby="rf-sheet-title">
+                <header class="rf-modal__head">
+                    <h3 id="rf-sheet-title">Número</h3>
+                    <button type="button" class="rf-modal__close" data-close aria-label="Cerrar">×</button>
+                </header>
+                <div id="rf-sheet-current" class="rf-sheet-current" hidden></div>
+                <p class="rf-label">¿Cómo queda?</p>
+                <div class="rf-estado" role="radiogroup" aria-label="Estado del número">
+                    <button type="button" class="rf-estado__opt" data-estado="Reservado" role="radio" aria-checked="false"><span class="rf-dot rf-dot--apartado"></span><strong>Apartado</strong><small>Aún no paga</small></button>
+                    <button type="button" class="rf-estado__opt" data-estado="Pagado" role="radio" aria-checked="false"><span class="rf-dot rf-dot--pagado"></span><strong>Pagado</strong><small>Ya pagó</small></button>
+                    <button type="button" class="rf-estado__opt" data-estado="Disponible" role="radio" aria-checked="false"><span class="rf-dot rf-dot--libre"></span><strong>Libre</strong><small>Quitar comprador</small></button>
+                </div>
+                <div id="rf-sheet-fields" class="rf-form">
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Nombre del comprador</span>
+                        <input type="text" id="rifa-sel-nombre" class="rifa-input" list="rf-buyers-datalist" autocomplete="off" placeholder="Ej.: Ana Mora" />
+                        <span class="rifa-field__help">Si ya compró antes, elíjalo de la lista y se completa su teléfono.</span>
+                    </label>
+                    <datalist id="rf-buyers-datalist"></datalist>
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Teléfono (para recordarle el pago)</span>
+                        <input type="tel" id="rifa-sel-tel" class="rifa-input" inputmode="tel" placeholder="8888-8888" />
+                    </label>
+                    <label class="rifa-field">
+                        <span class="rifa-field__label">Nota (opcional)</span>
+                        <input type="text" id="rifa-sel-contacto" class="rifa-input" placeholder="Instagram, quién lo refirió…" />
+                    </label>
+                </div>
+                <div class="rf-modal__actions">
+                    <button type="button" class="rifa-btn" data-close>Cancelar</button>
+                    <button type="button" class="rifa-btn rifa-btn--primary" id="rifa-sel-guardar">Guardar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acceso directo -->
+        <div id="rf-install" class="rf-modal" hidden>
+            <div class="rf-modal__box" role="dialog" aria-modal="true" aria-labelledby="rf-install-title">
+                <header class="rf-modal__head">
+                    <h3 id="rf-install-title">Acceso directo</h3>
+                    <button type="button" class="rf-modal__close" data-close aria-label="Cerrar">×</button>
+                </header>
+                <div id="rf-install-body"></div>
+                <div class="rf-modal__actions">
+                    <button type="button" class="rifa-btn rifa-btn--primary" data-close>Listo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Asistente de primera vez -->
+        <div id="rf-wizard" class="rf-wizard" hidden>
+            <div class="rf-wizard__box" role="dialog" aria-modal="true" aria-labelledby="rf-wz-title-0">
+                <div class="rf-wizard__progress" aria-hidden="true"><span id="rf-wz-bar"></span></div>
+                <p class="rf-wizard__step tech-font" id="rf-wz-step">Paso 1</p>
+
+                <div class="rf-wz-pane" data-wz="0">
+                    <h2 id="rf-wz-title-0">¡Bienvenido(a) a su rifa!</h2>
+                    <p>En unos pocos pasos la dejamos lista para vender. Desde este enlace va a poder:</p>
+                    <ul class="rf-wz-list">
+                        <li><strong>Anotar</strong> quién aparta y quién paga cada número.</li>
+                        <li><strong>Ver</strong> cuánto lleva recaudado y quién falta por pagar.</li>
+                        <li><strong>Crear</strong> la imagen y el mensaje para enviar a sus contactos.</li>
+                    </ul>
+                    <p class="rf-wz-note">🔒 Este enlace es solo para usted. A los compradores envíeles la imagen y el mensaje, no el enlace.</p>
+                </div>
+
+                <div class="rf-wz-pane" data-wz="1" hidden>
+                    <h2>¿Cómo se llama su rifa?</h2>
+                    <p>Así aparecerá en la imagen y en los mensajes.</p>
+                    <input type="text" id="wz-nombre" class="rifa-input rf-wz-big" maxlength="60" placeholder="Ej.: Rifa Pro Fondos Escuela" />
+                </div>
+
+                <div class="rf-wz-pane" data-wz="2" hidden>
+                    <h2>¿Qué se rifa?</h2>
+                    <p>Puede rifar hasta 3 premios.</p>
+                    <div class="rf-seg" role="radiogroup" aria-label="Cantidad de premios" id="wz-premios-n">
+                        <button type="button" data-n="1" role="radio">1 premio</button>
+                        <button type="button" data-n="2" role="radio">2 premios</button>
+                        <button type="button" data-n="3" role="radio">3 premios</button>
+                    </div>
+                    <label class="rifa-field" data-wz-premio="1"><span class="rifa-field__label">1.er premio</span><input type="text" id="wz-premio1" class="rifa-input" maxlength="120" placeholder="Ej.: Canasta navideña" /></label>
+                    <label class="rifa-field" data-wz-premio="2"><span class="rifa-field__label">2.º premio</span><input type="text" id="wz-premio2" class="rifa-input" maxlength="120" /></label>
+                    <label class="rifa-field" data-wz-premio="3"><span class="rifa-field__label">3.er premio</span><input type="text" id="wz-premio3" class="rifa-input" maxlength="120" /></label>
+                </div>
+
+                <div class="rf-wz-pane" data-wz="3" hidden>
+                    <h2>Precio y sorteo</h2>
+                    <label class="rifa-field"><span class="rifa-field__label">Precio de cada número</span><input type="text" id="wz-precio" class="rifa-input rifa-input-precio" inputmode="numeric" placeholder="₡1000" /></label>
+                    <p class="rf-label">¿Con qué juega el sorteo?</p>
+                    <div class="rf-radio-cards" role="radiogroup" aria-label="Modalidad del sorteo">
+                        <label class="rf-radio-card"><input type="radio" name="wz-modalidad" value="Chances" /><span><strong>Chances</strong><small>Juega martes o viernes, 7:30 p.m.</small></span></label>
+                        <label class="rf-radio-card"><input type="radio" name="wz-modalidad" value="Loteria Nacional" /><span><strong>Lotería Nacional</strong><small>Juega los domingos, 7:30 p.m.</small></span></label>
+                        <label class="rf-radio-card"><input type="radio" name="wz-modalidad" value="RNG" /><span><strong>Sorteo en esta app</strong><small>Cualquier día: la app saca el número al azar.</small></span></label>
+                    </div>
+                    <label class="rifa-field"><span class="rifa-field__label">Fecha del sorteo</span><input type="date" id="wz-fecha" class="rifa-input" /><span class="rifa-field__hint" id="wz-fecha-hint"></span></label>
+                </div>
+
+                <div class="rf-wz-pane" data-wz="4" hidden>
+                    <h2>Pagos y contacto</h2>
+                    <p>Estos datos salen en la imagen para que le paguen y le escriban.</p>
+                    <label class="rifa-field"><span class="rifa-field__label">Número de SINPE Móvil</span><input type="tel" id="wz-sinpe" class="rifa-input" inputmode="tel" maxlength="20" placeholder="8888-8888" /></label>
+                    <label class="rifa-field"><span class="rifa-field__label">WhatsApp para apartar números</span><input type="tel" id="wz-whatsapp" class="rifa-input" inputmode="tel" maxlength="20" placeholder="8888-8888" /><span class="rifa-field__help">Puede ser el mismo número del SINPE.</span></label>
+                </div>
+
+                <div class="rf-wz-pane" data-wz="5" hidden>
+                    <h2>Elija un estilo</h2>
+                    <p>Así se verá la imagen que va a compartir. Lo puede cambiar cuando quiera.</p>
+                    <div class="rf-wz-style">
+                        <div class="rf-themes" id="wz-themes" role="radiogroup" aria-label="Estilo de la imagen"></div>
+                        <div class="rf-wz-preview" id="wz-preview" aria-hidden="true"></div>
+                    </div>
+                </div>
+
+                <div class="rf-wz-pane" data-wz="6" hidden>
+                    <h2>¡Su rifa está lista! 🎉</h2>
+                    <p>Último paso, muy recomendado: deje la rifa en la pantalla de inicio de su teléfono para abrirla con un toque.</p>
+                    <div id="wz-install" class="rf-install-steps"></div>
+                </div>
+
+                <p class="rf-wizard__error" id="rf-wz-error" aria-live="polite"></p>
+                <div class="rf-wizard__nav">
+                    <button type="button" class="rifa-btn" id="rf-wz-back">Atrás</button>
+                    <button type="button" class="rf-linkbtn" id="rf-wz-skip">Ya está lista, saltar</button>
+                    <button type="button" class="rifa-btn rifa-btn--primary" id="rf-wz-next">Empezar</button>
+                </div>
             </div>
         </div>
     </div>

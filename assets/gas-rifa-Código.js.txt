@@ -11,6 +11,14 @@
  * Copia este archivo completo a Código.js en script.google.com,
  * configura las propiedades, despliega como Aplicación web (Cualquiera)
  * y pega la URL /exec en index.html como window.CPM_RIFA_GAS_URL.
+ *
+ * Versión 2 — archivado automático:
+ *   - Columna «fecha_archivo» (YYYY-MM-DD, opcional): pasada esa fecha la rifa
+ *     se considera archivada y su link deja de funcionar al instante.
+ *   - Ejecuta UNA VEZ «instalarArchivadoAutomatico» desde el editor para crear el
+ *     activador diario que además marca activo = FALSE en la hoja.
+ *   - Al actualizar el código: Implementar → Administrar implementaciones → Editar →
+ *     Versión «Nueva versión». Así la URL /exec no cambia.
  */
 
 var PROYECTOS_HEADERS_ = [
@@ -29,8 +37,11 @@ var PROYECTOS_HEADERS_ = [
   "sinpe",
   "precio",
   "banner_json",
-  "activo"
+  "activo",
+  "fecha_archivo"
 ];
+
+var API_VERSION_ = 2;
 
 var NUMEROS_HEADERS_ = ["numero", "estado", "nombre", "telefono", "contacto"];
 
@@ -38,7 +49,7 @@ var SHEET_NAME_RE_ = /^[A-Za-z0-9_-]{2,20}$/;
 var MODALIDADES_ = { Chances: 1, "Loteria Nacional": 1, RNG: 1 };
 
 function doGet() {
-  return jsonOut_({ status: "SUCCESS", data: { service: "rifa_multi", version: 1 } });
+  return jsonOut_({ status: "SUCCESS", data: { service: "rifa_multi", version: API_VERSION_ } });
 }
 
 function doPost(e) {
@@ -50,16 +61,17 @@ function doPost(e) {
     }
 
     if (action === "ping") {
-      return jsonOut_({ status: "SUCCESS", data: { pong: true } });
+      return jsonOut_({ status: "SUCCESS", data: { pong: true, version: API_VERSION_ } });
     }
 
     if (action.indexOf("super_") === 0) {
       assertMaster_(data.masterPin);
-      if (action === "super_list_projects") return jsonOut_(handleListProjects_());
+      if (action === "super_list_projects") return jsonOut_(handleListProjects_(data));
       if (action === "super_create_project") return jsonOut_(handleCreateProject_(data));
       if (action === "super_get_project") return jsonOut_(handleGetProject_(data));
       if (action === "super_update_project") return jsonOut_(handleUpdateProject_(data));
       if (action === "super_delete_project") return jsonOut_(handleDeleteProject_(data));
+      if (action === "super_reactivate_project") return jsonOut_(handleReactivateProject_(data));
       return jsonOut_({ status: "ERROR", message: "Acción super no reconocida («" + action + "»)." });
     }
 
@@ -147,9 +159,41 @@ function ensureProyectosSheet_() {
     var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
     if (!headers[0] || String(headers[0]).trim() === "") {
       sh.getRange(1, 1, 1, PROYECTOS_HEADERS_.length).setValues([PROYECTOS_HEADERS_]);
+    } else {
+      // Hojas creadas con la versión 1: agregar al final las columnas nuevas (p. ej. fecha_archivo)
+      var realCols = sh.getLastColumn();
+      var current = sh.getRange(1, 1, 1, realCols).getValues()[0];
+      for (var k = 0; k < PROYECTOS_HEADERS_.length; k++) {
+        if (colIndex_(current, PROYECTOS_HEADERS_[k]) < 0) {
+          realCols++;
+          sh.getRange(1, realCols).setValue(PROYECTOS_HEADERS_[k]);
+          current.push(PROYECTOS_HEADERS_[k]);
+        }
+      }
     }
   }
   return sh;
+}
+
+/** Hoy en la zona del script, como YYYY-MM-DD. */
+function hoyIso_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "America/Costa_Rica", "yyyy-MM-dd");
+}
+
+/** La rifa vence al terminar el día de su fecha de archivo. */
+function estaVencida_(fechaArchivo) {
+  var f = String(fechaArchivo || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  return hoyIso_() > f;
+}
+
+/** "" = sin fecha. Si viene una fecha, debe ser válida y no estar en el pasado. */
+function validarFechaArchivo_(v) {
+  var f = String(v == null ? "" : v).trim().slice(0, 10);
+  if (!f) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) throw new Error("Fecha de archivado inválida (usa YYYY-MM-DD).");
+  if (f < hoyIso_()) throw new Error("La fecha de archivado no puede estar en el pasado.");
+  return f;
 }
 
 function colIndex_(headers, name) {
@@ -197,7 +241,8 @@ function rowToProject_(headers, row) {
     precio: String(cell("precio") || "").trim(),
     banner: banner,
     banner_json: bannerRaw,
-    activo: activo
+    activo: activo,
+    fecha_archivo: formatFechaIso_(cell("fecha_archivo"))
   };
 }
 
@@ -243,9 +288,53 @@ function findProjectByHash_(hash) {
   if (!h) return null;
   var all = listAllProjects_(true);
   for (var i = 0; i < all.length; i++) {
-    if (all[i].hash_admin === h && all[i].activo) return all[i];
+    if (all[i].hash_admin === h && all[i].activo && !estaVencida_(all[i].fecha_archivo)) return all[i];
   }
   return null;
+}
+
+/** Busca por hash aunque esté archivada (para dar un mensaje claro en vez de «enlace inválido»). */
+function findAnyProjectByHash_(hash) {
+  var h = String(hash || "").trim();
+  if (!h) return null;
+  var all = listAllProjects_(true);
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].hash_admin === h) return all[i];
+  }
+  return null;
+}
+
+function setActivoRow_(sh, headers, row, activo) {
+  var idx = colIndex_(headers, "activo");
+  if (idx >= 0) sh.getRange(row, idx + 1).setValue(activo ? "TRUE" : "FALSE");
+}
+
+/**
+ * Marca activo = FALSE en las rifas cuya fecha de archivo ya pasó.
+ * La corre el activador diario y también el listado del hub.
+ */
+function archivarRifasVencidas() {
+  var sh = ensureProyectosSheet_();
+  var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length)).getValues()[0];
+  var all = listAllProjects_(true);
+  var n = 0;
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].activo && estaVencida_(all[i].fecha_archivo)) {
+      setActivoRow_(sh, headers, all[i]._row, false);
+      n++;
+    }
+  }
+  return n;
+}
+
+/** Ejecutar UNA VEZ desde el editor de Apps Script: crea el activador diario (2 a.m.). */
+function instalarArchivadoAutomatico() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "archivarRifasVencidas") ScriptApp.deleteTrigger(triggers[i]);
+  }
+  ScriptApp.newTrigger("archivarRifasVencidas").timeBased().everyDays(1).atHour(2).create();
+  return "Activador diario instalado.";
 }
 
 function randomHash_(len) {
@@ -260,7 +349,7 @@ function randomHash_(len) {
 function uniqueHash_() {
   for (var attempt = 0; attempt < 12; attempt++) {
     var h = randomHash_(20);
-    if (!findProjectByHash_(h)) return h;
+    if (!findAnyProjectByHash_(h)) return h;
   }
   throw new Error("No se pudo generar hash único.");
 }
@@ -416,16 +505,31 @@ function projectPublic_(p) {
     sinpe: p.sinpe,
     precio: p.precio,
     banner: p.banner,
-    activo: p.activo
+    activo: p.activo,
+    fecha_archivo: p.fecha_archivo || "",
+    vencida: estaVencida_(p.fecha_archivo)
   };
 }
 
-function handleListProjects_() {
-  var projects = listAllProjects_(false).map(function (p) {
-    var pub = projectPublic_(p);
-    return pub;
+function handleListProjects_(data) {
+  archivarRifasVencidas();
+  var includeInactive = !!(data && (data.include_inactive === true || String(data.include_inactive) === "true"));
+  var projects = listAllProjects_(includeInactive).map(function (p) {
+    return projectPublic_(p);
   });
-  return { status: "SUCCESS", data: { projects: projects } };
+  return { status: "SUCCESS", data: { projects: projects, version: API_VERSION_, archive_supported: true } };
+}
+
+function handleReactivateProject_(data) {
+  var p = findProjectById_(data.project_id);
+  if (!p) throw new Error("Proyecto no encontrado.");
+  var fecha = validarFechaArchivo_(data.fecha_archivo);
+  var sh = ensureProyectosSheet_();
+  var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length)).getValues()[0];
+  var idx = colIndex_(headers, "fecha_archivo");
+  if (idx >= 0) sh.getRange(p._row, idx + 1).setNumberFormat("@").setValue(fecha);
+  setActivoRow_(sh, headers, p._row, true);
+  return { status: "SUCCESS", data: { project: projectPublic_(findProjectById_(data.project_id)) } };
 }
 
 function handleCreateProject_(data) {
@@ -437,6 +541,7 @@ function handleCreateProject_(data) {
   var premio2 = cantidad >= 2 ? String(data.premio_2 || "").trim() : "";
   var premio3 = cantidad >= 3 ? String(data.premio_3 || "").trim() : "";
   if (!premio1) throw new Error("El premio 1 es obligatorio.");
+  var fechaArchivo = validarFechaArchivo_(data.fecha_archivo);
 
   var existing = listAllProjects_(true);
   for (var i = 0; i < existing.length; i++) {
@@ -479,9 +584,22 @@ function handleCreateProject_(data) {
       String(data.sinpe || "").trim(),
       String(data.precio || "").trim(),
       defaultBannerJson_(),
-      "TRUE"
+      "TRUE",
+      fechaArchivo
     ];
-    sh.appendRow(row);
+    // Escribir por nombre de columna: en hojas de la versión 1 las columnas nuevas quedan al final
+    var lastCol = Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length);
+    var headersNow = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    var ordered = [];
+    for (var c = 0; c < lastCol; c++) ordered.push("");
+    for (var h = 0; h < PROYECTOS_HEADERS_.length; h++) {
+      var ci = colIndex_(headersNow, PROYECTOS_HEADERS_[h]);
+      if (ci >= 0) ordered[ci] = row[h];
+    }
+    var newRow = sh.getLastRow() + 1;
+    var faIdx = colIndex_(headersNow, "fecha_archivo");
+    if (faIdx >= 0) sh.getRange(newRow, faIdx + 1).setNumberFormat("@");
+    sh.getRange(newRow, 1, 1, lastCol).setValues([ordered]);
 
     var project = projectPublic_({
       project_id: projectId,
@@ -499,7 +617,8 @@ function handleCreateProject_(data) {
       sinpe: String(data.sinpe || "").trim(),
       precio: String(data.precio || "").trim(),
       banner: JSON.parse(defaultBannerJson_()),
-      activo: true
+      activo: true,
+      fecha_archivo: fechaArchivo
     });
 
     return { status: "SUCCESS", data: { project: project, hash_admin: hash } };
@@ -523,7 +642,7 @@ function handleGetProject_(data) {
 function handleUpdateProject_(data) {
   var p = findProjectById_(data.project_id);
   if (!p) throw new Error("Proyecto no encontrado.");
-  applyProjectUpdates_(p, data, true);
+  applyProjectUpdates_(p, data, true, true);
   return { status: "SUCCESS", data: { project: projectPublic_(findProjectById_(data.project_id)) } };
 }
 
@@ -545,7 +664,7 @@ function handleDeleteProject_(data) {
   return { status: "SUCCESS", data: { deleted: true, hard: hard } };
 }
 
-function applyProjectUpdates_(p, data, allowDisplay) {
+function applyProjectUpdates_(p, data, allowDisplay, isSuper) {
   var sh = ensureProyectosSheet_();
   var lastCol = Math.max(sh.getLastColumn(), PROYECTOS_HEADERS_.length);
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
@@ -578,6 +697,11 @@ function applyProjectUpdates_(p, data, allowDisplay) {
   if (data.sinpe != null) setKey("sinpe", String(data.sinpe).trim());
   if (data.precio != null) setKey("precio", String(data.precio).trim());
 
+  // Solo el hub (llave maestra) cambia la fecha de archivado; el link de la rifa no.
+  if (isSuper && data.fecha_archivo != null) {
+    setKey("fecha_archivo", validarFechaArchivo_(data.fecha_archivo));
+  }
+
   if (data.banner_json != null) {
     var bj = data.banner_json;
     if (typeof bj === "object") bj = JSON.stringify(bj);
@@ -592,7 +716,12 @@ function applyProjectUpdates_(p, data, allowDisplay) {
 function handleResolveByHash_(data) {
   var hash = String(data.hash || data.hash_admin || "").trim();
   var p = findProjectByHash_(hash);
-  if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
+  if (!p) {
+    if (findAnyProjectByHash_(hash)) {
+      throw new Error("Esta rifa ya fue archivada y su enlace dejó de estar activo. Si necesita usarla de nuevo, comuníquese con Chino PC Master.");
+    }
+    throw new Error("Enlace inválido o proyecto inactivo.");
+  }
   var numeros = readNumbers_(p.sheet_name);
   return {
     status: "SUCCESS",
