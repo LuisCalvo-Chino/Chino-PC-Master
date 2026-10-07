@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-06T18:48:00-06:00",
+    "actualizado": "2026-10-07T01:58:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -35,11 +35,11 @@
     ],
     "parches": [
         {
-            "id": "2026-10-06-sitio",
-            "fecha": "2026-10-06T18:48:00-06:00",
+            "id": "2026-10-07-sitio",
+            "fecha": "2026-10-07T01:58:00-06:00",
             "producto": "sitio",
-            "titulo": "Nueva página de Servicios, Inicio renovado y la marca al compartir el enlace",
-            "resumen": "«Soluciones» ahora se llama «Servicios» y explica, sin palabras técnicas, todo lo que puedo hacer por usted. El Inicio invita a explorar, y el sitio estrena ícono propio y una tarjeta de presentación al compartir el enlace.",
+            "titulo": "Nueva página de Servicios, Inicio renovado y contacto por WhatsApp, Instagram o Messenger",
+            "resumen": "«Soluciones» ahora se llama «Servicios» y explica, sin palabras técnicas, todo lo que puedo hacer por usted. El Inicio invita a explorar y a seguirme en redes, con chat directo por WhatsApp, Instagram o Messenger, y el sitio estrena ícono propio y una tarjeta de presentación al compartir el enlace.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -58,6 +58,14 @@
                     "texto": "Al compartir el enlace en WhatsApp, Facebook, X, LinkedIn, Telegram o mensajes directos de Instagram aparece una tarjeta con el logo, los servicios principales y el WhatsApp."
                 },
                 {
+                    "tipo": "nuevo",
+                    "texto": "En la bienvenida del Inicio, «Escríbame por» con tres botones que abren el chat directo: WhatsApp, Instagram y Facebook Messenger."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Sección «Sígame y escríbame» al final del Inicio, con una tarjeta para WhatsApp, Instagram (@chino_pcmaster) y Facebook (Chino PC Master): un botón para seguir y otro para enviar mensaje."
+                },
+                {
                     "tipo": "mejorado",
                     "texto": "Inicio renovado: botones para ver los servicios o escribir por WhatsApp, una sección «¿Qué le está pasando?» que lleva directo a la solución de cada problema, las razones para confiar en mí y algunos trabajos que ya funcionan."
                 },
@@ -68,6 +76,10 @@
                 {
                     "tipo": "mejorado",
                     "texto": "«Parches y Noticias» ahora reúne en un solo parche todo lo que cambió en un mismo día. Si ese día se tocaron varias áreas, la tarjeta las muestra por separado y los filtros por aplicación siguen funcionando."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "En el celular las tres redes caben en una sola fila, sin tapar la invitación a explorar."
                 },
                 {
                     "tipo": "nota",

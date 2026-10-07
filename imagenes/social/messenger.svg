@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96">
+  <defs>
+    <linearGradient id="messenger-grad" x1="0.15" y1="1" x2="0.85" y2="0">
+      <stop offset="0" stop-color="#0099FF"/>
+      <stop offset="0.6" stop-color="#A033FF"/>
+      <stop offset="0.9" stop-color="#FF5280"/>
+      <stop offset="1" stop-color="#FF7061"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#messenger-grad)" d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.17.16.14.26.35.27.57l.05 1.78a.8.8 0 0 0 1.12.71l1.99-.88a.8.8 0 0 1 .53-.04c.91.25 1.88.39 2.9.39 5.64 0 10-4.13 10-9.7S17.64 2 12 2z"/>
+  <path fill="#fff" d="M5.99 14.54 8.93 9.88a1.5 1.5 0 0 1 2.17-.4l2.34 1.75a.6.6 0 0 0 .72 0l3.16-2.4c.42-.32.97.18.69.63l-2.94 4.66a1.5 1.5 0 0 1-2.17.4l-2.34-1.75a.6.6 0 0 0-.72 0l-3.16 2.4c-.42.32-.97-.18-.69-.63z"/>
+</svg>

@@ -7,7 +7,14 @@
         <p class="home-hero__lead">Computadoras, redes e internet y aplicaciones para su negocio. <strong>Le explico todo sin palabras técnicas.</strong></p>
         <div class="home-hero__actions">
             <a href="#servicios" data-page="servicios" class="svc-btn svc-btn--primary">Ver servicios</a>
-            <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="svc-btn svc-btn--ghost" target="_blank" rel="noopener noreferrer"><img src="imagenes/social/whatsapp.png" alt="" width="18" height="18" decoding="async"><span>Escríbame</span></a>
+        </div>
+        <div class="home-contact">
+            <p class="home-contact__label tech-font">Escríbame por</p>
+            <div class="home-contact__list">
+                <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="home-contact__btn home-contact__btn--whatsapp" target="_blank" rel="noopener noreferrer" aria-label="Escribirme por WhatsApp"><img src="imagenes/social/whatsapp.png" alt="" width="20" height="20" decoding="async"><span>WhatsApp</span></a>
+                <a href="https://ig.me/m/chino_pcmaster" class="home-contact__btn home-contact__btn--instagram" target="_blank" rel="noopener noreferrer" aria-label="Escribirme por Instagram"><img src="imagenes/social/instagram.png" alt="" width="20" height="20" decoding="async"><span>Instagram</span></a>
+                <a href="https://m.me/ChinoPCMaster" class="home-contact__btn home-contact__btn--messenger" target="_blank" rel="noopener noreferrer" aria-label="Escribirme por Facebook Messenger"><img src="imagenes/social/messenger.svg" alt="" width="20" height="20" decoding="async"><span>Messenger</span></a>
+            </div>
         </div>
     </div>
     <a href="#" data-page="home" data-scroll-target="home-problemas" class="home-hero__scroll tech-font">
@@ -157,13 +164,51 @@
     </div>
 </section>
 
-<section class="content-section home-block">
-    <aside class="svc-final-cta home-cta" aria-labelledby="home-cta-title">
-        <h3 id="home-cta-title">¿Listo para que la tecnología trabaje para usted?</h3>
-        <p>Cuénteme qué necesita y lo vemos juntos. Le respondo personalmente.</p>
-        <div class="svc-final-cta__actions">
-            <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="svc-btn svc-btn--primary" target="_blank" rel="noopener noreferrer"><img src="imagenes/social/whatsapp.png" alt="" width="18" height="18" loading="lazy" decoding="async"><span>Escribirme por WhatsApp</span></a>
-            <a href="#contacto" data-page="contacto" class="svc-btn svc-btn--ghost">Formulario de contacto</a>
-        </div>
-    </aside>
+<section id="home-redes" class="content-section home-block">
+    <h2 class="section-title">SÍGAME Y ESCRÍBAME</h2>
+    <p class="home-block__lead">¿Listo para que la tecnología trabaje para usted? Sígame para ver trabajos recientes y novedades, y escríbame por donde le quede más cómodo. <strong>Le respondo personalmente.</strong></p>
+    <div class="home-socials">
+        <article class="home-social home-social--whatsapp">
+            <div class="home-social__head">
+                <img src="imagenes/social/whatsapp.png" alt="" width="44" height="44" loading="lazy" decoding="async">
+                <div>
+                    <h3>WhatsApp</h3>
+                    <p class="home-social__handle tech-font">+506 6200 5921</p>
+                </div>
+            </div>
+            <p class="home-social__text">La forma más directa de consultar o pedir una cotización. Cuénteme qué necesita y lo vemos juntos.</p>
+            <div class="home-social__actions">
+                <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="svc-btn svc-btn--primary" target="_blank" rel="noopener noreferrer">Escribir por WhatsApp</a>
+            </div>
+        </article>
+        <article class="home-social home-social--instagram">
+            <div class="home-social__head">
+                <img src="imagenes/social/instagram.png" alt="" width="44" height="44" loading="lazy" decoding="async">
+                <div>
+                    <h3>Instagram</h3>
+                    <p class="home-social__handle tech-font">@chino_pcmaster</p>
+                </div>
+            </div>
+            <p class="home-social__text">Trabajos recientes y novedades. También puede escribirme por mensaje directo.</p>
+            <div class="home-social__actions">
+                <a href="https://www.instagram.com/chino_pcmaster/" class="svc-btn svc-btn--primary" target="_blank" rel="noopener noreferrer">Seguir</a>
+                <a href="https://ig.me/m/chino_pcmaster" class="svc-btn svc-btn--ghost" target="_blank" rel="noopener noreferrer">Enviar mensaje</a>
+            </div>
+        </article>
+        <article class="home-social home-social--facebook">
+            <div class="home-social__head">
+                <img src="imagenes/social/facebook.png" alt="" width="44" height="44" loading="lazy" decoding="async">
+                <div>
+                    <h3>Facebook</h3>
+                    <p class="home-social__handle tech-font">Chino PC Master</p>
+                </div>
+            </div>
+            <p class="home-social__text">Publicaciones y novedades de la página. Escríbame por Messenger cuando guste.</p>
+            <div class="home-social__actions">
+                <a href="https://www.facebook.com/ChinoPCMaster/" class="svc-btn svc-btn--primary" target="_blank" rel="noopener noreferrer">Seguir página</a>
+                <a href="https://m.me/ChinoPCMaster" class="svc-btn svc-btn--ghost" target="_blank" rel="noopener noreferrer"><img src="imagenes/social/messenger.svg" alt="" width="18" height="18" loading="lazy" decoding="async"><span>Messenger</span></a>
+            </div>
+        </article>
+    </div>
+    <p class="home-block__more home-socials__foot">¿Prefiere escribir con calma? Use el <a href="#contacto" data-page="contacto">formulario de contacto</a>.</p>
 </section>
