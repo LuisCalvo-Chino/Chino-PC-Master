@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-07T02:49:00-06:00",
+    "actualizado": "2026-10-07T03:11:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -36,7 +36,7 @@
     "parches": [
         {
             "id": "2026-10-07-sitio-rifa",
-            "fecha": "2026-10-07T02:49:00-06:00",
+            "fecha": "2026-10-07T03:11:00-06:00",
             "producto": [
                 "sitio",
                 "rifa"
@@ -148,6 +148,11 @@
                     "tipo": "mejorado",
                     "producto": "rifa",
                     "texto": "La imagen para compartir queda centrada y equilibrada, sin el espacio vacío que quedaba bajo los números."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "rifa",
+                    "texto": "Elegir 1, 2 o 3 premios ya muestra solo los campos que corresponden, en el asistente, en Ajustes y al crear la rifa. El segundo premio se rotula «2.do», igual que «1.er» y «3.er»."
                 },
                 {
                     "tipo": "nota",

@@ -1472,7 +1472,7 @@
         });
 
         const place = rngWinners.length + 1;
-        const labels = { 1: "1.er lugar", 2: "2.º lugar", 3: "3.er lugar" };
+        const labels = { 1: "1.er lugar", 2: "2.do lugar", 3: "3.er lugar" };
         const info = datos[winner] || {};
         rngWinners.push({ num: winner, place, nombre: info.nombre || "" });
         const ul = $("rifa-rng-winners");

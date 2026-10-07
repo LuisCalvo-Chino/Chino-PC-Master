@@ -141,7 +141,7 @@
 
                 <label class="rifa-field">
                     <span class="rifa-field__label">Cantidad de premios</span>
-                    <span class="rifa-field__help">Puedes rifar 1, 2 o 3 premios (1.er, 2.º y 3.er lugar). Solo se pedirán los nombres según esta cantidad.</span>
+                    <span class="rifa-field__help">Puedes rifar 1, 2 o 3 premios (1.er, 2.do y 3.er lugar). Solo se pedirán los nombres según esta cantidad.</span>
                     <select id="rifa-new-premios-n" class="rifa-input">
                         <option value="1">1 premio</option>
                         <option value="2">2 premios</option>
@@ -155,7 +155,7 @@
                     <input type="text" id="rifa-new-premio1" class="rifa-input" required maxlength="120" placeholder="iPhone 15" />
                 </label>
                 <label class="rifa-field" data-premio-field="2" hidden>
-                    <span class="rifa-field__label">Premio 2.º lugar</span>
+                    <span class="rifa-field__label">Premio 2.do lugar</span>
                     <span class="rifa-field__help">Segundo premio (opcional según cantidad).</span>
                     <input type="text" id="rifa-new-premio2" class="rifa-input" maxlength="120" />
                 </label>
@@ -553,7 +553,7 @@
                             <input type="text" id="cfg-premio1" class="rifa-input" maxlength="120" />
                         </label>
                         <label class="rifa-field" data-cfg-premio="2" hidden>
-                            <span class="rifa-field__label">2.º premio</span>
+                            <span class="rifa-field__label">2.do premio</span>
                             <input type="text" id="cfg-premio2" class="rifa-input" maxlength="120" />
                         </label>
                         <label class="rifa-field" data-cfg-premio="3" hidden>
@@ -706,14 +706,14 @@
 
                 <div class="rf-wz-pane" data-wz="2" hidden>
                     <h2>¿Qué se rifa?</h2>
-                    <p>Puede rifar hasta 3 premios.</p>
+                    <p class="rf-label">¿Cuántos premios va a rifar?</p>
                     <div class="rf-seg" role="radiogroup" aria-label="Cantidad de premios" id="wz-premios-n">
                         <button type="button" data-n="1" role="radio">1 premio</button>
                         <button type="button" data-n="2" role="radio">2 premios</button>
                         <button type="button" data-n="3" role="radio">3 premios</button>
                     </div>
                     <label class="rifa-field" data-wz-premio="1"><span class="rifa-field__label">1.er premio</span><input type="text" id="wz-premio1" class="rifa-input" maxlength="120" placeholder="Ej.: Canasta navideña" /></label>
-                    <label class="rifa-field" data-wz-premio="2"><span class="rifa-field__label">2.º premio</span><input type="text" id="wz-premio2" class="rifa-input" maxlength="120" /></label>
+                    <label class="rifa-field" data-wz-premio="2"><span class="rifa-field__label">2.do premio</span><input type="text" id="wz-premio2" class="rifa-input" maxlength="120" /></label>
                     <label class="rifa-field" data-wz-premio="3"><span class="rifa-field__label">3.er premio</span><input type="text" id="wz-premio3" class="rifa-input" maxlength="120" /></label>
                 </div>
 

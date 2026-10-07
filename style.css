@@ -5825,6 +5825,8 @@ body.cpm-rifa-standalone .rifa-public-bar {
 }
 .rifa-card-title { margin: 0; color: var(--neon-cyan); }
 .rifa-field { display: flex; flex-direction: column; gap: 0.35rem; }
+/* [hidden] debe ganar a display:flex: así se ocultan los premios 2 y 3 según la cantidad elegida */
+.rifa-field[hidden] { display: none; }
 .rifa-field__label { font-weight: 600; color: var(--white); }
 .rifa-field__help { font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; }
 .rifa-field__hint { font-size: 0.8rem; color: var(--neon-cyan); }
