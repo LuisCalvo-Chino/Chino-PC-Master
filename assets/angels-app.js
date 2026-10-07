@@ -1195,7 +1195,7 @@
         }
 
         if (page === "angels" && angels?.mode === "u" && angels?.hash) {
-            if (label) label.textContent = "Participante — solo necesitas el enlace";
+            if (label) label.textContent = "Participante — solo requieres el enlace";
             if (publicBar) publicBar.hidden = false;
             if (publicMode) publicMode.textContent = "Participante";
             if (heroBlock) heroBlock.hidden = true;
@@ -1611,7 +1611,7 @@
         async function openProjectEditModal(projectId) {
             const masterPin = getMasterPin() || document.getElementById("angels-master-pin")?.value || "";
             if (!masterPin) {
-                showMessage("Necesitas el Código Maestro guardado en la barra superior (o escríbelo en el campo y guarda).", "error");
+                showMessage("Requieres el Código Maestro guardado en la barra superior (o escríbelo en el campo y guarda).", "error");
                 return;
             }
             try {
@@ -1793,7 +1793,7 @@
                 }
                 const masterPin = getMasterPin() || document.getElementById("angels-master-pin")?.value || "";
                 if (!masterPin) {
-                    showMessage("Necesitas el Código Maestro (barra superior).", "error");
+                    showMessage("Requieres el Código Maestro (barra superior).", "error");
                     return;
                 }
                 (async () => {

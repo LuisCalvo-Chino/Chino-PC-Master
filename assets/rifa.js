@@ -2097,7 +2097,7 @@
         const p = plataforma();
         const nombre = escapeHtml(tituloRifa());
         if (p.standalone) {
-            return `<p class="rf-install-ok">✓ Ya está usando el acceso directo de «${nombre}». Ábralo desde su pantalla de inicio cada vez que lo necesite.</p>`;
+            return `<p class="rf-install-ok">✓ Ya está usando el acceso directo de «${nombre}». Ábralo desde su pantalla de inicio cada vez que lo requiera.</p>`;
         }
         const prompt = window.__cpmInstallPrompt;
         if (prompt && !p.iOS) {
@@ -2639,7 +2639,7 @@
                 return;
             }
             if (!$("cfg-nombre").value.trim()) {
-                showMessage("La rifa necesita un nombre.", "error");
+                showMessage("La rifa requiere un nombre.", "error");
                 return;
             }
             const cantidad = Number($("cfg-premios-n").value) || 1;

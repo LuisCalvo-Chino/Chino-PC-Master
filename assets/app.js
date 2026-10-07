@@ -265,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!enabled) {
                 link.title = requiresAdmin
                     ? "Solo administradores pueden acceder"
-                    : "Necesitas iniciar sesion con permisos para acceder";
+                    : "Requieres iniciar sesion con permisos para acceder";
             } else {
                 link.removeAttribute("title");
             }

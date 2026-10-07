@@ -718,7 +718,7 @@ function handleResolveByHash_(data) {
   var p = findProjectByHash_(hash);
   if (!p) {
     if (findAnyProjectByHash_(hash)) {
-      throw new Error("Esta rifa ya fue archivada y su enlace dejó de estar activo. Si necesita usarla de nuevo, comuníquese con Chino PC Master.");
+      throw new Error("Esta rifa ya fue archivada y su enlace dejó de estar activo. Si requiere usarla de nuevo, comuníquese con Chino PC Master.");
     }
     throw new Error("Enlace inválido o proyecto inactivo.");
   }

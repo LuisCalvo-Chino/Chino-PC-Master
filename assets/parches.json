@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-07T03:11:00-06:00",
+    "actualizado": "2026-10-07T03:29:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -36,12 +36,12 @@
     "parches": [
         {
             "id": "2026-10-07-sitio-rifa",
-            "fecha": "2026-10-07T03:11:00-06:00",
+            "fecha": "2026-10-07T03:29:00-06:00",
             "producto": [
                 "sitio",
                 "rifa"
             ],
-            "titulo": "Servicios, Inicio renovado y Rifas Digitales más fáciles de usar",
+            "titulo": "Servicios, Inicio renovado y Rifas Digitales fáciles de usar",
             "resumen": "«Soluciones» ahora se llama «Servicios» y el Inicio invita a explorar y a escribir por WhatsApp, Instagram o Messenger. Las rifas se manejan ahora desde el teléfono con un asistente, la lista de quién debe y la imagen y el mensaje listos para compartir.",
             "cambios": [
                 {
@@ -103,6 +103,11 @@
                     "tipo": "mejorado",
                     "producto": "sitio",
                     "texto": "En el pie de página, «Todas las WebApps» se reemplaza por «Rifas Digitales». Las herramientas privadas se abren desde el menú al iniciar sesión."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "Los textos del sitio y de sus aplicaciones siguen el lenguaje transformacional: «apoyo» en lugar de «ayuda», «requerir» en lugar de «necesitar», y sin «más» ni «menos» donde no se habla de cantidades."
                 },
                 {
                     "tipo": "nota",
@@ -182,7 +187,7 @@
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "Debajo de cada respuesta aparece el día y la hora en que llegó, y la más reciente se muestra arriba."
+                    "texto": "Debajo de cada respuesta aparece el día y la hora en que llegó, y la última se muestra arriba."
                 },
                 {
                     "tipo": "nota",
@@ -320,7 +325,7 @@
                 {
                     "tipo": "nuevo",
                     "producto": "sitio",
-                    "texto": "Sección «Parches y Noticias» con todo el historial del sitio y de sus WebApps, del más reciente al más antiguo."
+                    "texto": "Sección «Parches y Noticias» con todo el historial del sitio y de sus WebApps, del último al primero."
                 },
                 {
                     "tipo": "nuevo",
@@ -330,7 +335,7 @@
                 {
                     "tipo": "nuevo",
                     "producto": "sitio",
-                    "texto": "El parche más reciente aparece destacado arriba, con la fecha y hora exactas de publicación."
+                    "texto": "El último parche aparece destacado arriba, con la fecha y hora exactas de publicación."
                 },
                 {
                     "tipo": "nota",
@@ -478,7 +483,7 @@
             "fecha": "2026-07-11T10:20:00-06:00",
             "producto": "rifa",
             "titulo": "Rifas múltiples, enlace de administración y afiche descargable",
-            "resumen": "De una sola rifa a todas las que se necesiten al mismo tiempo, cada una con su propio enlace.",
+            "resumen": "De una sola rifa a todas las que se requieran al mismo tiempo, cada una con su propio enlace.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -653,7 +658,7 @@
                 {
                     "tipo": "mejorado",
                     "producto": "admin",
-                    "texto": "Carga de las secciones internas más rápida y con indicador de progreso."
+                    "texto": "Carga rápida de las secciones internas, con indicador de progreso."
                 }
             ]
         },
