@@ -1,30 +1,169 @@
-<section class="hero">
-    <div class="hero-content">
+<section class="hero home-hero">
+    <div class="home-hero__bg" aria-hidden="true"></div>
+    <div class="hero-content home-hero__content">
         <img src="imagenes/Extracción Logo.png" alt="Chino PC Master Logo" class="main-logo">
         <h1 class="glitch-text">CHINO PC MASTER</h1>
         <p class="subtitle tech-font">Transformando procesos, optimizando resultados.</p>
+        <p class="home-hero__lead">Computadoras, redes e internet y aplicaciones para su negocio. <strong>Le explico todo sin palabras técnicas.</strong></p>
+        <div class="home-hero__actions">
+            <a href="#servicios" data-page="servicios" class="svc-btn svc-btn--primary">Ver servicios</a>
+            <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="svc-btn svc-btn--ghost" target="_blank" rel="noopener noreferrer"><img src="imagenes/social/whatsapp.png" alt="" width="18" height="18" decoding="async"><span>Escríbame</span></a>
+        </div>
+    </div>
+    <a href="#" data-page="home" data-scroll-target="home-problemas" class="home-hero__scroll tech-font">
+        <span>Explorar</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>
+    </a>
+</section>
+
+<section id="home-problemas" class="content-section home-block">
+    <h2 class="section-title">¿QUÉ LE ESTÁ PASANDO?</h2>
+    <p class="home-block__lead">Toque lo que se parece a su problema y le muestro cómo lo resuelvo.</p>
+    <div class="home-problems">
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-optimizacion" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+            <span class="home-problem__text">Mi computadora está lenta</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-limpieza" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/></svg></span>
+            <span class="home-problem__text">Se calienta, hace ruido o se apaga</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-seguridad" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="home-problem__text">Creo que tengo un virus</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-instalacion" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
+            <span class="home-problem__text">Necesito formatear o instalar Windows</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-wifi" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/></svg></span>
+            <span class="home-problem__text">El WiFi no llega a todos lados</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-doble-internet" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>
+            <span class="home-problem__text">El internet se me cae</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-apps" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg></span>
+            <span class="home-problem__text">Llevo mi negocio en un cuaderno o en Excel</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-consultoria" class="home-problem">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg></span>
+            <span class="home-problem__text">No sé qué necesito</span>
+            <span class="home-problem__arrow" aria-hidden="true">→</span>
+        </a>
     </div>
 </section>
 
-<section id="soluciones" class="content-section">
-    <h2 class="section-title">SOLUCIONES TECNOLÓGICAS A TU MEDIDA</h2>
-    <div class="services-grid services-grid--compact">
-        <a href="#soluciones" data-page="soluciones" data-scroll-target="svc-detail-i" class="service-card service-card--link">
-            <span class="service-icon" aria-hidden="true">⚙</span>
-            <span class="card-tag tech-font">AUTOMATIZACIÓN</span>
-            <h3>Automatización de Procesos</h3>
-            <p>¿Cansado de hacer lo mismo mil veces en Excel? Creo sistemas inteligentes que hacen el trabajo pesado por ti: generan reportes, envían correos automáticos y organizan tus datos al instante.</p>
+<section id="servicios" class="content-section home-block home-block--band">
+    <h2 class="section-title">SERVICIOS</h2>
+    <p class="home-block__lead">Si tiene que ver con computadoras, yo lo resuelvo. Elija lo que necesita y vea en detalle cómo puedo ayudarle.</p>
+    <div class="services-grid services-grid--compact services-grid--four">
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-cat-equipos" class="service-card service-card--link">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+            <span class="card-tag tech-font">COMPUTADORAS</span>
+            <h3>¿Su computadora está lenta o se calienta?</h3>
+            <p>Optimización, limpieza interna, instalación de Windows, mejoras de equipo, eliminación de virus y respaldo de sus archivos.</p>
+            <span class="svc-home-more tech-font">Ver servicios <span aria-hidden="true">→</span></span>
         </a>
-        <a href="#soluciones" data-page="soluciones" data-scroll-target="svc-detail-ii" class="service-card service-card--link">
-            <span class="service-icon" aria-hidden="true">🖧</span>
-            <span class="card-tag tech-font">REDES</span>
-            <h3>Infraestructura y Redes</h3>
-            <p>Me encargo de que tu internet y tus computadoras nunca te fallen. Configuro tu red Wi-Fi para que sea rápida y segura, y optimizo tus equipos de cómputo para que funcionen como nuevos, sin parones molestos.</p>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-cat-redes" class="service-card service-card--link">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/></svg></span>
+            <span class="card-tag tech-font">REDES E INTERNET</span>
+            <h3>¿El WiFi no llega o el internet se cae?</h3>
+            <p>WiFi en toda la casa, redes para negocios, internet con dos proveedores que no se cae, e impresoras y archivos compartidos.</p>
+            <span class="svc-home-more tech-font">Ver servicios <span aria-hidden="true">→</span></span>
         </a>
-        <a href="#soluciones" data-page="soluciones" data-scroll-target="svc-detail-iii" class="service-card service-card--link">
-            <span class="service-icon" aria-hidden="true">☁</span>
-            <span class="card-tag tech-font">DIGITALIZACIÓN</span>
-            <h3>Digitalización de Negocios</h3>
-            <p>Te ayudo a dar el salto al mundo digital. Desde implementar firmas electrónicas hasta organizar toda tu información en la nube para que puedas trabajar desde cualquier lugar con total seguridad.</p>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-cat-negocios" class="service-card service-card--link">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg></span>
+            <span class="card-tag tech-font">NEGOCIOS Y APLICACIONES</span>
+            <h3>¿Todavía lleva el control en un cuaderno?</h3>
+            <p>Aplicaciones a la medida, tareas que se hacen solas, oficina en la nube y herramientas web para su negocio o grupo.</p>
+            <span class="svc-home-more tech-font">Ver servicios <span aria-hidden="true">→</span></span>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-cat-asesoria" class="service-card service-card--link">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/></svg></span>
+            <span class="card-tag tech-font">ASESORÍA Y APRENDIZAJE</span>
+            <h3>¿No sabe qué necesita?</h3>
+            <p>Le ayudo a elegir qué comprar, le enseño a usar su tecnología a su ritmo y le propongo cómo ahorrar tiempo.</p>
+            <span class="svc-home-more tech-font">Ver servicios <span aria-hidden="true">→</span></span>
         </a>
     </div>
+    <p class="home-block__more"><a href="#servicios" data-page="servicios" class="home-link tech-font">Ver los 17 servicios en detalle <span aria-hidden="true">→</span></a></p>
+</section>
+
+<section id="home-por-que" class="content-section home-block">
+    <h2 class="section-title">¿POR QUÉ CHINO PC MASTER?</h2>
+    <div class="home-values">
+        <div class="home-value">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/></svg></span>
+            <h3>Sin palabras técnicas</h3>
+            <p>Le explico qué tiene su equipo y qué voy a hacer, en un lenguaje que cualquiera entiende.</p>
+        </div>
+        <div class="home-value">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
+            <h3>Precio claro desde el inicio</h3>
+            <p>Sabe cuánto cuesta antes de empezar. Sin sorpresas al final.</p>
+        </div>
+        <div class="home-value">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5 7 21l5-3 5 3-1.5-8.5"/></svg></span>
+            <h3>Experiencia de empresa</h3>
+            <p>Formación Cisco CCNA y soporte técnico a nivel empresarial, ahora al servicio de su casa o negocio. <a href="#trayectoria" data-page="trayectoria">Ver trayectoria</a></p>
+        </div>
+        <div class="home-value">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>
+            <h3>Hecho a su medida</h3>
+            <p>Cada solución se adapta a su forma de trabajar, y no al revés.</p>
+        </div>
+    </div>
+</section>
+
+<section id="home-trabajos" class="content-section home-block home-block--band">
+    <h2 class="section-title">TRABAJOS QUE YA FUNCIONAN</h2>
+    <p class="home-block__lead">Herramientas que diseñé y que hoy usan personas reales. Explórelas.</p>
+    <div class="home-works">
+        <a href="#angeles-secretos" data-page="angeles-secretos" class="service-card service-card--link home-work home-work--featured">
+            <div class="home-work__media">
+                <img src="imagenes/angeles/capitanes-mensajes.webp" alt="Panel de Ángeles Secretos con la lista de ángeles y la vista previa de un mensaje" width="1200" height="833" loading="lazy" decoding="async">
+            </div>
+            <div class="home-work__body">
+                <span class="card-tag tech-font">APLICACIÓN WEB</span>
+                <h3>Ángeles Secretos</h3>
+                <p>Un juego de ángeles secretos por correo: el equipo escribe desde el celular y los mensajes salen solos cada semana.</p>
+                <span class="svc-home-more tech-font">Conocer la herramienta <span aria-hidden="true">→</span></span>
+            </div>
+        </a>
+        <a href="#servicios" data-page="servicios" data-scroll-target="svc-web" class="service-card service-card--link home-work">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>
+            <span class="card-tag tech-font">APLICACIÓN WEB</span>
+            <h3>Rifas digitales</h3>
+            <p>Cuadrícula de números, control de vendidos y un afiche listo para compartir.</p>
+            <span class="svc-home-more tech-font">Quiero una <span aria-hidden="true">→</span></span>
+        </a>
+        <a href="#canje" data-page="canje" class="service-card service-card--link home-work">
+            <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="card-tag tech-font">APLICACIÓN WEB</span>
+            <h3>Certificados verificables</h3>
+            <p>Certificados con código único: cualquiera puede comprobar en línea que son auténticos.</p>
+            <span class="svc-home-more tech-font">Verificar un certificado <span aria-hidden="true">→</span></span>
+        </a>
+    </div>
+</section>
+
+<section class="content-section home-block">
+    <aside class="svc-final-cta home-cta" aria-labelledby="home-cta-title">
+        <h3 id="home-cta-title">¿Listo para que la tecnología trabaje para usted?</h3>
+        <p>Cuénteme qué necesita y lo vemos juntos. Le respondo personalmente.</p>
+        <div class="svc-final-cta__actions">
+            <a href="https://wa.me/50662005921?text=Hola%2C%20quisiera%20consultar%20sobre%20un%20servicio." class="svc-btn svc-btn--primary" target="_blank" rel="noopener noreferrer"><img src="imagenes/social/whatsapp.png" alt="" width="18" height="18" loading="lazy" decoding="async"><span>Escribirme por WhatsApp</span></a>
+            <a href="#contacto" data-page="contacto" class="svc-btn svc-btn--ghost">Formulario de contacto</a>
+        </div>
+    </aside>
+</section>

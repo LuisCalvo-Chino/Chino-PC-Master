@@ -1,6 +1,6 @@
 {
-    "_comentario": "Bitácora pública de Chino PC Master. Para publicar un parche nuevo: agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos»), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota. Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-09-19T10:30:00-06:00",
+    "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
+    "actualizado": "2026-10-06T18:12:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -35,28 +35,44 @@
     ],
     "parches": [
         {
-            "id": "2026-09-19-angeles-semana-respuestas-sin-emisor",
-            "fecha": "2026-09-19T10:30:00-06:00",
-            "producto": "angeles",
-            "titulo": "La semana de cada respuesta ya sale bien sin actualizar el Emisor",
-            "resumen": "Las respuestas a la Semana 2 seguían apareciendo como Semana 3 en los proyectos con el Emisor anterior. Ahora el sitio mismo lo corrige.",
+            "id": "2026-10-06-sitio",
+            "fecha": "2026-10-06T18:12:00-06:00",
+            "producto": "sitio",
+            "titulo": "Nueva página de Servicios e Inicio renovado",
+            "resumen": "«Soluciones» ahora se llama «Servicios» y explica, sin palabras técnicas, todo lo que puedo hacer por usted. El Inicio invita a explorar y lleva directo a la solución de cada problema.",
             "cambios": [
                 {
-                    "tipo": "corregido",
-                    "texto": "Cada respuesta toma la semana del mensaje del Ángel que está contestando, usando la fecha que el correo trae citada («El mié, 16 sept 2026… escribió:»). Funciona con Gmail, iPhone y Outlook, en español o inglés."
+                    "tipo": "nuevo",
+                    "texto": "17 servicios ordenados en cuatro grupos: Computadoras, Redes e internet, Negocios y aplicaciones, y Asesoría. Cada uno empieza con la pregunta que usted ya se hace y dice qué incluye."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Botón «Solicitar» en cada servicio que abre WhatsApp con el mensaje listo, y una sección que explica cómo trabajo, paso a paso."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Inicio renovado: botones para ver los servicios o escribir por WhatsApp, una sección «¿Qué le está pasando?» que lleva directo a la solución de cada problema, las razones para confiar en mí y algunos trabajos que ya funcionan."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Desde Inicio y desde el pie de página se llega directo a cada grupo de servicios."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "«Parches y Noticias» ahora reúne en un solo parche todo lo que cambió en un mismo día. Si ese día se tocaron varias áreas, la tarjeta las muestra por separado y los filtros por aplicación siguen funcionando."
                 },
                 {
                     "tipo": "nota",
-                    "texto": "Ya no hace falta volver a publicar el Emisor para ver la semana correcta. Si se actualiza, además aparece el día y la hora en que llegó cada respuesta."
+                    "texto": "Los enlaces viejos a «Soluciones» siguen funcionando y llevan a la página nueva."
                 }
             ]
         },
         {
-            "id": "2026-09-19-angeles-respuestas-legibles",
-            "fecha": "2026-09-19T02:45:00-06:00",
+            "id": "2026-09-19-angeles",
+            "fecha": "2026-09-19T10:30:00-06:00",
             "producto": "angeles",
-            "titulo": "Respuestas fáciles de leer y en la semana correcta",
-            "resumen": "La pestaña «Respuestas» ahora muestra solo lo que escribió el angelado, en letra blanca sobre el fondo oscuro, y cada respuesta queda en la semana del mensaje que está contestando.",
+            "titulo": "Respuestas fáciles de leer y siempre en la semana correcta",
+            "resumen": "La pestaña «Respuestas» muestra solo lo que escribió el angelado, en letra blanca sobre el fondo oscuro, y cada respuesta queda en la semana del mensaje que está contestando, incluso en proyectos con el Emisor anterior.",
             "cambios": [
                 {
                     "tipo": "mejorado",
@@ -68,7 +84,7 @@
                 },
                 {
                     "tipo": "corregido",
-                    "texto": "Las respuestas que llegaban de jueves a martes se marcaban con la semana siguiente (por ejemplo, contestar el jueves a la Semana 2 aparecía como Semana 3). Ahora cada respuesta toma la semana del último mensaje que recibió el angelado; si no hay registro, cuenta de miércoles a martes."
+                    "texto": "Las respuestas que llegaban de jueves a martes se marcaban con la semana siguiente (por ejemplo, contestar el jueves a la Semana 2 aparecía como Semana 3). Ahora cada respuesta toma la semana del mensaje del Ángel que está contestando, usando la fecha que el correo trae citada («El mié, 16 sept 2026… escribió:»). Funciona con Gmail, iPhone y Outlook, en español o inglés."
                 },
                 {
                     "tipo": "nuevo",
@@ -76,72 +92,78 @@
                 },
                 {
                     "tipo": "nota",
-                    "texto": "La semana correcta y la fecha requieren actualizar el Emisor: copia el código nuevo desde el Maestro, pégalo en Apps Script y publica una nueva versión del Web App. El texto limpio en blanco funciona desde ya, sin tocar el Emisor."
+                    "texto": "La semana correcta y el texto limpio funcionan sin volver a publicar el Emisor. El día y la hora de llegada sí requieren actualizarlo: copia el código nuevo desde el Maestro, pégalo en Apps Script y publica una nueva versión del Web App."
                 }
             ]
         },
         {
-            "id": "2026-09-16-angeles-confirmacion-envio",
+            "id": "2026-09-16-angeles-sitio",
             "fecha": "2026-09-16T12:22:00-06:00",
-            "producto": "angeles",
-            "titulo": "«Enviar a cola» ya no da falsas alarmas en pestañas privadas",
-            "resumen": "Un Ángel veía «No se pudo enviar a cola» aunque su mensaje sí había quedado guardado. Ahora la app comprueba el estado real antes de avisar y el mensaje dice lo que de verdad pasó.",
+            "producto": [
+                "angeles",
+                "sitio"
+            ],
+            "titulo": "«Enviar a cola» sin falsas alarmas y la página de Ángeles al día",
+            "resumen": "Un Ángel veía «No se pudo enviar a cola» aunque su mensaje sí había quedado guardado: ahora la app comprueba el estado real antes de avisar. Además, el catálogo público de la herramienta cuenta todo lo que se ganó en los últimos parches.",
             "cambios": [
                 {
                     "tipo": "corregido",
+                    "producto": "angeles",
                     "texto": "Desde una pestaña privada o de incógnito, Google a veces no entrega la confirmación aunque el mensaje ya se guardó. Antes eso se mostraba como error; ahora la app revisa el estado de la semana y, si el mensaje está en cola, lo confirma como un envío normal."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "angeles",
                     "texto": "Pantalla «Comprobando tu mensaje…» mientras se verifica, sin posibilidad de enviar dos veces."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "angeles",
                     "texto": "Avisos claros para cada caso: «Tu mensaje no se guardó» (con lo escrito intacto y la sugerencia de reintentar o usar una pestaña normal) o «No pudimos confirmar el envío», que lleva directo a «Status semanal» para revisarlo."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "angeles",
                     "texto": "Los avisos de error muestran una línea de detalle técnico, para que el soporte sepa qué respondió Google sin pedir capturas extra."
                 },
                 {
                     "tipo": "corregido",
+                    "producto": "angeles",
                     "texto": "Si la conexión fallaba después de guardar, la app reenviaba el mensaje por su cuenta y podía terminar en un confuso «ya se ha alojado el mensaje semanal». Ese reenvío automático ya no ocurre al guardar."
                 },
                 {
                     "tipo": "nota",
+                    "producto": "angeles",
                     "texto": "El cambio es solo del sitio: no hace falta actualizar ni volver a publicar el Emisor en Google."
-                }
-            ]
-        },
-        {
-            "id": "2026-09-16-angeles-pagina-al-dia",
-            "fecha": "2026-09-16T00:20:00-06:00",
-            "producto": "sitio",
-            "titulo": "La página de Ángeles Secretos se pone al día",
-            "resumen": "El catálogo público de la herramienta ya cuenta todo lo que se ganó en los últimos parches, y ahora abre con un resumen de novedades.",
-            "cambios": [
+                },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Bloque «Lo último» al inicio de la página, con las novedades de los parches recientes y un enlace directo a esta bitácora."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Apartado propio sobre el modo oscuro: qué hace la casilla de protección, las dos simulaciones de la vista previa, el aviso de gradientes y la recomendación de enviarse un correo de prueba."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Se documenta que «Guardar tabla» bloquea la pantalla, confirma cuántas filas quedaron guardadas y relee la hoja para no duplicar filas ni correos."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Se documenta la lista de quiénes ya cumplieron en la semana, el botón «Refrescar» de «Mensajes» y de «Mantenimiento», y que los selectores solo ofrecen semanas reales."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "El apartado del editor detalla la alineación justificada, los hipervínculos con texto visible y la subida de imágenes; el de móvil aclara que la vista previa flotante también está en «Diseño email» y «Mensajes»."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "sitio",
                     "texto": "«Por qué se usa» suma la tarjeta «No se descolora en modo oscuro»."
                 }
             ]
@@ -192,89 +214,89 @@
             ]
         },
         {
-            "id": "2026-09-09-parches",
+            "id": "2026-09-09-sitio-angeles",
             "fecha": "2026-09-09T15:30:00-06:00",
-            "producto": "sitio",
-            "titulo": "Nace «Parches y Noticias»",
-            "resumen": "El sitio ahora lleva su propia bitácora pública: cada mejora, corrección y función nueva queda registrada con fecha y hora, ordenada por aplicación.",
+            "producto": [
+                "sitio",
+                "angeles"
+            ],
+            "titulo": "Nace «Parches y Noticias», pestaña «Mensajes» y envíos sin duplicados",
+            "resumen": "El sitio estrena su bitácora pública de cambios. En Ángeles Secretos, el Capi revisa sin salir del panel qué escribió cada quien, y se acabaron los envíos dobles: la app avisa qué está completo y confirma cada guardado.",
             "cambios": [
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Sección «Parches y Noticias» con todo el historial del sitio y de sus WebApps, del más reciente al más antiguo."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "Filtros por aplicación: se puede ver solo Ángeles Secretos, solo Rifa, solo Certificados, solo el Panel Admin o solo los cambios del sitio."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "El parche más reciente aparece destacado arriba, con la fecha y hora exactas de publicación."
                 },
                 {
                     "tipo": "nota",
+                    "producto": "sitio",
                     "texto": "Se reconstruyó el historial completo desde el nacimiento del sitio, en marzo de 2026, agrupado en hitos legibles."
-                }
-            ]
-        },
-        {
-            "id": "2026-09-09-angeles-bloqueo-envio",
-            "fecha": "2026-09-09T12:46:00-06:00",
-            "producto": "angeles",
-            "titulo": "Ángeles ya enviados quedan bloqueados y todo envío se confirma",
-            "resumen": "Se acabaron los envíos dobles y la duda de si el mensaje salió o no: la app avisa qué está completo y confirma cada guardado.",
-            "cambios": [
-                {
-                    "tipo": "nuevo",
-                    "texto": "En «Redactar», el Ángel que ya tiene su mensaje de la semana aparece marcado como completo (✅ mensaje en cola o ✅ mensaje enviado) y ya no se puede seleccionar."
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "Debajo del selector se lista quiénes ya cumplieron esta semana; si están todos, la app lo dice."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "«Enviar a cola» abre una pantalla de envío que bloquea la interacción mientras se guarda, así no hay forma de mandar el mensaje dos veces."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "Al terminar aparece una confirmación; al aceptar, la app recarga y lleva directo a «Status semanal» para ver el mensaje ya en cola."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "En el panel del organizador, «Guardar tabla» también confirma el guardado y recarga la lista releyéndola desde la hoja."
-                },
-                {
-                    "tipo": "corregido",
-                    "texto": "Guardar la tabla de Ángeles varias veces seguidas ya no duplica correos ni filas."
-                },
-                {
-                    "tipo": "corregido",
-                    "texto": "Los errores al guardar la tabla ahora se muestran en pantalla en vez de perderse en silencio."
-                }
-            ]
-        },
-        {
-            "id": "2026-09-09-angeles-mensajes",
-            "fecha": "2026-09-09T00:03:00-06:00",
-            "producto": "angeles",
-            "titulo": "Pestaña «Mensajes» para el organizador",
-            "resumen": "El Capi ya puede revisar, sin salir del panel, qué escribió cada quien y en qué estado va cada correo.",
-            "cambios": [
-                {
-                    "tipo": "nuevo",
+                    "producto": "angeles",
                     "texto": "Nueva pestaña «Mensajes» con la lista de Ángeles, el estado del mensaje de cada uno y vista previa del correo tal cual quedó redactado."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "angeles",
                     "texto": "Selector de semana para revisar semanas anteriores y descarga del HTML del mensaje que se está viendo."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "angeles",
                     "texto": "Las semanas previas al inicio del juego ya no aparecen en los selectores: solo se ofrecen semanas reales."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "angeles",
                     "texto": "Capturas del catálogo de funciones actualizadas, incluidas las que habían quedado desfasadas."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "En «Redactar», el Ángel que ya tiene su mensaje de la semana aparece marcado como completo (✅ mensaje en cola o ✅ mensaje enviado) y ya no se puede seleccionar."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "Debajo del selector se lista quiénes ya cumplieron esta semana; si están todos, la app lo dice."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "«Enviar a cola» abre una pantalla de envío que bloquea la interacción mientras se guarda, así no hay forma de mandar el mensaje dos veces."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "Al terminar aparece una confirmación; al aceptar, la app recarga y lleva directo a «Status semanal» para ver el mensaje ya en cola."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "En el panel del organizador, «Guardar tabla» también confirma el guardado y recarga la lista releyéndola desde la hoja."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "angeles",
+                    "texto": "Guardar la tabla de Ángeles varias veces seguidas ya no duplica correos ni filas."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "angeles",
+                    "texto": "Los errores al guardar la tabla ahora se muestran en pantalla en vez de perderse en silencio."
                 }
             ]
         },
@@ -500,54 +522,66 @@
             ]
         },
         {
-            "id": "2026-03-27-certificados",
-            "fecha": "2026-03-27T10:05:00-06:00",
-            "producto": "certificados",
-            "titulo": "Certificados y verificación pública por código",
-            "resumen": "Emisión de certificados con firma y una página donde cualquiera puede comprobar que son auténticos.",
+            "id": "2026-03-27-certificados-admin",
+            "fecha": "2026-03-27T14:39:00-06:00",
+            "producto": [
+                "certificados",
+                "admin"
+            ],
+            "titulo": "Certificados verificables y panel de administración de usuarios",
+            "resumen": "Emisión de certificados con firma y una página donde cualquiera puede comprobar que son auténticos, más un lugar para ver quién tiene cuenta y qué puede usar cada quien.",
             "cambios": [
                 {
                     "tipo": "nuevo",
+                    "producto": "certificados",
                     "texto": "Emisión de certificados con la identidad y la firma de la marca."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "certificados",
                     "texto": "Página pública de canje: se ingresa el código y se verifica el certificado al instante."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "certificados",
                     "texto": "Mejoras de interfaz en la emisión y en la verificación, y el menú pasa a llamarse «Certificado»."
-                }
-            ]
-        },
-        {
-            "id": "2026-03-27-panel-admin",
-            "fecha": "2026-03-27T14:39:00-06:00",
-            "producto": "admin",
-            "titulo": "Panel de administración de usuarios",
-            "resumen": "Un lugar para ver quién tiene cuenta y qué puede usar cada quien.",
-            "cambios": [
+                },
                 {
                     "tipo": "nuevo",
+                    "producto": "admin",
                     "texto": "Listado de usuarios registrados con sus permisos y accesos."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "admin",
                     "texto": "Asignación de permisos por herramienta, que controla qué WebApps ve cada usuario."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "admin",
                     "texto": "Carga de las secciones internas más rápida y con indicador de progreso."
                 }
             ]
         },
         {
-            "id": "2026-03-26-cuentas-movil",
+            "id": "2026-03-26-sitio",
             "fecha": "2026-03-26T04:47:00-06:00",
             "producto": "sitio",
-            "titulo": "Cuentas, permisos y navegación móvil",
-            "resumen": "El sitio deja de ser solo portafolio: aparecen las cuentas y el menú pensado para el teléfono.",
+            "titulo": "El sitio sale al aire, con cuentas y menú para celular",
+            "resumen": "Primera publicación de Chino PC Master en GitHub Pages: la base sobre la que se construyó todo lo demás, ya con cuentas de usuario, permisos y un menú pensado para el teléfono.",
             "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Estructura inicial del sitio con Inicio, Soluciones, Trayectoria, WebApps y Contacto."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Publicación automática: cada cambio aprobado queda en línea sin pasos manuales."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Identidad visual de Chino PC Master: paleta cian y azul cobalto sobre fondo oscuro."
+                },
                 {
                     "tipo": "nuevo",
                     "texto": "Registro e inicio de sesión con ventana propia, y saludo con el nombre de la persona conectada."
@@ -567,27 +601,6 @@
                 {
                     "tipo": "nuevo",
                     "texto": "Menú lateral tipo hamburguesa en celular y encabezado en cuadrícula en escritorio."
-                }
-            ]
-        },
-        {
-            "id": "2026-03-26-inicio",
-            "fecha": "2026-03-26T02:22:00-06:00",
-            "producto": "sitio",
-            "titulo": "El sitio sale al aire",
-            "resumen": "Primera publicación de chinopcmaster en GitHub Pages: la base sobre la que se construyó todo lo demás.",
-            "cambios": [
-                {
-                    "tipo": "nuevo",
-                    "texto": "Estructura inicial del sitio con Inicio, Soluciones, Trayectoria, WebApps y Contacto."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "Publicación automática: cada cambio aprobado queda en línea sin pasos manuales."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "Identidad visual de Chino PC Master: paleta cian y azul cobalto sobre fondo oscuro."
                 }
             ]
         }

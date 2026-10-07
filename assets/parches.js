@@ -3,6 +3,9 @@
  *
  * La página solo aporta el esqueleto; el contenido vive en assets/parches.json para que publicar
  * un parche nuevo sea agregar un objeto al inicio de ese arreglo, sin tocar HTML ni este archivo.
+ *
+ * Un parche por día: si ese día se tocaron varias áreas, «producto» es un arreglo y cada cambio
+ * dice a cuál pertenece con su propio «producto». Así los filtros por aplicación siguen siendo fieles.
  */
 (function () {
     "use strict";
@@ -78,6 +81,17 @@
         return Date.UTC(p.y, p.mo - 1, p.d, p.hh, p.mm);
     }
 
+    /** Áreas que toca un parche, en el orden en que se escribieron. */
+    function productosDe(parche) {
+        const raw = Array.isArray(parche.producto) ? parche.producto : [parche.producto];
+        const ids = raw.map((x) => String(x || "").trim()).filter(Boolean);
+        return ids.length ? ids : ["sitio"];
+    }
+
+    function productoDeCambio(cambio, parche) {
+        return String((cambio && cambio.producto) || "").trim() || productosDe(parche)[0];
+    }
+
     function agrupaCambios(cambios) {
         const lista = Array.isArray(cambios) ? cambios : [];
         const grupos = new Map();
@@ -102,22 +116,49 @@
             .join("");
     }
 
-    function htmlParche(parche, producto, destacado) {
-        const nombreProducto = producto ? producto.nombre : "Sitio web";
-        const idProducto = producto ? producto.id : "sitio";
+    function htmlTag(id, productos) {
+        const prod = productos.get(id);
+        return `<span class="patch-tag patch-tag--${esc(id)}">${esc(prod ? prod.nombre : "Sitio web")}</span>`;
+    }
+
+    /**
+     * Cambios del parche: si toca una sola área van agrupados por tipo; si toca varias, primero
+     * por área (con su etiqueta) y dentro de cada una por tipo. Con un filtro activo solo se
+     * muestran los cambios de esa área.
+     */
+    function htmlCuerpo(parche, ids, productos) {
+        const cambios = (Array.isArray(parche.cambios) ? parche.cambios : []).filter((c) =>
+            ids.includes(productoDeCambio(c, parche))
+        );
+        if (ids.length < 2) return `<div class="patch-card__changes">${htmlCambios(cambios)}</div>`;
+        return ids
+            .map((id) => {
+                const propios = cambios.filter((c) => productoDeCambio(c, parche) === id);
+                if (!propios.length) return "";
+                return `<div class="patch-area">
+                        <p class="patch-area__head">${htmlTag(id, productos)}</p>
+                        <div class="patch-card__changes">${htmlCambios(propios)}</div>
+                    </div>`;
+            })
+            .join("");
+    }
+
+    function htmlParche(parche, productos, destacado, filtro) {
+        const todos = productosDe(parche);
+        const ids = filtro && filtro !== "todos" ? todos.filter((id) => id === filtro) : todos;
         const fecha = fechaLarga(parche.fecha);
         const hora = horaCorta(parche.fecha);
-        return `<article class="patch-card${destacado ? " patch-card--featured" : ""}" data-producto="${esc(idProducto)}">
+        return `<article class="patch-card${destacado ? " patch-card--featured" : ""}" data-producto="${esc(todos.join(" "))}">
                 ${destacado ? '<p class="patch-card__flag tech-font">Último parche</p>' : ""}
                 <header class="patch-card__head">
-                    <span class="patch-tag patch-tag--${esc(idProducto)}">${esc(nombreProducto)}</span>
+                    ${todos.map((id) => htmlTag(id, productos)).join("")}
                     <time class="patch-card__date tech-font" datetime="${esc(parche.fecha)}">
                         ${esc(fecha)}<span class="patch-card__hour"> · ${esc(hora)}</span>
                     </time>
                 </header>
                 <h3 class="patch-card__title">${esc(parche.titulo || "")}</h3>
                 ${parche.resumen ? `<p class="patch-card__lead">${esc(parche.resumen)}</p>` : ""}
-                <div class="patch-card__changes">${htmlCambios(parche.cambios)}</div>
+                ${htmlCuerpo(parche, ids, productos)}
             </article>`;
     }
 
@@ -131,13 +172,14 @@
         const count = document.getElementById("patch-count");
         if (!feed) return;
 
-        const visibles = filtro === "todos" ? parches : parches.filter((p) => p.producto === filtro);
+        const visibles =
+            filtro === "todos" ? parches : parches.filter((p) => productosDe(p).includes(filtro));
 
         if (!visibles.length) {
             feed.innerHTML = '<p class="patch-empty">Todavía no hay parches publicados para esta aplicación.</p>';
         } else {
             feed.innerHTML = visibles
-                .map((p, i) => htmlParche(p, productos.get(p.producto), i === 0))
+                .map((p, i) => htmlParche(p, productos, i === 0, filtro))
                 .join("");
         }
 
@@ -153,7 +195,7 @@
         if (!cont) return;
         const parches = data.parches || [];
         const productos = (data.productos || []).filter((p) =>
-            parches.some((x) => x.producto === p.id)
+            parches.some((x) => productosDe(x).includes(p.id))
         );
         const chips = [{ id: "todos", nombre: "Todas" }].concat(productos);
         cont.innerHTML = chips
@@ -161,7 +203,7 @@
                 const n =
                     c.id === "todos"
                         ? parches.length
-                        : parches.filter((p) => p.producto === c.id).length;
+                        : parches.filter((p) => productosDe(p).includes(c.id)).length;
                 return `<button type="button" class="patch-chip${c.id === "todos" ? " is-active" : ""}" data-filtro="${esc(
                     c.id
                 )}" aria-pressed="${c.id === "todos"}">${esc(c.nombre)} <span class="patch-chip__n">${n}</span></button>`;
@@ -183,7 +225,7 @@
         const el = document.getElementById("patch-stats");
         if (!el) return;
         const parches = data.parches || [];
-        const apps = new Set(parches.map((p) => p.producto)).size;
+        const apps = new Set(parches.flatMap((p) => productosDe(p))).size;
         const ultima = parches
             .slice()
             .sort((a, b) => fechaOrden(b.fecha) - fechaOrden(a.fecha))[0];

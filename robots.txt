@@ -10,7 +10,7 @@ Disallow: /certificados.html
 Disallow: /canje.html
 Disallow: /contacto.html
 Disallow: /home.html
-Disallow: /soluciones.html
+Disallow: /servicios.html
 Disallow: /trayectoria.html
 Disallow: /webapps.html
 Disallow: /terminos.html

@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     const PUBLIC_PAGES = new Set([
         "home",
-        "soluciones",
+        "servicios",
         "trayectoria",
         "contacto",
         "webapps",
@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     const FOOTER_PAGES = new Set([
         "home",
-        "soluciones",
+        "servicios",
         "trayectoria",
         "contacto",
         "webapps",
@@ -576,9 +576,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
     }
 
+    /** Rutas renombradas: los enlaces viejos (p. ej. #soluciones en un afiche o mensaje) siguen funcionando. */
+    const PAGE_ALIASES = {
+        soluciones: "servicios"
+    };
+
     function resolvePage(rawPage) {
         const clean = String(rawPage || "").replace(/^#/, "").trim().toLowerCase();
-        return clean || "home";
+        return PAGE_ALIASES[clean] || clean || "home";
     }
 
     /**
@@ -1141,6 +1146,17 @@ document.addEventListener("DOMContentLoaded", () => {
         dropdownBtn.setAttribute("aria-expanded", "false");
         if (link.closest("#mobile-sidebar")) {
             closeMobileNav();
+        }
+        // Ancla dentro de la página ya abierta (índice de Servicios, footer): solo desplazar, sin recargar
+        if (
+            navTarget.scrollTarget &&
+            navTarget.page === currentPage &&
+            !navTarget.angels &&
+            !navTarget.rifa &&
+            document.getElementById(navTarget.scrollTarget)
+        ) {
+            scrollToTarget(navTarget.scrollTarget);
+            return;
         }
         navigateTo(navTarget.page, {
             scrollTarget: navTarget.scrollTarget,
