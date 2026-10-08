@@ -1292,22 +1292,84 @@
         prev.remove();
     }
 
-    /** Overlay con la imagen ya generada: guardar nativo, descargar o mantener pulsado. */
-    function openBannerResult(blob, filename) {
+    /** El portapapeles solo acepta PNG: se convierte la imagen ya mostrada. */
+    function imagenAPng(img) {
+        return new Promise((resolve, reject) => {
+            const pintar = () => {
+                try {
+                    const c = document.createElement("canvas");
+                    c.width = img.naturalWidth || 1080;
+                    c.height = img.naturalHeight || 1920;
+                    c.getContext("2d").drawImage(img, 0, 0);
+                    canvasToBlob(c, "image/png").then(resolve, reject);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            if (img.complete && img.naturalWidth) pintar();
+            else {
+                img.addEventListener("load", pintar, { once: true });
+                img.addEventListener("error", () => reject(new Error("No se pudo leer la imagen.")), { once: true });
+            }
+        });
+    }
+
+    /**
+     * Ventana con la imagen ya creada. Cada botón es un toque nuevo: el iPhone solo
+     * abre el menú de compartir justo después de un toque, nunca al terminar una espera.
+     * Con `text` se ofrece además compartir o copiar el mensaje.
+     */
+    function openBannerResult(blob, filename, text) {
         closeBannerResult();
         const url = URL.createObjectURL(blob);
+        const p = plataforma();
+        const conMensaje = !!(text && text.trim());
         let file = null;
         try {
             file = new File([blob], filename, { type: blob.type || "image/jpeg" });
         } catch (e) {
             file = null;
         }
-        const canShareFile = !!(
-            file &&
-            navigator.canShare &&
-            navigator.share &&
-            navigator.canShare({ files: [file] })
+        let canShareFile = false;
+        try {
+            canShareFile = !!(file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+        } catch (e) {
+            canShareFile = false;
+        }
+        const canCopyImg = !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+        // En el iPhone «Descargar» deja el archivo en la app Archivos (y desde el acceso directo no funciona):
+        // el menú de compartir tiene «Guardar imagen», que la manda a Fotos.
+        const guardarPorMenu = p.iOS && canShareFile;
+        const movil = isMobileLike();
+
+        let hint;
+        if (conMensaje && canShareFile) {
+            hint = "Toque <strong>Compartir imagen y mensaje</strong> y elija WhatsApp u otra app. El mensaje queda copiado: si la app solo toma la imagen, péguelo en el chat.";
+        } else if (conMensaje) {
+            hint = "Guarde la imagen y copie el mensaje. Luego adjunte la imagen en el chat y pegue el mensaje.";
+        } else if (guardarPorMenu) {
+            hint = "Toque <strong>Guardar en Fotos</strong> y, en el menú que se abre, elija <strong>«Guardar imagen»</strong>.";
+        } else {
+            hint = "Imagen lista para guardar o compartir.";
+        }
+        if (movil) hint += " También puede mantener presionada la imagen para guardarla.";
+
+        const botones = [];
+        if (canShareFile) {
+            botones.push(
+                conMensaje
+                    ? '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share-both">Compartir imagen y mensaje</button>'
+                    : '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share">Compartir imagen</button>'
+            );
+        }
+        botones.push(
+            `<button type="button" class="rifa-btn${!canShareFile ? " rifa-btn--primary" : ""}" data-act="save">${
+                guardarPorMenu ? "Guardar en Fotos" : "Descargar imagen"
+            }</button>`
         );
+        if (canCopyImg) botones.push('<button type="button" class="rifa-btn" data-act="copy-img">Copiar imagen</button>');
+        if (conMensaje) botones.push('<button type="button" class="rifa-btn" data-act="copy-text">Copiar mensaje</button>');
+        botones.push('<button type="button" class="rifa-btn" data-act="close">Cerrar</button>');
 
         const ov = document.createElement("div");
         ov.id = "rifa-banner-result";
@@ -1315,24 +1377,29 @@
         ov.setAttribute("data-object-url", url);
         ov.innerHTML = `
             <div class="rifa-banner-result__box" role="dialog" aria-modal="true" aria-label="Imagen de la rifa">
-                <p class="rifa-banner-result__hint">Imagen lista. ${
-                    canShareFile
-                        ? "Toque <strong>Guardar o compartir</strong> para mandarla a su galería o a WhatsApp"
-                        : "Mantenga presionada la imagen para guardarla"
-                }, o descárguela como archivo.</p>
+                <p class="rifa-banner-result__hint">${hint}</p>
                 <div class="rifa-banner-result__imgwrap">
-                    <img class="rifa-banner-result__img" alt="Banner de la rifa" src="${escapeAttr(url)}" />
+                    <img class="rifa-banner-result__img" alt="Imagen de la rifa" src="${escapeAttr(url)}" />
                 </div>
-                <div class="rifa-banner-result__actions">
-                    ${
-                        canShareFile
-                            ? '<button type="button" class="rifa-btn rifa-btn--primary" data-act="share">Guardar o compartir</button>'
-                            : ""
-                    }
-                    <button type="button" class="rifa-btn" data-act="download">Descargar archivo</button>
-                    <button type="button" class="rifa-btn" data-act="close">Cerrar</button>
-                </div>
+                <div class="rifa-banner-result__actions">${botones.join("")}</div>
             </div>`;
+        const img = ov.querySelector("img");
+
+        const compartir = async (data) => {
+            try {
+                await navigator.share(data);
+                return true;
+            } catch (e) {
+                if (e?.name === "AbortError") return false;
+                showMessage(
+                    movil
+                        ? "No se pudo abrir el menú de compartir. Mantenga presionada la imagen para guardarla."
+                        : "No se pudo abrir el menú de compartir. Use «Descargar imagen».",
+                    "error"
+                );
+                return false;
+            }
+        };
 
         ov.addEventListener("click", async (ev) => {
             const btn = ev.target.closest("[data-act]");
@@ -1343,23 +1410,35 @@
             const act = btn.getAttribute("data-act");
             if (act === "close") {
                 closeBannerResult();
-            } else if (act === "download") {
-                downloadBlob(blob, filename);
-            } else if (act === "share") {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: filename,
-                        text: `Rifa ${project?.sheet_name || ""}`.trim()
-                    });
-                } catch (e) {
-                    if (e?.name !== "AbortError") {
-                        showMessage(
-                            "No se pudo compartir. Mantenga presionada la imagen para guardarla.",
-                            "error"
-                        );
-                    }
+            } else if (act === "save") {
+                if (guardarPorMenu) {
+                    // Solo el archivo: si va con texto, el iPhone esconde «Guardar imagen».
+                    await compartir({ files: [file] });
+                } else {
+                    downloadBlob(blob, filename);
+                    showMessage("Imagen descargada.", "success");
                 }
+            } else if (act === "share") {
+                await compartir({ files: [file], title: tituloRifa() });
+            } else if (act === "share-both") {
+                // Se copia sin esperar: el menú de compartir tiene que abrirse en este mismo toque.
+                try {
+                    navigator.clipboard?.writeText(text).catch(() => {});
+                } catch (e) {
+                    /* sin portapapeles: el botón «Copiar mensaje» sigue disponible */
+                }
+                const ok = await compartir({ files: [file], text, title: tituloRifa() });
+                if (ok) showMessage("Listo. Si el mensaje no aparece junto a la imagen, péguelo en el chat: ya está copiado.", "success");
+            } else if (act === "copy-img") {
+                try {
+                    // Se pasa la promesa (no el archivo ya hecho) para que Safari acepte la copia en este toque.
+                    await navigator.clipboard.write([new ClipboardItem({ "image/png": imagenAPng(img) })]);
+                    showMessage("Imagen copiada. Péguela en el chat (por ejemplo en WhatsApp Web).", "success");
+                } catch (e) {
+                    showMessage("No se pudo copiar la imagen. Use «Descargar imagen».", "error");
+                }
+            } else if (act === "copy-text") {
+                await copiarTexto(text, "Mensaje copiado. Péguelo en el chat o grupo.");
             }
         });
 
@@ -2043,32 +2122,11 @@
         const text = $("rf-msg-text")?.value || "";
         if (btn) btn.disabled = true;
         try {
+            // Crear la imagen toma unos segundos y el iPhone ya no deja compartir al terminar:
+            // se muestra lista y el siguiente toque es el que comparte.
             const blob = await generarBannerBlob();
-            const filename = nombreArchivoImagen();
-            let file = null;
-            try {
-                file = new File([blob], filename, { type: "image/jpeg" });
-            } catch (e) {
-                file = null;
-            }
-            if (file && navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
-                // Algunas apps solo toman la imagen: dejamos el texto copiado para pegarlo.
-                try {
-                    await navigator.clipboard.writeText(text);
-                } catch (e) {
-                    /* sin permiso de portapapeles: no pasa nada */
-                }
-                try {
-                    await navigator.share({ files: [file], text, title: tituloRifa() });
-                    showMessage("Listo. Si el mensaje no aparece junto a la imagen, péguelo en el chat: ya está copiado.", "success");
-                } catch (e) {
-                    if (e?.name !== "AbortError") throw e;
-                }
-            } else {
-                downloadBlob(blob, filename);
-                await copiarTexto(text);
-                showMessage("Imagen descargada y mensaje copiado. Adjunte la imagen en el chat y pegue el mensaje.", "success");
-            }
+            showMessage("Imagen lista.", "success");
+            openBannerResult(blob, nombreArchivoImagen(), text);
         } catch (e) {
             showMessage(e.message || String(e), "error");
         } finally {
