@@ -161,15 +161,11 @@
 
                 <div class="rifa-field">
                     <span class="rifa-field__label">Archivado automático</span>
-                    <span class="rifa-field__help">Al terminar ese día el link deja de funcionar y la rifa pasa a «Archivadas», donde la puedes reactivar o eliminar. Se cuenta desde hoy, porque la fecha del sorteo la elige el cliente; el asistente no le deja poner un sorteo después de esta fecha.</span>
+                    <span class="rifa-field__help">Al terminar ese día el link deja de funcionar y la rifa pasa a «Archivadas», donde la puedes reactivar o eliminar. La fecha exacta se calcula cuando el cliente elige el sorteo en su asistente.</span>
                     <select id="rifa-new-archivo-modo" class="rifa-input">
-                        <option value="60">En dos meses</option>
-                        <option value="30">En un mes</option>
-                        <option value="90">En tres meses</option>
-                        <option value="custom">Elegir una fecha</option>
+                        <option value="semana">Una semana después del sorteo</option>
                         <option value="none">Sin fecha (no se archiva sola)</option>
                     </select>
-                    <input type="date" id="rifa-new-archivo" class="rifa-input" hidden aria-label="Fecha de archivado" />
                     <span id="rifa-new-archivo-hint" class="rifa-field__hint" aria-live="polite"></span>
                 </div>
 

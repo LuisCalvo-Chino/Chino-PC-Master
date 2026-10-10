@@ -47,6 +47,8 @@ var NUMEROS_HEADERS_ = ["numero", "estado", "nombre", "telefono", "contacto"];
 
 var SHEET_NAME_RE_ = /^[A-Za-z0-9_-]{2,20}$/;
 var MODALIDADES_ = { Chances: 1, "Loteria Nacional": 1, RNG: 1 };
+/** Fecha de archivado marcadora: «una semana después del sorteo», mientras el cliente no elige el sorteo. */
+var ARCHIVO_SEMANA_ = "2099-12-31";
 
 function doGet() {
   return jsonOut_({ status: "SUCCESS", data: { service: "rifa_multi", version: API_VERSION_ } });
@@ -697,7 +699,8 @@ function applyProjectUpdates_(p, data, allowDisplay, isSuper) {
   if (data.sinpe != null) setKey("sinpe", String(data.sinpe).trim());
   if (data.precio != null) setKey("precio", String(data.precio).trim());
 
-  // Solo el hub (llave maestra) cambia la fecha de archivado; el link de la rifa no.
+  // Solo el hub (llave maestra) cambia la fecha de archivado; el link de la rifa no,
+  // salvo el cálculo automático de «una semana después del sorteo» (ver handleUpdateConfig_).
   if (isSuper && data.fecha_archivo != null) {
     setKey("fecha_archivo", validarFechaArchivo_(data.fecha_archivo));
   }
@@ -789,13 +792,26 @@ function handleUpdateConfig_(data) {
   var cfg = data.config || data;
   // El sorteo (modalidad y fecha) lo elige el cliente solo en el asistente de primer uso,
   // mientras la rifa sigue con el premio de relleno «Por definir». Después solo lo cambia el hub.
-  if (String(p.premio_1 || "").trim() !== "Por definir") {
-    cfg = JSON.parse(JSON.stringify(cfg));
+  cfg = JSON.parse(JSON.stringify(cfg));
+  var primerUso = String(p.premio_1 || "").trim() === "Por definir";
+  if (!primerUso) {
     delete cfg.modalidad;
     delete cfg.fecha_sorteo;
     delete cfg.fecha;
   }
-  applyProjectUpdates_(p, cfg, true);
+  delete cfg.fecha_archivo;
+  // «Una semana después del sorteo»: el hub crea la rifa con la fecha marcadora 2099-12-31
+  // y aquí se cambia por la real en cuanto el cliente elige el sorteo.
+  var archivoAuto = false;
+  var fechaElegida = String(cfg.fecha_sorteo || cfg.fecha || "").slice(0, 10);
+  if (primerUso && p.fecha_archivo === ARCHIVO_SEMANA_ && /^\d{4}-\d{2}-\d{2}$/.test(fechaElegida)) {
+    var partes = fechaElegida.split("-");
+    var d = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]) + 7);
+    var fa = Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Costa_Rica", "yyyy-MM-dd");
+    cfg.fecha_archivo = fa < hoyIso_() ? hoyIso_() : fa;
+    archivoAuto = true;
+  }
+  applyProjectUpdates_(p, cfg, true, archivoAuto);
   var updated = findProjectByHash_(hash);
   return { status: "SUCCESS", data: { project: projectPublic_(updated) } };
 }

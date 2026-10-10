@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-10T08:27:00-06:00",
+    "actualizado": "2026-10-10T09:20:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -36,7 +36,7 @@
     "parches": [
         {
             "id": "2026-10-10-rifa",
-            "fecha": "2026-10-10T08:27:00-06:00",
+            "fecha": "2026-10-10T09:20:00-06:00",
             "producto": "rifa",
             "titulo": "Cada cliente configura su rifa y compartir queda a un toque",
             "resumen": "La rifa nueva se crea solo con su nombre interno y su fecha de archivado: el cliente completa premios, precio, sorteo y pagos en el asistente. Compartir tiene sus botones al inicio y al final, el editor de la imagen es sencillo y la imagen se genera las veces que se quiera, también en iPhone.",
@@ -79,7 +79,7 @@
                 },
                 {
                     "tipo": "nota",
-                    "texto": "El archivado automático de una rifa nueva se cuenta desde el día en que se crea (uno, dos o tres meses, una fecha elegida o sin fecha), porque la fecha del sorteo la elige el cliente después."
+                    "texto": "El archivado automático se elige al crear la rifa: una semana después del sorteo o sin fecha. La fecha exacta se pone sola en cuanto el cliente elige su sorteo, y se mueve junto con el sorteo si este se cambia desde el panel de administración."
                 }
             ]
         },

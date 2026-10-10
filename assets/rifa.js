@@ -424,26 +424,43 @@
         );
     }
 
-    /** Fecha de archivado elegida en «Nueva rifa» (contada desde hoy): "" = sin fecha. */
+    /**
+     * «Una semana después del sorteo»: al crear la rifa todavía no hay sorteo, así que se guarda
+     * esta fecha marcadora (el Apps Script la acepta y nunca vence). Cuando el cliente elige el
+     * sorteo, se reemplaza por sorteo + 7 días: lo hace el hub al cargar la lista y, desde la
+     * versión con ese cambio, también el Apps Script al guardar el asistente.
+     */
+    const ARCHIVO_SEMANA = "2099-12-31";
+    const DIAS_ARCHIVO = 7;
+
+    function archivoPendiente(p) {
+        return String(p?.fecha_archivo || "").slice(0, 10) === ARCHIVO_SEMANA;
+    }
+
+    /** Fecha real de archivado para un sorteo: una semana después, nunca antes de hoy. */
+    function archivoDeSorteo(fechaSorteo) {
+        const f = sumarDias(fechaSorteo, DIAS_ARCHIVO);
+        return f && f >= hoyIso() ? f : hoyIso();
+    }
+
+    /** Fecha de archivado elegida en «Nueva rifa»: "" = sin fecha. */
     function fechaArchivoNueva() {
-        const modo = $("rifa-new-archivo-modo")?.value || "60";
-        if (modo === "none") return "";
-        if (modo === "custom") return String($("rifa-new-archivo")?.value || "").slice(0, 10);
-        return sumarDias(hoyIso(), Number(modo));
+        return ($("rifa-new-archivo-modo")?.value || "semana") === "none" ? "" : ARCHIVO_SEMANA;
     }
 
     function syncNuevaArchivo() {
-        const modo = $("rifa-new-archivo-modo")?.value || "60";
-        const input = $("rifa-new-archivo");
-        if (input) input.hidden = modo !== "custom";
         const hint = $("rifa-new-archivo-hint");
         if (!hint) return;
-        if (modo === "none") {
-            hint.textContent = "Quedará activa hasta que la archives a mano.";
-            return;
-        }
-        const f = fechaArchivoNueva();
-        hint.textContent = f ? `Se archiva al terminar el ${formatFechaLargaEs(f).toLowerCase()}.` : "Elige la fecha.";
+        hint.textContent =
+            ($("rifa-new-archivo-modo")?.value || "semana") === "none"
+                ? "Quedará activa hasta que la archives a mano."
+                : "Se archiva al terminar el día, una semana después del sorteo que elija el cliente.";
+    }
+
+    /** Texto corto de cuándo se archiva, para la lista del hub. */
+    function archivoCorto(p) {
+        if (archivoPendiente(p)) return "1 semana después del sorteo";
+        return p.fecha_archivo || "";
     }
 
     function sorteoCorto(p) {
@@ -479,7 +496,7 @@
                     const tr = document.createElement("tr");
                     const link = adminLink(p.hash_admin);
                     const vig = p.fecha_archivo
-                        ? `<span class="rifa-vig">${escapeHtml(p.fecha_archivo)}</span>`
+                        ? `<span class="rifa-vig">${escapeHtml(archivoCorto(p))}</span>`
                         : '<span class="rifa-muted">Sin fecha</span>';
                     tr.innerHTML = `
                         <td><strong>${escapeHtml(p.sheet_name)}</strong><br/><span class="rifa-muted">${escapeHtml(p.nombre_display || "")}</span></td>
@@ -560,8 +577,38 @@
             // La versión 1 del Apps Script ignora include_inactive y no informa archive_supported
             hubArchiveSupported = !!res.data?.archive_supported;
             renderHubTables();
+            void fijarArchivosPendientes(pin);
         } catch (e) {
             tbody.innerHTML = `<tr><td colspan="7" class="rifa-error">${escapeHtml(e.message || String(e))}</td></tr>`;
+        }
+    }
+
+    /**
+     * Rifas creadas con «una semana después del sorteo» cuyo cliente ya eligió el sorteo:
+     * se cambia la fecha marcadora por la real. Con el Apps Script nuevo ya llega puesta.
+     */
+    async function fijarArchivosPendientes(pin) {
+        const listas = hubProjects.filter((p) => p.activo && archivoPendiente(p) && !configIncompleta(p) && p.fecha_sorteo);
+        if (!listas.length) return;
+        let cambios = 0;
+        for (const p of listas) {
+            const fecha = archivoDeSorteo(p.fecha_sorteo);
+            try {
+                await api.post({ action: "super_update_project", masterPin: pin, project_id: p.project_id, fecha_archivo: fecha });
+                p.fecha_archivo = fecha;
+                cambios++;
+            } catch (e) {
+                /* se reintenta la próxima vez que se cargue la lista */
+            }
+        }
+        if (cambios) {
+            renderHubTables();
+            showMessage(
+                cambios === 1
+                    ? "Se fijó la fecha de archivado de 1 rifa: una semana después de su sorteo."
+                    : `Se fijó la fecha de archivado de ${cambios} rifas: una semana después de su sorteo.`,
+                "success"
+            );
         }
     }
 
@@ -591,9 +638,9 @@
         $("rifa-vigencia-desc").textContent = `${project.nombre_display || project.sheet_name} · sorteo ${project.fecha_sorteo || "—"}`;
         const fecha = $("rifa-vig-fecha");
         const sugerida =
-            project.fecha_archivo && project.fecha_archivo >= hoyIso()
+            project.fecha_archivo && project.fecha_archivo >= hoyIso() && !archivoPendiente(project)
                 ? project.fecha_archivo
-                : sumarDias(project.fecha_sorteo >= hoyIso() ? project.fecha_sorteo : hoyIso(), 7);
+                : sumarDias(project.fecha_sorteo >= hoyIso() ? project.fecha_sorteo : hoyIso(), DIAS_ARCHIVO);
         fecha.value = sugerida;
         fecha.min = hoyIso();
         const radios = dlg.querySelectorAll('input[name="rifa-vig-modo"]');
@@ -623,13 +670,23 @@
         const mod = $("rifa-sorteo-modalidad");
         const fecha = $("rifa-sorteo-fecha");
         const hint = $("rifa-sorteo-hint");
-        $("rifa-sorteo-desc").textContent = `${p.nombre_display || p.sheet_name}${p.fecha_archivo ? ` · se archiva el ${p.fecha_archivo}` : ""}`;
+        // Si se archiva una semana después del sorteo, el archivado se mueve junto con el sorteo
+        const sigue = archivoPendiente(p) || (p.fecha_archivo && p.fecha_archivo === sumarDias(p.fecha_sorteo, DIAS_ARCHIVO));
+        const archivoTxt = sigue
+            ? " · se archiva una semana después del sorteo"
+            : p.fecha_archivo
+              ? ` · se archiva el ${p.fecha_archivo}`
+              : "";
+        $("rifa-sorteo-desc").textContent = `${p.nombre_display || p.sheet_name}${archivoTxt}`;
         mod.value = p.modalidad || "Chances";
         fecha.value = (p.fecha_sorteo || "").slice(0, 10);
-        fecha.max = p.fecha_archivo || "";
+        fecha.max = sigue ? "" : p.fecha_archivo || "";
         const sync = () => {
             const err = fecha.value ? validateFechaModalidad(mod.value, fecha.value) : "";
-            const tarde = p.fecha_archivo && fecha.value > p.fecha_archivo ? "Queda después de la fecha de archivado: cambia también el archivado." : "";
+            const tarde =
+                !sigue && p.fecha_archivo && fecha.value > p.fecha_archivo
+                    ? "Queda después de la fecha de archivado: cambia también el archivado."
+                    : "";
             hint.textContent = err || tarde || fechaHint(mod.value);
         };
         mod.onchange = sync;
@@ -650,7 +707,11 @@
                 "close",
                 () => {
                     form.removeEventListener("submit", onSubmit);
-                    resolve(dlg.returnValue === "ok" ? { modalidad: mod.value, fecha: fecha.value } : null);
+                    resolve(
+                        dlg.returnValue === "ok"
+                            ? { modalidad: mod.value, fecha: fecha.value, fechaArchivo: sigue ? archivoDeSorteo(fecha.value) : undefined }
+                            : null
+                    );
                 },
                 { once: true }
             );
@@ -686,9 +747,6 @@
         });
 
         $("rifa-new-archivo-modo")?.addEventListener("change", syncNuevaArchivo);
-        $("rifa-new-archivo")?.addEventListener("change", syncNuevaArchivo);
-        const archivoInput = $("rifa-new-archivo");
-        if (archivoInput) archivoInput.min = hoyIso();
         syncNuevaArchivo();
 
         $("rifa-new-form")?.addEventListener("submit", async (ev) => {
@@ -704,14 +762,6 @@
                 return;
             }
             const fechaArchivo = fechaArchivoNueva();
-            if ($("rifa-new-archivo-modo")?.value === "custom" && !fechaArchivo) {
-                showMessage("Elige la fecha de archivado o cambia la opción.", "error");
-                return;
-            }
-            if (fechaArchivo && fechaArchivo < hoyIso()) {
-                showMessage("La fecha de archivado no puede estar en el pasado.", "error");
-                return;
-            }
             // Valores de relleno que el Apps Script acepta; el cliente los reemplaza en el asistente.
             const payload = {
                 action: "super_create_project",
@@ -736,9 +786,7 @@
                 const hash = res.data?.hash_admin || res.data?.project?.hash_admin;
                 const link = adminLink(hash);
                 const envio = `¡Hola! Aquí está el enlace de su rifa:\n${link}\n\nLa primera vez que lo abra, un asistente le guía paso a paso para poner los premios, el precio, la fecha del sorteo y sus datos de pago. Guárdelo bien: es la llave de su rifa, no lo comparta con los compradores.`;
-                const archivoTxt = fechaArchivo
-                    ? `Se archiva al terminar el ${formatFechaLargaEs(fechaArchivo).toLowerCase()}.`
-                    : "Sin fecha de archivado.";
+                const archivoTxt = fechaArchivo ? "Se archiva una semana después del sorteo." : "Sin fecha de archivado.";
                 const box = $("rifa-new-result");
                 if (box) {
                     box.hidden = false;
@@ -779,9 +827,13 @@
                         masterPin: pinActual(),
                         project_id: p.project_id,
                         modalidad: r.modalidad,
-                        fecha_sorteo: r.fecha
+                        fecha_sorteo: r.fecha,
+                        ...(r.fechaArchivo ? { fecha_archivo: r.fechaArchivo } : {})
                     });
-                    showMessage("Sorteo actualizado.", "success");
+                    showMessage(
+                        r.fechaArchivo ? `Sorteo actualizado. Se archivará al terminar el ${r.fechaArchivo}.` : "Sorteo actualizado.",
+                        "success"
+                    );
                     void loadProjectsTable();
                 } catch (e) {
                     showMessage(e.message || String(e), "error");
@@ -2647,7 +2699,9 @@
         const note = $("rf-archive-note");
         if (note) {
             note.hidden = !project.fecha_archivo;
-            if (project.fecha_archivo) {
+            if (archivoPendiente(project)) {
+                note.textContent = "Este enlace funciona hasta una semana después del sorteo. Después la rifa se archiva.";
+            } else if (project.fecha_archivo) {
                 note.textContent = `Este enlace funciona hasta el ${formatFechaLargaEs(project.fecha_archivo).toLowerCase()}. Después la rifa se archiva.`;
             }
         }
@@ -2697,7 +2751,7 @@
         const err = validateFechaModalidad(mod, f);
         if (err) return err;
         if (f < hoyIso()) return "La fecha del sorteo ya pasó. Elija una fecha de hoy en adelante.";
-        const archivo = project?.fecha_archivo || "";
+        const archivo = archivoPendiente(project) ? "" : project?.fecha_archivo || "";
         if (archivo && f > archivo) {
             return `La fecha del sorteo debe ser a más tardar el ${formatFechaLargaEs(archivo).toLowerCase()}, porque ese día se archiva la rifa.`;
         }
@@ -2715,7 +2769,11 @@
         if (nota) {
             const archivo = project?.fecha_archivo || "";
             nota.hidden = !archivo;
-            if (archivo) nota.textContent = `📅 Su rifa está activa hasta el ${formatFechaLargaEs(archivo).toLowerCase()}. El sorteo debe ser ese día o antes.`;
+            if (archivoPendiente(project)) {
+                nota.textContent = "📅 Su enlace funciona hasta una semana después del sorteo. Después la rifa se archiva.";
+            } else if (archivo) {
+                nota.textContent = `📅 Su rifa está activa hasta el ${formatFechaLargaEs(archivo).toLowerCase()}. El sorteo debe ser ese día o antes.`;
+            }
         }
     }
 
@@ -2768,7 +2826,7 @@
         document.querySelectorAll('input[name="wz-modalidad"]').forEach((r) => (r.checked = r.value === mod));
         $("wz-fecha").value = nueva ? "" : (project?.fecha_sorteo || "").slice(0, 10);
         $("wz-fecha").min = hoyIso();
-        if (project?.fecha_archivo) $("wz-fecha").max = project.fecha_archivo;
+        $("wz-fecha").max = project?.fecha_archivo && !archivoPendiente(project) ? project.fecha_archivo : "";
         $("wz-sorteo-edit").hidden = !wzObligatorio;
         $("wz-sorteo-warn").hidden = !wzObligatorio;
         $("wz-sorteo-locked").hidden = wzObligatorio;
