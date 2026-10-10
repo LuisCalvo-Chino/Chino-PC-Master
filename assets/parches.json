@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-07T03:29:00-06:00",
+    "actualizado": "2026-10-10T08:27:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -35,8 +35,57 @@
     ],
     "parches": [
         {
+            "id": "2026-10-10-rifa",
+            "fecha": "2026-10-10T08:27:00-06:00",
+            "producto": "rifa",
+            "titulo": "Cada cliente configura su rifa y compartir queda a un toque",
+            "resumen": "La rifa nueva se crea solo con su nombre interno y su fecha de archivado: el cliente completa premios, precio, sorteo y pagos en el asistente. Compartir tiene sus botones al inicio y al final, el editor de la imagen es sencillo y la imagen se genera las veces que se quiera, también en iPhone.",
+            "cambios": [
+                {
+                    "tipo": "corregido",
+                    "texto": "En el iPhone (Safari y Chrome), la imagen solo salía bien la primera vez: después había que cerrar la pestaña. Ahora se puede cerrar, cambiar algo y volver a generarla cuantas veces se quiera, y queda lista en uno o dos segundos."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Crear una rifa ahora pide solo el nombre de la hoja y cuándo se archiva. Los premios, el precio, el sorteo, el SINPE y el WhatsApp los completa el cliente en el asistente, que se abre la primera vez y no se puede saltar hasta terminarlo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "El asistente avisa con un recuadro visible que el sorteo (con qué juega y la fecha) queda fijo, no deja elegir una fecha que ya pasó y pide que el sorteo sea a más tardar el día en que se archiva la rifa."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "En Ajustes, el sorteo se muestra fijo con el aviso de pedírselo a Chino PC Master para cambiarlo. Desde el panel de administración se puede cambiar cuando el cliente lo solicite."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En «Compartir», los botones «Compartir imagen y mensaje», «Descargar imagen», «Enviar solo texto por WhatsApp» y «Copiar mensaje» están al inicio y al final, para enviar la rifa en un toque."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "«Números libres» y «Números vendidos» vienen sin marcar en el mensaje: la imagen ya los muestra."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "«Personalizar colores, letras y logotipo» se destaca a la vista y se usa por pasos: fondo de uno o dos colores, nombre o logotipo, un tipo de letra para todo (o uno por texto), tamaños con una barra, colores con muestras grandes e íconos. Una vista previa pequeña acompaña mientras se baja, y el logotipo se sube con solo elegir la imagen."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "En Compradores, «Ver todos los números en cuadrícula» se destaca con color para encontrarlo de inmediato. Ahí se editan varios números a la vez y se descarga la lista para Excel."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "El ícono del calendario en las fechas se veía negro sobre el fondo oscuro. Ahora es blanco."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "El archivado automático de una rifa nueva se cuenta desde el día en que se crea (uno, dos o tres meses, una fecha elegida o sin fecha), porque la fecha del sorteo la elige el cliente después."
+                }
+            ]
+        },
+        {
             "id": "2026-10-07-sitio-rifa",
-            "fecha": "2026-10-07T03:29:00-06:00",
+            "fecha": "2026-10-07T20:29:00-06:00",
             "producto": [
                 "sitio",
                 "rifa"
@@ -158,6 +207,16 @@
                     "tipo": "corregido",
                     "producto": "rifa",
                     "texto": "Elegir 1, 2 o 3 premios ya muestra solo los campos que corresponden, en el asistente, en Ajustes y al crear la rifa. El segundo premio se rotula «2.do», igual que «1.er» y «3.er»."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "rifa",
+                    "texto": "En el iPhone, descargar la imagen o compartirla con el mensaje no hacía nada. Ahora la imagen aparece lista en una ventana con «Compartir imagen y mensaje», «Guardar en Fotos», «Copiar imagen» y «Copiar mensaje», y funciona igual en iPhone, Android y computadora."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "rifa",
+                    "texto": "En el teléfono, la barra de pestañas de abajo ya no tapa el botón «Cerrar» de esa ventana."
                 },
                 {
                     "tipo": "nota",

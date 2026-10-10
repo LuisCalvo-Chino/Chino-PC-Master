@@ -787,6 +787,14 @@ function handleUpdateConfig_(data) {
   var p = findProjectByHash_(hash);
   if (!p) throw new Error("Enlace inválido o proyecto inactivo.");
   var cfg = data.config || data;
+  // El sorteo (modalidad y fecha) lo elige el cliente solo en el asistente de primer uso,
+  // mientras la rifa sigue con el premio de relleno «Por definir». Después solo lo cambia el hub.
+  if (String(p.premio_1 || "").trim() !== "Por definir") {
+    cfg = JSON.parse(JSON.stringify(cfg));
+    delete cfg.modalidad;
+    delete cfg.fecha_sorteo;
+    delete cfg.fecha;
+  }
   applyProjectUpdates_(p, cfg, true);
   var updated = findProjectByHash_(hash);
   return { status: "SUCCESS", data: { project: projectPublic_(updated) } };

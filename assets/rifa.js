@@ -289,6 +289,8 @@
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.54 5.23 19.15 3.55A1.99 1.99 0 0 0 17.56 3H6.44c-.62 0-1.2.29-1.59.76L3.46 5.23C3.17 5.57 3 6.01 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.49-.17-.93-.46-1.27zM12 17.5 6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>';
     const ICON_CALENDAR =
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2zm12 8H5v9h14v-9zM5 6v2h14V6H5z"/></svg>';
+    const ICON_EDIT =
+        '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
     const ICON_TRASH =
         '<svg class="rifa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 
@@ -404,16 +406,34 @@
         return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     }
 
-    /** Fecha de archivado elegida en «Nueva rifa»: "" = sin fecha. */
+    /**
+     * Al crear la rifa solo se elige la hoja y el archivado; lo demás lo llena el cliente en el
+     * asistente. El Apps Script exige premio, modalidad y fecha válidos para crearla, así que se
+     * guardan estos valores de relleno y se reconocen como «falta configurar».
+     */
+    const PREMIO_PENDIENTE = "Por definir";
+
+    function configIncompleta(p) {
+        if (!p) return false;
+        const premio = String(p.premio_1 || "").trim();
+        return (
+            !premio ||
+            premio === PREMIO_PENDIENTE ||
+            !String(p.precio || "").replace(/\D/g, "") ||
+            String(p.sinpe || "").replace(/\D/g, "").length < 8
+        );
+    }
+
+    /** Fecha de archivado elegida en «Nueva rifa» (contada desde hoy): "" = sin fecha. */
     function fechaArchivoNueva() {
-        const modo = $("rifa-new-archivo-modo")?.value || "7";
+        const modo = $("rifa-new-archivo-modo")?.value || "60";
         if (modo === "none") return "";
         if (modo === "custom") return String($("rifa-new-archivo")?.value || "").slice(0, 10);
-        return sumarDias($("rifa-new-fecha")?.value, Number(modo));
+        return sumarDias(hoyIso(), Number(modo));
     }
 
     function syncNuevaArchivo() {
-        const modo = $("rifa-new-archivo-modo")?.value || "7";
+        const modo = $("rifa-new-archivo-modo")?.value || "60";
         const input = $("rifa-new-archivo");
         if (input) input.hidden = modo !== "custom";
         const hint = $("rifa-new-archivo-hint");
@@ -423,19 +443,17 @@
             return;
         }
         const f = fechaArchivoNueva();
-        hint.textContent = f
-            ? `Se archiva al terminar el ${formatFechaLargaEs(f).toLowerCase()}.`
-            : modo === "custom"
-              ? "Elige la fecha."
-              : "Elige primero la fecha del sorteo.";
+        hint.textContent = f ? `Se archiva al terminar el ${formatFechaLargaEs(f).toLowerCase()}.` : "Elige la fecha.";
     }
 
     function sorteoCorto(p) {
+        if (configIncompleta(p)) return "—";
         const mod = p.modalidad === "RNG" ? "App" : p.modalidad === "Loteria Nacional" ? "Lotería" : p.modalidad || "";
         return `${mod}${p.fecha_sorteo ? " · " + p.fecha_sorteo : ""}`;
     }
 
     function premiosCorto(p) {
+        if (configIncompleta(p)) return "Esperando que el cliente la configure";
         return [p.premio_1, p.premio_2, p.premio_3]
             .filter(Boolean)
             .slice(0, p.cantidad_premios || 1)
@@ -466,7 +484,12 @@
                     tr.innerHTML = `
                         <td><strong>${escapeHtml(p.sheet_name)}</strong><br/><span class="rifa-muted">${escapeHtml(p.nombre_display || "")}</span></td>
                         <td>${escapeHtml(premiosCorto(p))}</td>
-                        <td>${escapeHtml(sorteoCorto(p))}</td>
+                        <td>
+                            <div class="rifa-link-actions">
+                                <span>${escapeHtml(sorteoCorto(p))}</span>
+                                ${configIncompleta(p) ? "" : `<button type="button" class="rifa-icon-btn" data-sorteo-id="${escapeAttr(p.project_id)}" title="Cambiar el sorteo (el cliente no puede)" aria-label="Cambiar el sorteo">${ICON_EDIT}</button>`}
+                            </div>
+                        </td>
                         <td>${escapeHtml(p.precio)}</td>
                         <td>
                             <div class="rifa-link-actions">
@@ -590,6 +613,52 @@
         });
     }
 
+    /** Solo desde el hub se cambia el sorteo de una rifa ya configurada. Devuelve null si se cancela. */
+    function pedirSorteo(p) {
+        const dlg = $("rifa-sorteo-dialog");
+        if (!dlg || typeof dlg.showModal !== "function") {
+            showMessage("Este navegador no permite abrir el cuadro para cambiar el sorteo.", "error");
+            return Promise.resolve(null);
+        }
+        const mod = $("rifa-sorteo-modalidad");
+        const fecha = $("rifa-sorteo-fecha");
+        const hint = $("rifa-sorteo-hint");
+        $("rifa-sorteo-desc").textContent = `${p.nombre_display || p.sheet_name}${p.fecha_archivo ? ` · se archiva el ${p.fecha_archivo}` : ""}`;
+        mod.value = p.modalidad || "Chances";
+        fecha.value = (p.fecha_sorteo || "").slice(0, 10);
+        fecha.max = p.fecha_archivo || "";
+        const sync = () => {
+            const err = fecha.value ? validateFechaModalidad(mod.value, fecha.value) : "";
+            const tarde = p.fecha_archivo && fecha.value > p.fecha_archivo ? "Queda después de la fecha de archivado: cambia también el archivado." : "";
+            hint.textContent = err || tarde || fechaHint(mod.value);
+        };
+        mod.onchange = sync;
+        fecha.onchange = sync;
+        sync();
+        return new Promise((resolve) => {
+            const form = $("rifa-sorteo-form");
+            const onSubmit = (ev) => {
+                if (ev.submitter?.value !== "ok") return;
+                const err = validateFechaModalidad(mod.value, fecha.value);
+                if (err) {
+                    ev.preventDefault();
+                    hint.textContent = err;
+                }
+            };
+            form.addEventListener("submit", onSubmit);
+            dlg.addEventListener(
+                "close",
+                () => {
+                    form.removeEventListener("submit", onSubmit);
+                    resolve(dlg.returnValue === "ok" ? { modalidad: mod.value, fecha: fecha.value } : null);
+                },
+                { once: true }
+            );
+            dlg.returnValue = "";
+            dlg.showModal();
+        });
+    }
+
     function initHub() {
         restaurarSitio();
         $("rifa-hub").hidden = false;
@@ -616,23 +685,11 @@
             void loadProjectsTable();
         });
 
-        $("rifa-new-premios-n")?.addEventListener("change", () =>
-            syncPremioFields("rifa-new-premios-n", "data-premio-field")
-        );
-        const syncNewFecha = () => {
-            const hint = $("rifa-new-fecha-hint");
-            if (hint) hint.textContent = fechaHint($("rifa-new-modalidad")?.value);
-            syncNuevaArchivo();
-        };
-        $("rifa-new-modalidad")?.addEventListener("change", syncNewFecha);
-        $("rifa-new-fecha")?.addEventListener("change", syncNuevaArchivo);
         $("rifa-new-archivo-modo")?.addEventListener("change", syncNuevaArchivo);
         $("rifa-new-archivo")?.addEventListener("change", syncNuevaArchivo);
         const archivoInput = $("rifa-new-archivo");
         if (archivoInput) archivoInput.min = hoyIso();
-        syncNewFecha();
-        syncPremioFields("rifa-new-premios-n", "data-premio-field");
-        wirePrecioInput($("rifa-new-precio"));
+        syncNuevaArchivo();
 
         $("rifa-new-form")?.addEventListener("submit", async (ev) => {
             ev.preventDefault();
@@ -641,11 +698,9 @@
                 showMessage("Guarda la Llave Maestra antes de crear.", "error");
                 return;
             }
-            const modalidad = $("rifa-new-modalidad").value;
-            const fecha = $("rifa-new-fecha").value;
-            const err = validateFechaModalidad(modalidad, fecha);
-            if (err) {
-                showMessage(err, "error");
+            const sheet = $("rifa-new-sheet").value.trim();
+            if (!/^[A-Za-z0-9_-]{2,20}$/.test(sheet)) {
+                showMessage("Nombre de hoja inválido. Usa 2–20 caracteres: letras, números, _ o - (sin espacios).", "error");
                 return;
             }
             const fechaArchivo = fechaArchivoNueva();
@@ -657,22 +712,22 @@
                 showMessage("La fecha de archivado no puede estar en el pasado.", "error");
                 return;
             }
-            const cantidad = Number($("rifa-new-premios-n").value) || 1;
+            // Valores de relleno que el Apps Script acepta; el cliente los reemplaza en el asistente.
             const payload = {
                 action: "super_create_project",
                 masterPin: pin,
-                sheet_name: $("rifa-new-sheet").value.trim(),
-                nombre_display: $("rifa-new-display").value.trim(),
-                cantidad_premios: cantidad,
-                premio_1: $("rifa-new-premio1").value.trim(),
-                premio_2: cantidad >= 2 ? $("rifa-new-premio2").value.trim() : "",
-                premio_3: cantidad >= 3 ? $("rifa-new-premio3").value.trim() : "",
-                modalidad,
-                fecha_sorteo: fecha,
+                sheet_name: sheet,
+                nombre_display: sheet,
+                cantidad_premios: 1,
+                premio_1: PREMIO_PENDIENTE,
+                premio_2: "",
+                premio_3: "",
+                modalidad: "RNG",
+                fecha_sorteo: hoyIso(),
                 fecha_archivo: fechaArchivo,
-                sinpe: $("rifa-new-sinpe").value.trim(),
-                whatsapp: $("rifa-new-whatsapp").value.trim(),
-                precio: formatColonPrice($("rifa-new-precio").value.trim())
+                sinpe: "",
+                whatsapp: "",
+                precio: ""
             };
             const submit = $("rifa-new-submit");
             if (submit) submit.disabled = true;
@@ -680,8 +735,7 @@
                 const res = await api.post(payload, { timeoutMs: 45000 });
                 const hash = res.data?.hash_admin || res.data?.project?.hash_admin;
                 const link = adminLink(hash);
-                const nombre = payload.nombre_display || payload.sheet_name;
-                const envio = `¡Hola! Aquí está el enlace para manejar su rifa «${nombre}»:\n${link}\n\nLa primera vez que lo abra, un asistente le guía paso a paso. Guárdelo bien: es la llave de su rifa, no lo comparta con los compradores.`;
+                const envio = `¡Hola! Aquí está el enlace de su rifa:\n${link}\n\nLa primera vez que lo abra, un asistente le guía paso a paso para poner los premios, el precio, la fecha del sorteo y sus datos de pago. Guárdelo bien: es la llave de su rifa, no lo comparta con los compradores.`;
                 const archivoTxt = fechaArchivo
                     ? `Se archiva al terminar el ${formatFechaLargaEs(fechaArchivo).toLowerCase()}.`
                     : "Sin fecha de archivado.";
@@ -697,8 +751,7 @@
                 }
                 showMessage("Rifa creada correctamente.", "success");
                 $("rifa-new-form").reset();
-                syncPremioFields("rifa-new-premios-n", "data-premio-field");
-                syncNewFecha();
+                syncNuevaArchivo();
             } catch (e) {
                 showMessage(e.message || String(e), "error");
             } finally {
@@ -714,6 +767,27 @@
                 return;
             }
             const findP = (id) => hubProjects.find((p) => p.project_id === id) || { project_id: id };
+
+            const sorteoBtn = ev.target.closest("[data-sorteo-id]");
+            if (sorteoBtn) {
+                const p = findP(sorteoBtn.getAttribute("data-sorteo-id"));
+                const r = await pedirSorteo(p);
+                if (!r) return;
+                try {
+                    await api.post({
+                        action: "super_update_project",
+                        masterPin: pinActual(),
+                        project_id: p.project_id,
+                        modalidad: r.modalidad,
+                        fecha_sorteo: r.fecha
+                    });
+                    showMessage("Sorteo actualizado.", "success");
+                    void loadProjectsTable();
+                } catch (e) {
+                    showMessage(e.message || String(e), "error");
+                }
+                return;
+            }
 
             const vigBtn = ev.target.closest("[data-vigencia-id]");
             if (vigBtn) {
@@ -952,9 +1026,56 @@
         $("bn-i-wa-url").value = b.icons.whatsapp.url || "";
         $("bn-i-sinpe-url").value = b.icons.sinpe.url || "";
         $("bn-i-tomado-url").value = b.icons.tomado.url || "";
+        // Una sola letra para todo, salvo que el diseño guardado ya use letras distintas
+        const fuentes = new Set(TYPO_FONT_IDS.map((id) => $(id)?.value));
+        ensureFontSelectOptions($("bn-font-all"), ty.titulo.font);
+        $("bn-font-each").checked = fuentes.size > 1;
         syncHeadMode();
         syncIconUploadPanels();
+        syncCustomUi();
     }
+
+    const TYPO_FONT_IDS = ["bn-f-titulo", "bn-f-p1", "bn-f-p2", "bn-f-p3", "bn-f-precio", "bn-f-mod", "bn-f-wa", "bn-f-sinpe"];
+
+    /** Estado visual de «Personalizar»: botones elegidos, campos que aplican y valores en px. */
+    function syncCustomUi() {
+        const grad = !!$("bn-grad")?.checked;
+        document.querySelectorAll("[data-bg-modo]").forEach((b) => {
+            const on = (b.getAttribute("data-bg-modo") === "degradado") === grad;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-checked", String(on));
+        });
+        document.querySelectorAll("[data-solo-degradado]").forEach((el) => (el.hidden = !grad));
+        const bg1 = $("bn-bg1-label");
+        if (bg1) bg1.textContent = grad ? "Primer color" : "Color del fondo";
+
+        document.querySelectorAll("[data-sz-out]").forEach((o) => {
+            o.textContent = `${$(o.getAttribute("data-sz-out"))?.value || ""}`;
+        });
+        $("bn-sizes")?.classList.toggle("is-font-each", !!$("bn-font-each")?.checked);
+
+        const n = project?.cantidad_premios || 1;
+        document.querySelectorAll("[data-bn-premio]").forEach((el) => {
+            el.hidden = Number(el.getAttribute("data-bn-premio")) > n;
+        });
+
+        const url = $("bn-logo-url")?.value || "";
+        const thumb = $("bn-logo-thumb");
+        if (thumb) {
+            thumb.innerHTML = url ? `<img src="${escapeAttr(url)}" alt="Logotipo" />` : "<span>Sin logotipo</span>";
+        }
+        const clear = $("bn-logo-clear");
+        if (clear) clear.hidden = !url;
+        const pick = $("bn-logo-pick-label");
+        if (pick) pick.textContent = url ? "Cambiar imagen" : "Elegir imagen";
+
+        document.querySelectorAll("[data-icon-reset]").forEach((b) => {
+            const kind = b.getAttribute("data-icon-reset");
+            b.hidden = !$(ICON_URL_IDS[kind])?.value;
+        });
+    }
+
+    const ICON_URL_IDS = { whatsapp: "bn-i-wa-url", sinpe: "bn-i-sinpe-url", tomado: "bn-i-tomado-url" };
 
     function resetBannerToDefaults() {
         const base = defaultBanner();
@@ -972,18 +1093,36 @@
         const lw = $("bn-head-logo-wrap");
         if (tw) tw.hidden = modeH !== "text";
         if (lw) lw.hidden = modeH !== "logo";
+        document.querySelectorAll("[data-head-modo]").forEach((b) => {
+            const on = b.getAttribute("data-head-modo") === modeH;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-checked", String(on));
+        });
 
-        const tituloCell = document.querySelector('.rifa-typo-cell[data-typo="titulo"]');
+        const tituloCell = document.querySelector('.rf-size[data-typo="titulo"]');
         const label = $("bn-typo-titulo-label");
         const fontSel = $("bn-f-titulo");
-        const sizeInput = $("bn-sz-titulo");
         const isLogo = modeH === "logo";
         if (tituloCell) tituloCell.classList.toggle("is-logo-mode", isLogo);
-        if (label) label.textContent = isLogo ? "Logo (altura)" : "Título";
+        if (label) label.textContent = isLogo ? "Alto del logotipo" : "Encabezado";
         if (fontSel) fontSel.hidden = isLogo;
-        if (sizeInput) {
-            sizeInput.title = isLogo ? "Altura del logotipo en px" : "Tamaño de tipografía en px";
+        // El color del encabezado no aplica a un logotipo
+        const colorTitulo = $("bn-c-titulo-wrap");
+        if (colorTitulo) colorTitulo.hidden = isLogo;
+    }
+
+    function setHeadMode(modeH) {
+        const sizeEl = $("bn-sz-titulo");
+        // Al pasar a logo, si el tamaño sigue siendo el de texto por defecto, usar altura típica de logo
+        if (modeH === "logo" && sizeEl && Number(sizeEl.value) === 56) {
+            sizeEl.value = "160";
+        } else if (modeH === "text" && sizeEl && Number(sizeEl.value) === 160) {
+            sizeEl.value = "56";
         }
+        $("bn-head-mode").value = modeH;
+        syncHeadMode();
+        syncCustomUi();
+        refreshBannerPreview();
     }
 
     function readTypographyFromForm() {
@@ -1206,6 +1345,9 @@
         stage.style.width = "auto";
         stage.style.height = "auto";
         stage.style.overflow = "visible";
+        // Copia pequeña que acompaña mientras se baja por «Personalizar»
+        const mini = $("bn-mini-preview");
+        if (mini && $("rf-banner-advanced")?.open) mini.innerHTML = buildBannerHtml(b, false, 0.1);
     }
 
     async function uploadImageToImgBB(file) {
@@ -1701,7 +1843,7 @@
     async function generarBannerBlob() {
         if (bannerBusy) throw new Error("La imagen ya se está generando.");
         bannerBusy = true;
-        const buttons = Array.from(document.querySelectorAll(".rifa-btn-banner-dl, #rf-share-both"));
+        const buttons = Array.from(document.querySelectorAll('[data-share-act="both"], [data-share-act="download"]'));
         buttons.forEach((btn) => (btn.disabled = true));
         showMessage("Creando la imagen…", "info");
         let canvas = null;
@@ -1807,7 +1949,7 @@
     const MSG_DEFAULTS = {
         saludo: "¡Hola! Les comparto mi rifa 🎉",
         despedida: "¡Gracias por apoyar! 🙏",
-        incluir: { premios: true, precio: true, sorteo: true, libres: true, vendidos: false, pago: true, contacto: true }
+        incluir: { premios: true, precio: true, sorteo: true, libres: false, vendidos: false, pago: true, contacto: true }
     };
 
     /** Lo que guardamos dentro de banner_json además del diseño: estilo, asistente y mensaje. */
@@ -1819,6 +1961,7 @@
     let wzStep = 0;
     let wzPremios = 1;
     let wzTheme = "claro";
+    let wzObligatorio = false;
     let adminWired = false;
 
     function extrasDe(raw) {
@@ -2346,9 +2489,8 @@
     }
 
     async function compartirImagenYMensaje() {
-        const btn = $("rf-share-both");
+        if (bannerBusy) return;
         const text = $("rf-msg-text")?.value || "";
-        if (btn) btn.disabled = true;
         try {
             // Crear la imagen toma unos segundos y el iPhone ya no deja compartir al terminar:
             // se muestra lista y el siguiente toque es el que comparte.
@@ -2357,8 +2499,6 @@
             openBannerResult(blob, nombreArchivoImagen(), text);
         } catch (e) {
             showMessage(e.message || String(e), "error");
-        } finally {
-            if (btn) btn.disabled = false;
         }
     }
 
@@ -2494,14 +2634,13 @@
         $("cfg-premio1").value = project.premio_1 || "";
         $("cfg-premio2").value = project.premio_2 || "";
         $("cfg-premio3").value = project.premio_3 || "";
-        $("cfg-modalidad").value = project.modalidad || "Chances";
-        $("cfg-fecha").value = (project.fecha_sorteo || "").slice(0, 10);
+        // El sorteo solo se elige en el asistente de primer uso; aquí se muestra sin poder cambiarlo.
+        const sorteo = $("cfg-sorteo-txt");
+        if (sorteo) sorteo.textContent = configIncompleta(project) ? "Se elige al configurar la rifa." : textoSorteo() || "—";
         $("cfg-whatsapp").value = project.whatsapp || "";
         $("cfg-sinpe").value = project.sinpe || "";
         $("cfg-precio").value = formatColonPrice(project.precio || "");
         syncPremioFields("cfg-premios-n", "data-cfg-premio");
-        const hint = $("cfg-fecha-hint");
-        if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
         const rngTab = $("rifa-tab-rng");
         if (rngTab) rngTab.hidden = project.modalidad !== "RNG";
         wirePrecioInput($("cfg-precio"));
@@ -2547,32 +2686,57 @@
     }
 
     function wzModalidad() {
-        return document.querySelector('input[name="wz-modalidad"]:checked')?.value || "Chances";
+        return document.querySelector('input[name="wz-modalidad"]:checked')?.value || "";
+    }
+
+    /** Mismas reglas de fecha que tenía el creador del hub, más la fecha en que se archiva la rifa. */
+    function wzErrorFecha(f) {
+        const mod = wzModalidad();
+        if (!mod) return "Elija con qué juega el sorteo.";
+        if (!f) return "Elija la fecha del sorteo.";
+        const err = validateFechaModalidad(mod, f);
+        if (err) return err;
+        if (f < hoyIso()) return "La fecha del sorteo ya pasó. Elija una fecha de hoy en adelante.";
+        const archivo = project?.fecha_archivo || "";
+        if (archivo && f > archivo) {
+            return `La fecha del sorteo debe ser a más tardar el ${formatFechaLargaEs(archivo).toLowerCase()}, porque ese día se archiva la rifa.`;
+        }
+        return "";
     }
 
     function wzSyncFecha() {
         const hint = $("wz-fecha-hint");
         if (!hint) return;
         const f = $("wz-fecha").value;
-        const err = f ? validateFechaModalidad(wzModalidad(), f) : "";
-        hint.textContent = err || fechaHint(wzModalidad());
+        const err = f && wzModalidad() ? wzErrorFecha(f) : "";
+        hint.textContent = err || (wzModalidad() ? fechaHint(wzModalidad()) : "Primero elija con qué juega el sorteo.");
         hint.classList.toggle("is-error", !!err);
+        const nota = $("wz-archivo-note");
+        if (nota) {
+            const archivo = project?.fecha_archivo || "";
+            nota.hidden = !archivo;
+            if (archivo) nota.textContent = `📅 Su rifa está activa hasta el ${formatFechaLargaEs(archivo).toLowerCase()}. El sorteo debe ser ese día o antes.`;
+        }
     }
 
     /** Lo escrito en el asistente, con la forma que espera update_config. */
     function wzCfg() {
-        return {
+        const cfg = {
             nombre_display: $("wz-nombre").value.trim(),
             cantidad_premios: wzPremios,
             premio_1: $("wz-premio1").value.trim(),
             premio_2: wzPremios >= 2 ? $("wz-premio2").value.trim() : "",
             premio_3: wzPremios >= 3 ? $("wz-premio3").value.trim() : "",
             precio: formatColonPrice($("wz-precio").value.trim()),
-            modalidad: wzModalidad(),
-            fecha_sorteo: $("wz-fecha").value,
             sinpe: $("wz-sinpe").value.trim(),
             whatsapp: $("wz-whatsapp").value.trim()
         };
+        // El sorteo solo se manda en la configuración de primer uso; después queda fijo.
+        if (wzObligatorio) {
+            cfg.modalidad = wzModalidad();
+            cfg.fecha_sorteo = $("wz-fecha").value;
+        }
+        return cfg;
     }
 
     function wzPreview() {
@@ -2592,15 +2756,23 @@
     }
 
     function wzFill() {
+        // Rifa recién creada desde el hub: lo guardado son valores de relleno, se empieza en blanco.
+        const nueva = String(project?.premio_1 || "").trim() === PREMIO_PENDIENTE;
         $("wz-nombre").value = project?.nombre_display && project.nombre_display !== project.sheet_name ? project.nombre_display : "";
         wzPremios = Math.min(3, Math.max(1, Number(project?.cantidad_premios) || 1));
-        $("wz-premio1").value = project?.premio_1 && project.premio_1 !== "Premio" ? project.premio_1 : "";
+        $("wz-premio1").value = project?.premio_1 && project.premio_1 !== "Premio" && !nueva ? project.premio_1 : "";
         $("wz-premio2").value = project?.premio_2 || "";
         $("wz-premio3").value = project?.premio_3 || "";
-        $("wz-precio").value = project?.precio ? formatColonPrice(project.precio) : "";
-        const mod = project?.modalidad || "Chances";
+        $("wz-precio").value = String(project?.precio || "").replace(/\D/g, "") ? formatColonPrice(project.precio) : "";
+        const mod = nueva ? "" : project?.modalidad || "";
         document.querySelectorAll('input[name="wz-modalidad"]').forEach((r) => (r.checked = r.value === mod));
-        $("wz-fecha").value = (project?.fecha_sorteo || "").slice(0, 10);
+        $("wz-fecha").value = nueva ? "" : (project?.fecha_sorteo || "").slice(0, 10);
+        $("wz-fecha").min = hoyIso();
+        if (project?.fecha_archivo) $("wz-fecha").max = project.fecha_archivo;
+        $("wz-sorteo-edit").hidden = !wzObligatorio;
+        $("wz-sorteo-warn").hidden = !wzObligatorio;
+        $("wz-sorteo-locked").hidden = wzObligatorio;
+        $("wz-sorteo-txt").textContent = textoSorteo() || "—";
         $("wz-sinpe").value = project?.sinpe || "";
         $("wz-whatsapp").value = project?.whatsapp || "";
         wzTheme = bannerExtras.theme || "claro";
@@ -2621,7 +2793,8 @@
         $("rf-wz-bar").style.width = `${Math.round((wzStep / WZ_LAST) * 100)}%`;
         $("rf-wz-step").textContent = wzStep === 0 ? "Bienvenida" : wzStep === WZ_LAST ? "¡Listo!" : `Paso ${wzStep} de ${WZ_LAST - 1}`;
         $("rf-wz-back").hidden = wzStep === 0 || wzStep === WZ_LAST;
-        $("rf-wz-skip").hidden = wzStep !== 0;
+        // Mientras falten datos de la rifa el asistente no se puede saltar
+        $("rf-wz-skip").hidden = wzStep !== 0 || wzObligatorio;
         $("rf-wz-next").textContent = wzStep === 0 ? "Empezar" : wzStep === WZ_LAST - 1 ? "Guardar y terminar" : wzStep === WZ_LAST ? "Ir a mis números" : "Siguiente";
         $("rf-wz-error").textContent = "";
         if (wzStep === 5) wzPreview();
@@ -2642,8 +2815,7 @@
         }
         if (step === 3) {
             if (!v("wz-precio").replace(/[^\d]/g, "")) return "Escriba el precio de cada número.";
-            if (!v("wz-fecha")) return "Elija la fecha del sorteo.";
-            const err = validateFechaModalidad(wzModalidad(), v("wz-fecha"));
+            const err = wzObligatorio ? wzErrorFecha(v("wz-fecha")) : "";
             if (err) return err;
         }
         if (step === 4 && v("wz-sinpe").replace(/[^\d]/g, "").length < 8) return "Escriba el número de SINPE Móvil (8 dígitos).";
@@ -2685,6 +2857,7 @@
     }
 
     function abrirAsistente() {
+        wzObligatorio = configIncompleta(project);
         wzFill();
         $("rf-wizard").hidden = false;
         document.body.classList.add("rf-modal-open");
@@ -2812,19 +2985,21 @@
         $("rifa-lista-guardar")?.addEventListener("click", () => void guardarListaCompleta());
 
         // Compartir
-        document.querySelectorAll(".rifa-btn-banner-dl").forEach((btn) => {
-            btn.addEventListener("click", () => void descargarBannerJpg());
+        // Los mismos cuatro botones van al inicio y al final de «Compartir»
+        document.querySelectorAll("[data-share-act]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const act = btn.getAttribute("data-share-act");
+                if (act === "both") void compartirImagenYMensaje();
+                else if (act === "download") void descargarBannerJpg();
+                else if (act === "copy") void copiarTexto($("rf-msg-text").value, "Mensaje copiado. Péguelo en el chat o grupo.");
+                else if (act === "wa") window.open(`https://wa.me/?text=${encodeURIComponent($("rf-msg-text").value)}`, "_blank", "noopener");
+            });
         });
         ["rf-msg-saludo", "rf-msg-despedida"].forEach((id) => $(id)?.addEventListener("input", () => renderMensaje(true)));
         document.querySelectorAll("[data-msg]").forEach((c) => c.addEventListener("change", () => renderMensaje(true)));
         $("rf-msg-text")?.addEventListener("input", () => {
             msgTocado = true;
         });
-        $("rf-msg-copy")?.addEventListener("click", () => void copiarTexto($("rf-msg-text").value, "Mensaje copiado. Péguelo en el chat o grupo."));
-        $("rf-msg-wa")?.addEventListener("click", () => {
-            window.open(`https://wa.me/?text=${encodeURIComponent($("rf-msg-text").value)}`, "_blank", "noopener");
-        });
-        $("rf-share-both")?.addEventListener("click", () => void compartirImagenYMensaje());
         $("rf-msg-save")?.addEventListener("click", async () => {
             const o = opcionesMensaje();
             try {
@@ -2835,17 +3010,29 @@
             }
         });
 
-        // Diseño avanzado del afiche
-        $("bn-head-mode")?.addEventListener("change", () => {
-            const modeH = $("bn-head-mode")?.value;
-            const sizeEl = $("bn-sz-titulo");
-            // Al pasar a logo, si el tamaño sigue siendo el de texto por defecto, usar altura típica de logo
-            if (modeH === "logo" && sizeEl && Number(sizeEl.value) === 56) {
-                sizeEl.value = "160";
-            } else if (modeH === "text" && sizeEl && Number(sizeEl.value) === 160) {
-                sizeEl.value = "56";
+        // Personalizar la imagen
+        document.querySelectorAll("[data-bg-modo]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                $("bn-grad").checked = btn.getAttribute("data-bg-modo") === "degradado";
+                syncCustomUi();
+                refreshBannerPreview();
+            });
+        });
+        document.querySelectorAll("[data-head-modo]").forEach((btn) => {
+            btn.addEventListener("click", () => setHeadMode(btn.getAttribute("data-head-modo")));
+        });
+        $("bn-font-all")?.addEventListener("change", () => {
+            const v = $("bn-font-all").value;
+            TYPO_FONT_IDS.forEach((id) => ensureFontSelectOptions($(id), v));
+            refreshBannerPreview();
+        });
+        $("bn-font-each")?.addEventListener("change", () => {
+            // Al volver a «una sola letra», todos los textos toman la elegida arriba
+            if (!$("bn-font-each").checked) {
+                const v = $("bn-font-all").value;
+                TYPO_FONT_IDS.forEach((id) => ensureFontSelectOptions($(id), v));
             }
-            syncHeadMode();
+            syncCustomUi();
             refreshBannerPreview();
         });
         ["bn-i-wa", "bn-i-sinpe", "bn-i-tomado"].forEach((id) => {
@@ -2854,46 +3041,65 @@
                 refreshBannerPreview();
             });
         });
-        $("rifa-banner-form")?.addEventListener("input", () => refreshBannerPreview());
+        $("rifa-banner-form")?.addEventListener("input", () => {
+            syncCustomUi();
+            refreshBannerPreview();
+        });
         $("rifa-banner-form")?.addEventListener("change", () => refreshBannerPreview());
         syncIconUploadPanels();
 
-        $("bn-logo-upload")?.addEventListener("click", async () => {
-            const file = $("bn-logo-file")?.files?.[0];
-            if (!file) {
-                showMessage("Selecciona una imagen primero.", "error");
-                return;
-            }
+        // Al elegir el archivo se sube solo: no hay un segundo botón «Subir»
+        $("bn-logo-file")?.addEventListener("change", async () => {
+            const input = $("bn-logo-file");
+            const file = input?.files?.[0];
+            if (!file) return;
+            const status = $("bn-logo-status");
+            const textoInicial = status?.textContent || "";
+            if (status) status.textContent = "Subiendo el logotipo…";
             try {
-                const url = await uploadImageToImgBB(file);
-                $("bn-logo-url").value = url;
+                $("bn-logo-url").value = await uploadImageToImgBB(file);
+                syncCustomUi();
                 refreshBannerPreview();
-                showMessage("Logo subido.", "success");
+                showMessage("Logotipo listo. Toque «Guardar diseño» para conservarlo.", "success");
             } catch (e) {
                 showMessage(e.message || String(e), "error");
+            } finally {
+                if (status) status.textContent = textoInicial;
+                input.value = "";
             }
         });
+        $("bn-logo-clear")?.addEventListener("click", () => {
+            $("bn-logo-url").value = "";
+            syncCustomUi();
+            refreshBannerPreview();
+        });
 
-        document.querySelectorAll("[data-icon-upload]").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-                const kind = btn.getAttribute("data-icon-upload");
-                const fileEl = $(kind === "whatsapp" ? "bn-i-wa-file" : kind === "sinpe" ? "bn-i-sinpe-file" : "bn-i-tomado-file");
-                const urlEl = $(kind === "whatsapp" ? "bn-i-wa-url" : kind === "sinpe" ? "bn-i-sinpe-url" : "bn-i-tomado-url");
-                const file = fileEl?.files?.[0];
-                if (!file) {
-                    showMessage("Selecciona una imagen.", "error");
-                    return;
-                }
+        document.querySelectorAll("[data-icon-file]").forEach((input) => {
+            input.addEventListener("change", async () => {
+                const kind = input.getAttribute("data-icon-file");
+                const file = input.files?.[0];
+                if (!file) return;
+                showMessage("Subiendo el ícono…", "info");
                 try {
-                    const url = await uploadImageToImgBB(file);
-                    if (urlEl) urlEl.value = url;
+                    $(ICON_URL_IDS[kind]).value = await uploadImageToImgBB(file);
+                    syncCustomUi();
                     refreshBannerPreview();
-                    showMessage("Icono subido.", "success");
+                    showMessage("Ícono listo. Toque «Guardar diseño» para conservarlo.", "success");
                 } catch (e) {
                     showMessage(e.message || String(e), "error");
+                } finally {
+                    input.value = "";
                 }
             });
         });
+        document.querySelectorAll("[data-icon-reset]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                $(ICON_URL_IDS[btn.getAttribute("data-icon-reset")]).value = "";
+                syncCustomUi();
+                refreshBannerPreview();
+            });
+        });
+        $("rf-banner-advanced")?.addEventListener("toggle", () => refreshBannerPreview());
 
         $("rifa-banner-save")?.addEventListener("click", async () => {
             try {
@@ -2911,19 +3117,8 @@
 
         // Ajustes
         $("cfg-premios-n")?.addEventListener("change", () => syncPremioFields("cfg-premios-n", "data-cfg-premio"));
-        $("cfg-modalidad")?.addEventListener("change", () => {
-            const hint = $("cfg-fecha-hint");
-            if (hint) hint.textContent = fechaHint($("cfg-modalidad").value);
-        });
         $("rifa-config-form")?.addEventListener("submit", async (ev) => {
             ev.preventDefault();
-            const modalidad = $("cfg-modalidad").value;
-            const fecha = $("cfg-fecha").value;
-            const err = validateFechaModalidad(modalidad, fecha);
-            if (err) {
-                showMessage(err, "error");
-                return;
-            }
             if (!$("cfg-nombre").value.trim()) {
                 showMessage("La rifa requiere un nombre.", "error");
                 return;
@@ -2937,8 +3132,6 @@
                         premio_1: $("cfg-premio1").value.trim(),
                         premio_2: cantidad >= 2 ? $("cfg-premio2").value.trim() : "",
                         premio_3: cantidad >= 3 ? $("cfg-premio3").value.trim() : "",
-                        modalidad,
-                        fecha_sorteo: fecha,
                         whatsapp: $("cfg-whatsapp").value.trim(),
                         sinpe: $("cfg-sinpe").value.trim(),
                         precio: formatColonPrice($("cfg-precio").value.trim())
@@ -3018,7 +3211,7 @@
             renderLista();
             showAdTab("numeros");
             finalizeSplash(true);
-            if (!bannerExtras.setup?.done) abrirAsistente();
+            if (!bannerExtras.setup?.done || configIncompleta(project)) abrirAsistente();
         } catch (e) {
             finalizeSplash(false);
             const splash = $("rifa-splash");
