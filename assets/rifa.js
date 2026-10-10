@@ -1225,20 +1225,6 @@
         return json.data.url;
     }
 
-    function loadHtml2Canvas() {
-        return new Promise((resolve, reject) => {
-            if (window.html2canvas) {
-                resolve(window.html2canvas);
-                return;
-            }
-            const s = document.createElement("script");
-            s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-            s.onload = () => resolve(window.html2canvas);
-            s.onerror = () => reject(new Error("No se pudo cargar html2canvas."));
-            document.head.appendChild(s);
-        });
-    }
-
     /** En móvil el <a download> con data: URL no guarda nada: se usa overlay + Web Share. */
     function isMobileLike() {
         if (typeof navigator === "undefined") return false;
@@ -1301,7 +1287,9 @@
                     c.width = img.naturalWidth || 1080;
                     c.height = img.naturalHeight || 1920;
                     c.getContext("2d").drawImage(img, 0, 0);
-                    canvasToBlob(c, "image/png").then(resolve, reject);
+                    canvasToBlob(c, "image/png")
+                        .then(resolve, reject)
+                        .finally(() => (c.width = c.height = 0));
                 } catch (e) {
                     reject(e);
                 }
@@ -1454,37 +1442,277 @@
         return `Rifa_${base || "numeros"}.jpg`;
     }
 
-    /** Dibuja el afiche a 1080×1920 fuera de pantalla y lo devuelve como JPG. */
+    /** Carga una imagen para el canvas; si falla o tarda, se omite en vez de trabar todo. */
+    function cargarImagen(src) {
+        return new Promise((resolve) => {
+            if (!src) {
+                resolve(null);
+                return;
+            }
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            let listo = false;
+            const fin = (ok) => {
+                if (listo) return;
+                listo = true;
+                clearTimeout(t);
+                resolve(ok && img.naturalWidth ? img : null);
+            };
+            const t = setTimeout(() => fin(false), 8000);
+            img.onload = () => fin(true);
+            img.onerror = () => fin(false);
+            img.src = src;
+        });
+    }
+
+    /** Espera las fuentes del afiche, con tope: sin ellas se dibuja con la de respaldo. */
+    function cargarFuentes(specs) {
+        if (!document.fonts || typeof document.fonts.load !== "function") return Promise.resolve();
+        const todas = Promise.all(specs.map((s) => document.fonts.load(s).catch(() => null)));
+        return Promise.race([todas, new Promise((r) => setTimeout(r, 4000))]);
+    }
+
+    /** Parte el texto en líneas que caben en `ancho` (como word-break: break-word). */
+    function partirLineas(ctx, texto, ancho) {
+        const out = [];
+        String(texto || "")
+            .split("\n")
+            .forEach((par) => {
+                let linea = "";
+                par.split(/\s+/)
+                    .filter(Boolean)
+                    .forEach((pal) => {
+                        const prueba = linea ? linea + " " + pal : pal;
+                        if (!linea || ctx.measureText(prueba).width <= ancho) {
+                            linea = prueba;
+                        } else {
+                            out.push(linea);
+                            linea = pal;
+                        }
+                        // Palabra más ancha que el espacio: se corta por letras
+                        while (linea.length > 1 && ctx.measureText(linea).width > ancho) {
+                            let i = linea.length - 1;
+                            while (i > 1 && ctx.measureText(linea.slice(0, i)).width > ancho) i--;
+                            out.push(linea.slice(0, i));
+                            linea = linea.slice(i);
+                        }
+                    });
+                out.push(linea);
+            });
+        return out;
+    }
+
+    /** Equivalente a object-fit: contain dentro de la caja (x, y, w, h). */
+    function dibujarContenida(ctx, img, x, y, w, h) {
+        const r = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        const dw = img.naturalWidth * r;
+        const dh = img.naturalHeight * r;
+        ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+    }
+
+    function rectRedondeado(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+
+    /** Degradado con la misma dirección que el CSS (to bottom, to right o grados). */
+    function fondoBanner(ctx, b, W, H) {
+        if (!b.bg.gradient) return b.bg.color1;
+        const o = String(b.bg.orient || "to bottom").trim();
+        let deg = 180;
+        if (o === "to right") deg = 90;
+        else if (o === "to left") deg = 270;
+        else if (o === "to top") deg = 0;
+        else if (/^-?\d+(\.\d+)?deg$/.test(o)) deg = parseFloat(o);
+        const a = (deg * Math.PI) / 180;
+        const dx = Math.sin(a);
+        const dy = -Math.cos(a);
+        const half = (Math.abs(W * dx) + Math.abs(H * dy)) / 2;
+        const cx = W / 2;
+        const cy = H / 2;
+        const g = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+        g.addColorStop(0, b.bg.color1);
+        g.addColorStop(1, b.bg.color2);
+        return g;
+    }
+
+    /**
+     * Dibuja el afiche 1080×1920 directo en un canvas, con el mismo diseño que la vista previa.
+     * Antes se fotografiaba el HTML con html2canvas, pero en el iPhone esa copia a veces se
+     * quedaba esperando para siempre y el botón no volvía a responder hasta cerrar la pestaña.
+     */
+    async function dibujarBanner(b) {
+        const W = 1080;
+        const H = 1920;
+        const INNER = 1000;
+        const n = project?.cantidad_premios || 1;
+        const tTitulo = typoOf(b, "titulo");
+        const tPrecio = typoOf(b, "precio");
+        const tMod = typoOf(b, "modalidadFecha");
+        const tWa = typoOf(b, "whatsapp");
+        const tSinpe = typoOf(b, "sinpe");
+        const baseFont = tTitulo.font || b.font || "Inter, sans-serif";
+
+        const premios = [];
+        [1, 2, 3].forEach((i) => {
+            const t = project?.[`premio_${i}`];
+            if (n >= i && t) {
+                premios.push({ txt: `${premioLabel(i)}: ${t}`, c: b.textColors[`premio${i}`], typo: typoOf(b, `premio${i}`) });
+            }
+        });
+
+        const usaLogo = b.head.mode === "logo" && b.head.logoUrl;
+        const [logo, icoWa, icoSinpe, icoTomado] = await Promise.all([
+            usaLogo ? cargarImagen(b.head.logoUrl) : null,
+            b.icons.whatsapp.enabled ? cargarImagen(b.icons.whatsapp.url || DEFAULT_ICON.whatsapp) : null,
+            b.icons.sinpe.enabled ? cargarImagen(b.icons.sinpe.url || DEFAULT_ICON.sinpe) : null,
+            b.icons.tomado.enabled ? cargarImagen(b.icons.tomado.url || DEFAULT_ICON.tomado) : null,
+            cargarFuentes([
+                `700 ${tTitulo.size}px ${tTitulo.font}`,
+                `700 26px ${baseFont}`,
+                `700 ${tPrecio.size}px ${tPrecio.font}`,
+                `400 ${tMod.size}px ${tMod.font}`,
+                `400 ${tWa.size}px ${tWa.font}`,
+                `400 ${tSinpe.size}px ${tSinpe.font}`,
+                ...premios.map((p) => `700 ${p.typo.size}px ${p.typo.font}`)
+            ])
+        ]);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext("2d");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const fuente = (peso, t) => `${peso} ${t.size}px ${t.font}`;
+
+        // Cada bloque mide su alto primero; luego todo se centra en vertical como el flex del HTML.
+        const bloques = [];
+        const texto = (txt, t, peso, color, lh, mt, mb) => {
+            ctx.font = fuente(peso, t);
+            const lineas = partirLineas(ctx, txt, INNER);
+            const alto = lineas.length * t.size * lh;
+            bloques.push({
+                h: mt + alto + mb,
+                draw(y) {
+                    ctx.font = fuente(peso, t);
+                    ctx.fillStyle = color;
+                    lineas.forEach((l, i) => ctx.fillText(l, W / 2, y + mt + (i + 0.5) * t.size * lh));
+                }
+            });
+        };
+        const fila = (txt, t, ico, color, mt) => {
+            const alto = Math.max(ico ? t.size : 0, t.size * 1.2);
+            bloques.push({
+                h: mt + alto,
+                draw(y) {
+                    ctx.font = fuente(400, t);
+                    ctx.fillStyle = color;
+                    const tw = ctx.measureText(txt).width;
+                    const total = (ico ? t.size + 12 : 0) + tw;
+                    let x = (W - total) / 2;
+                    const cy = y + mt + alto / 2;
+                    if (ico) {
+                        dibujarContenida(ctx, ico, x, cy - t.size / 2, t.size, t.size);
+                        x += t.size + 12;
+                    }
+                    ctx.textAlign = "left";
+                    ctx.fillText(txt, x, cy);
+                    ctx.textAlign = "center";
+                }
+            });
+        };
+
+        // Encabezado: logotipo o título
+        if (usaLogo) {
+            const h = tTitulo.size;
+            bloques.push({
+                h: h + 16,
+                draw(y) {
+                    if (!logo) return;
+                    const w = Math.min(420, (logo.naturalWidth / logo.naturalHeight) * h);
+                    dibujarContenida(ctx, logo, (W - w) / 2, y, w, h);
+                }
+            });
+        } else {
+            const title = b.head.title || project?.nombre_display || project?.sheet_name || "Rifa";
+            texto(title, tTitulo, 700, b.textColors.titulo || "#FFFFFF", 1.15, 0, 16);
+        }
+
+        // Premios (separados 4 px, con 12 px antes de la cuadrícula)
+        premios.forEach((p, i) =>
+            texto(p.txt, p.typo, 700, p.c, 1.2, 4, i === premios.length - 1 ? 4 + 12 : 0)
+        );
+        if (!premios.length) bloques.push({ h: 12, draw() {} });
+
+        // Cuadrícula 10×10
+        const GAP = 6;
+        const celda = (INNER - GAP * 9) / 10;
+        bloques.push({
+            h: 12 + INNER + 20,
+            draw(y) {
+                const x0 = (W - INNER) / 2;
+                const y0 = y + 12;
+                ctx.font = `700 26px ${baseFont}`;
+                for (let i = 0; i < 100; i++) {
+                    const num = String(i).padStart(2, "0");
+                    const info = datos[num] || { estado: "Disponible" };
+                    const taken = info.estado === "Reservado" || info.estado === "Pagado";
+                    const x = x0 + (i % 10) * (celda + GAP);
+                    const yy = y0 + Math.floor(i / 10) * (celda + GAP);
+                    ctx.fillStyle = taken ? b.numberColors.tomadoBg : b.numberColors.disponibleBg;
+                    rectRedondeado(ctx, x, yy, celda, celda, 6);
+                    ctx.fill();
+                    if (taken && b.icons.tomado.enabled) {
+                        if (icoTomado) dibujarContenida(ctx, icoTomado, x + celda * 0.15, yy + celda * 0.15, celda * 0.7, celda * 0.7);
+                        continue;
+                    }
+                    ctx.fillStyle = taken ? b.numberColors.tomadoText : b.numberColors.disponibleText;
+                    ctx.fillText(taken ? "ø" : num, x + celda / 2, yy + celda / 2);
+                }
+            }
+        });
+        bloques.push({ h: 28, draw() {} });
+
+        // Precio, modalidad y fecha, WhatsApp y SINPE
+        const fechaLarga = formatFechaLargaEs(project?.fecha_sorteo || "");
+        texto(`Precio: ${formatColonPrice(project?.precio || "")}`, tPrecio, 700, b.textColors.costo, 1.2, 8, 0);
+        texto(`${project?.modalidad || ""}${fechaLarga ? ": " + fechaLarga : ""}`, tMod, 400, b.textColors.modalidadFecha, 1.25, 8, 0);
+        fila(project?.whatsapp || "", tWa, icoWa, b.textColors.whatsapp, 12);
+        fila(project?.sinpe || "", tSinpe, icoSinpe, b.textColors.sinpe, 8);
+
+        ctx.fillStyle = fondoBanner(ctx, b, W, H);
+        ctx.fillRect(0, 0, W, H);
+        const total = bloques.reduce((s, x) => s + x.h, 0);
+        let y = 40 + (H - 40 - 48 - total) / 2;
+        bloques.forEach((x) => {
+            x.draw(y);
+            y += x.h;
+        });
+        return canvas;
+    }
+
+    /** Dibuja el afiche a 1080×1920 y lo devuelve como JPG. */
     async function generarBannerBlob() {
         if (bannerBusy) throw new Error("La imagen ya se está generando.");
-        const root = $("rifa-capture-root");
-        if (!root) throw new Error("No se pudo preparar la imagen.");
-        root.innerHTML = buildBannerHtml(readBannerFromForm(), true);
-        root.style.cssText =
-            "position:fixed;left:-10000px;top:0;width:1080px;height:1920px;overflow:visible;z-index:-1;pointer-events:none;";
-        const target = root.querySelector("[data-rifa-banner-root]") || root.firstElementChild;
         bannerBusy = true;
         const buttons = Array.from(document.querySelectorAll(".rifa-btn-banner-dl, #rf-share-both"));
         buttons.forEach((btn) => (btn.disabled = true));
         showMessage("Creando la imagen…", "info");
+        let canvas = null;
         try {
-            const html2canvas = await loadHtml2Canvas();
-            const canvas = await html2canvas(target, {
-                width: 1080,
-                height: 1920,
-                windowWidth: 1080,
-                windowHeight: 1920,
-                scale: 1,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: null,
-                logging: false
-            });
+            canvas = await dibujarBanner(readBannerFromForm());
             return await canvasToBlob(canvas, "image/jpeg", 0.92);
         } finally {
+            // El iPhone limita la memoria total de los canvas: se libera en cuanto hay JPG.
+            if (canvas) canvas.width = canvas.height = 0;
             buttons.forEach((btn) => (btn.disabled = false));
             bannerBusy = false;
-            root.innerHTML = "";
         }
     }
 
