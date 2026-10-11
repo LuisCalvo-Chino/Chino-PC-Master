@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-10T09:20:00-06:00",
+    "actualizado": "2026-10-11T01:15:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -35,51 +35,84 @@
     ],
     "parches": [
         {
-            "id": "2026-10-10-rifa",
-            "fecha": "2026-10-10T09:20:00-06:00",
-            "producto": "rifa",
-            "titulo": "Cada cliente configura su rifa y compartir queda a un toque",
-            "resumen": "La rifa nueva se crea solo con su nombre interno y su fecha de archivado: el cliente completa premios, precio, sorteo y pagos en el asistente. Compartir tiene sus botones al inicio y al final, el editor de la imagen es sencillo y la imagen se genera las veces que se quiera, también en iPhone.",
+            "id": "2026-10-10-rifa-sitio",
+            "fecha": "2026-10-11T01:15:00-06:00",
+            "producto": [
+                "rifa",
+                "sitio"
+            ],
+            "titulo": "Rifas Digitales al alcance de todos: su rifa por ₡2 500",
+            "resumen": "Cada cliente configura su propia rifa con un asistente, el sorteo queda fijo y se archiva una semana después. Compartir queda a un toque y la imagen funciona en el iPhone. En el sitio, Rifas Digitales pasa al menú principal y al frente del Inicio, con su precio y el WhatsApp para pedirla.",
             "cambios": [
                 {
                     "tipo": "corregido",
+                    "producto": "rifa",
                     "texto": "En el iPhone (Safari y Chrome), la imagen solo salía bien la primera vez: después había que cerrar la pestaña. Ahora se puede cerrar, cambiar algo y volver a generarla cuantas veces se quiera, y queda lista en uno o dos segundos."
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "Crear una rifa ahora pide solo el nombre de la hoja y cuándo se archiva. Los premios, el precio, el sorteo, el SINPE y el WhatsApp los completa el cliente en el asistente, que se abre la primera vez y no se puede saltar hasta terminarlo."
+                    "producto": "rifa",
+                    "texto": "Cada cliente configura su rifa: el asistente se abre la primera vez que entra a su enlace, le pide los premios, el precio, el sorteo, el SINPE y el WhatsApp, y no se puede saltar hasta terminarlo."
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "El asistente avisa con un recuadro visible que el sorteo (con qué juega y la fecha) queda fijo, no deja elegir una fecha que ya pasó y pide que el sorteo sea a más tardar el día en que se archiva la rifa."
+                    "producto": "rifa",
+                    "texto": "El asistente avisa con un recuadro visible que el sorteo (con qué juega y la fecha) queda fijo, y no deja elegir una fecha que ya pasó ni una que no corresponda a la modalidad."
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "En Ajustes, el sorteo se muestra fijo con el aviso de pedírselo a Chino PC Master para cambiarlo. Desde el panel de administración se puede cambiar cuando el cliente lo solicite."
+                    "producto": "rifa",
+                    "texto": "En Ajustes, el sorteo se muestra fijo con el aviso de pedirle el cambio a Chino PC Master, quien lo puede cambiar desde el panel de administración."
                 },
                 {
                     "tipo": "nuevo",
+                    "producto": "rifa",
+                    "texto": "Archivado automático: la rifa se archiva una semana después del sorteo que elija el cliente, o queda sin fecha. Si el sorteo se cambia, el archivado se mueve con él."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "rifa",
                     "texto": "En «Compartir», los botones «Compartir imagen y mensaje», «Descargar imagen», «Enviar solo texto por WhatsApp» y «Copiar mensaje» están al inicio y al final, para enviar la rifa en un toque."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "rifa",
                     "texto": "«Números libres» y «Números vendidos» vienen sin marcar en el mensaje: la imagen ya los muestra."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "rifa",
                     "texto": "«Personalizar colores, letras y logotipo» se destaca a la vista y se usa por pasos: fondo de uno o dos colores, nombre o logotipo, un tipo de letra para todo (o uno por texto), tamaños con una barra, colores con muestras grandes e íconos. Una vista previa pequeña acompaña mientras se baja, y el logotipo se sube con solo elegir la imagen."
                 },
                 {
                     "tipo": "mejorado",
+                    "producto": "rifa",
                     "texto": "En Compradores, «Ver todos los números en cuadrícula» se destaca con color para encontrarlo de inmediato. Ahí se editan varios números a la vez y se descarga la lista para Excel."
                 },
                 {
                     "tipo": "corregido",
+                    "producto": "rifa",
                     "texto": "El ícono del calendario en las fechas se veía negro sobre el fondo oscuro. Ahora es blanco."
                 },
                 {
-                    "tipo": "nota",
-                    "texto": "El archivado automático se elige al crear la rifa: una semana después del sorteo o sin fecha. La fecha exacta se pone sola en cuanto el cliente elige su sorteo, y se mueve junto con el sorteo si este se cambia desde el panel de administración."
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "«Rifas Digitales» en el menú principal, en la computadora y en el teléfono."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "La página de Rifas Digitales muestra el precio (₡2 500 por rifa), el botón para pedirla por WhatsApp y el número para consultas, al inicio y al final. Explica en tres pasos cómo obtenerla, reúne las novedades y responde preguntas como cuánto cuesta o cómo cambiar el sorteo. Todas sus capturas son de la versión actual."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "En el Inicio, Rifas Digitales encabeza «Trabajos que ya funcionan» con la imagen de una rifa, lo que incluye, su precio y los botones para pedirla o ver cómo funciona."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "La barra superior queda limpia: «Login» y «Registro» ya no aparecen ahí. El acceso para usuarios con cuenta está en «Iniciar sesión», al pie de la página."
                 }
             ]
         },

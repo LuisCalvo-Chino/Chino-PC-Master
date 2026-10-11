@@ -1542,6 +1542,128 @@ a.card.spa-page-link {
     padding: 20px 20px 22px;
 }
 
+.home-works--two { grid-template-columns: 2fr 1fr; }
+
+/* Rifas Digitales, protagonista de «Trabajos que ya funcionan» */
+.home-spotlight {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(20px, 4vw, 48px);
+    margin: 0 0 24px;
+    padding: clamp(22px, 4vw, 40px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 85% 20%, rgba(0, 255, 255, 0.14), transparent 55%),
+        linear-gradient(150deg, rgba(0, 71, 171, 0.35), rgba(20, 20, 20, 0.95));
+    box-shadow: 0 0 28px rgba(0, 255, 255, 0.16);
+}
+
+.home-spotlight h3 {
+    margin: 6px 0 8px;
+    color: var(--text-heading);
+    font-size: clamp(1.6rem, 4vw, 2.3rem);
+}
+
+.home-spotlight__lead {
+    margin: 0 0 14px;
+    color: var(--text-body);
+    font-size: 1.05rem;
+    line-height: 1.6;
+}
+
+.home-spotlight__list {
+    margin: 0 0 20px;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.home-spotlight__list li {
+    position: relative;
+    padding-left: 22px;
+    color: var(--text-body);
+    line-height: 1.55;
+}
+
+.home-spotlight__list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--neon-cyan);
+    font-weight: 700;
+}
+
+.home-spotlight__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin: 0 0 18px;
+}
+
+.home-spotlight__amount {
+    color: var(--neon-cyan);
+    font-size: clamp(2rem, 5vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.home-spotlight__unit {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.home-spotlight__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.home-spotlight__phone {
+    margin: 14px 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.home-spotlight__phone a {
+    color: var(--neon-cyan);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.home-spotlight__media {
+    display: block;
+    justify-self: center;
+    width: min(100%, 290px);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+    transform: rotate(2deg);
+    transition: transform 0.3s ease;
+}
+
+.home-spotlight__media:hover,
+.home-spotlight__media:focus-visible { transform: rotate(0deg) scale(1.02); }
+
+.home-spotlight__media img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+@media (max-width: 760px) {
+    .home-spotlight { grid-template-columns: 1fr; }
+    .home-spotlight__media { width: min(70%, 240px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-spotlight__media,
+    .home-spotlight__media:hover { transform: none; }
+}
+
 /* «Escríbame por»: WhatsApp, Instagram y Messenger en la bienvenida */
 .home-contact {
     margin-top: 22px;
@@ -1724,6 +1846,9 @@ a.card.spa-page-link {
     }
     .home-work--featured {
         grid-column: 1 / -1;
+    }
+    .home-works.home-works--two {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -8261,6 +8386,26 @@ body.cpm-no-footer .site-footer {
     text-decoration: underline;
 }
 
+/* Acceso discreto: el login ya no está en la barra superior */
+.site-footer__login {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.site-footer__login[hidden] { display: none; }
+
+.site-footer__login:hover,
+.site-footer__login:focus-visible {
+    color: var(--neon-cyan);
+    text-decoration: underline;
+}
+
 /* Cinco columnas no caben cómodas: la marca pasa arriba y los enlaces quedan en una fila */
 @media (max-width: 1360px) {
     .site-footer__inner {
@@ -9110,6 +9255,109 @@ body.cpm-no-footer .site-footer {
 .doc-callout__foot a:focus-visible {
     border-bottom-color: var(--neon-cyan);
 }
+
+/* --- Rifas Digitales: precio y contacto --- */
+.rd-offer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(18px, 3vw, 34px);
+    margin: 0 0 34px;
+    padding: clamp(20px, 3vw, 30px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 12px;
+    background: linear-gradient(150deg, rgba(0, 71, 171, 0.3), rgba(0, 0, 0, 0.25));
+    box-shadow: 0 0 22px rgba(0, 255, 255, 0.12);
+}
+
+.rd-offer--end { margin: 22px 0 0; }
+
+.rd-offer__price {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 26px;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+.rd-offer__label {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.rd-offer__amount {
+    color: var(--neon-cyan);
+    font-size: clamp(2rem, 6vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.rd-offer__unit {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.rd-offer__title {
+    margin: 0 0 8px;
+    color: var(--text-heading);
+    font-size: clamp(1.15rem, 2.6vw, 1.4rem);
+}
+
+.rd-offer__body p {
+    margin: 0 0 16px;
+    color: var(--text-body);
+    line-height: 1.7;
+}
+
+.rd-offer__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+}
+
+.rd-offer__btn { padding: 12px 22px; }
+
+.rd-offer__phone {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--neon-cyan);
+    text-decoration: none;
+    font-size: 1.05rem;
+}
+
+.rd-offer__phone-label {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.rd-offer__phone:hover .tech-font,
+.rd-offer__phone:focus-visible .tech-font { text-decoration: underline; }
+
+@media (max-width: 600px) {
+    .rd-offer { grid-template-columns: 1fr; }
+    .rd-offer__price { justify-self: stretch; }
+}
+
+.rd-warn {
+    margin: 18px 0;
+    padding: 14px 16px;
+    border: 2px solid #FFB020;
+    border-left-width: 6px;
+    border-radius: 10px;
+    background: rgba(255, 176, 32, 0.12);
+    color: var(--text-body);
+    line-height: 1.6;
+}
+
+.rd-warn strong { color: #FFC94D; }
 
 /* --- Bloque de donaciones --- */
 .doc-donate {

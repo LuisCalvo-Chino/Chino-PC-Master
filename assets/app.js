@@ -133,7 +133,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const loginForm = document.getElementById("login-form");
     const registerForm = document.getElementById("register-form");
     const btnLoginOpen = document.getElementById("btn-login-open");
-    const btnRegisterOpen = document.getElementById("btn-register-open");
     const btnLogout = document.getElementById("btn-logout");
     const authGreeting = document.getElementById("auth-greeting");
     const menuRifa = dropdownMenu.querySelector('[data-page="rifa"]');
@@ -303,8 +302,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const mobileMenuAngels = mobileSidebar?.querySelector('[data-page="angels-dashboard"]');
         if (mobileMenuAngels) mobileMenuAngels.hidden = !canAdmin;
 
-        btnLoginOpen.hidden = Boolean(session);
-        btnRegisterOpen.hidden = Boolean(session);
+        // El acceso queda discreto en el pie de página; el registro ya no se ofrece en la página.
+        if (btnLoginOpen) btnLoginOpen.hidden = Boolean(session);
         btnLogout.hidden = !session;
 
         if (session) {
@@ -1167,8 +1166,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    btnLoginOpen.addEventListener("click", () => openAuthModal("login"));
-    btnRegisterOpen.addEventListener("click", () => openAuthModal("register"));
+    btnLoginOpen?.addEventListener("click", () => openAuthModal("login"));
     btnLogout.addEventListener("click", () => {
         clearSession();
         updateNavigationBySession();
