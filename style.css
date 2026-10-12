@@ -1654,9 +1654,24 @@ a.card.spa-page-link {
     height: auto;
 }
 
+.home-spotlight__media--video,
+.home-spotlight__media--video:hover {
+    margin: 0;
+    overflow: visible;
+    box-shadow: none;
+    transform: none;
+}
+
+.home-spotlight__media--video .rd-video__player {
+    box-shadow: 0 0 22px rgba(0, 255, 255, 0.14), 0 14px 38px rgba(0, 0, 0, 0.55);
+}
+
+.home-spotlight__media--video .rd-video__credit { text-align: center; }
+
 @media (max-width: 760px) {
     .home-spotlight { grid-template-columns: 1fr; }
     .home-spotlight__media { width: min(70%, 240px); }
+    .home-spotlight__media--video { width: min(100%, 290px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -9344,6 +9359,36 @@ body.cpm-no-footer .site-footer {
 @media (max-width: 600px) {
     .rd-offer { grid-template-columns: 1fr; }
     .rd-offer__price { justify-self: stretch; }
+}
+
+/* --- Rifas Digitales: video promocional (vertical) --- */
+.rd-video {
+    margin: 0 auto 38px;
+    max-width: 360px;
+    text-align: center;
+}
+
+.rd-video__title {
+    margin: 0 0 14px;
+    color: var(--text-heading);
+    font-size: clamp(1.15rem, 2.6vw, 1.4rem);
+}
+
+.rd-video__player {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9 / 16;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 14px;
+    background: #0f0f0f;
+    box-shadow: 0 0 22px rgba(0, 255, 255, 0.14);
+}
+
+.rd-video__credit {
+    margin-top: 9px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
 }
 
 .rd-warn {
