@@ -9391,6 +9391,8 @@ body.cpm-no-footer .site-footer {
     color: var(--text-muted);
 }
 
+.rd-video__credit span { display: block; line-height: 1.6; }
+
 .rd-warn {
     margin: 18px 0;
     padding: 14px 16px;

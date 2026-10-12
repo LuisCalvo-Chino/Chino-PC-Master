@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-12T06:41:00-06:00",
+    "actualizado": "2026-10-12T06:47:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -36,7 +36,7 @@
     "parches": [
         {
             "id": "2026-10-12-sitio-video-rifas",
-            "fecha": "2026-10-12T06:41:00-06:00",
+            "fecha": "2026-10-12T06:47:00-06:00",
             "producto": "sitio",
             "titulo": "Rifas Digitales en video: véala en 1 minuto",
             "resumen": "Un video corto muestra cómo funciona Rifas Digitales, en el Inicio y en la página de la app. Se reproduce dentro de la página, también en el iPhone.",
@@ -51,7 +51,7 @@
                 },
                 {
                     "tipo": "nota",
-                    "texto": "El video empieza solo cuando usted le da play y no descarga nada antes: mientras tanto se ve su portada. En el celular se reproduce dentro de la página, sin abrirse solo en pantalla completa."
+                    "texto": "El video empieza solo cuando usted le da play y no descarga nada antes: mientras tanto se ve su portada. En el celular se reproduce dentro de la página, sin abrirse solo en pantalla completa. Debajo del video está el crédito de la música: bensound.com, con su código de licencia y el artista, Benjamin Tissot."
                 }
             ]
         },
