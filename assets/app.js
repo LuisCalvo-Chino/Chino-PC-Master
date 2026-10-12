@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "52"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "53"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -318,6 +318,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         applyProtectedLinksState();
+        // Avisa a las páginas ya montadas (p. ej. Parches) para mostrar u ocultar opciones de admin.
+        document.dispatchEvent(new CustomEvent("cpm:session-change", { detail: { isAdmin: canAdmin } }));
     }
 
     function switchAuthTab(tabName) {
@@ -716,7 +718,10 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (pageName === "parches") {
                 await loadParchesScript();
                 if (typeof window.initParchesApp === "function") {
-                    pageReady = window.initParchesApp({ showMessage });
+                    pageReady = window.initParchesApp({
+                        showMessage,
+                        isAdmin: () => isAdminSession(getSession())
+                    });
                 }
                 const mainLogo = document.querySelector(".main-logo");
                 if (mainLogo) mainLogo.classList.remove("logo-animate-up");

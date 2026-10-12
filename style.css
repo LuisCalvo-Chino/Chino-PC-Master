@@ -8636,6 +8636,32 @@ body.cpm-no-footer .site-footer {
     opacity: 0.7;
 }
 
+/* Solo admin: copia el parche con formato de WhatsApp */
+.patch-copy {
+    margin-left: auto;
+    border: 1px solid rgba(37, 211, 102, 0.55);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    color: #bdf5d2;
+    background: rgba(37, 211, 102, 0.12);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.patch-copy:hover,
+.patch-copy:focus-visible {
+    background: rgba(37, 211, 102, 0.24);
+    border-color: rgba(37, 211, 102, 0.85);
+}
+
+.patch-copy.is-done {
+    color: #0b1a10;
+    background: #25d366;
+    border-color: #25d366;
+}
+
 .patch-card__title {
     margin: 0 0 8px;
     font-size: 1.12rem;

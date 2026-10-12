@@ -19,6 +19,10 @@
 
     const ORDEN_TIPOS = ["nuevo", "mejorado", "corregido", "nota"];
 
+    const EMOJI_TIPOS = { nuevo: "🆕", mejorado: "✨", corregido: "🔧", nota: "📝" };
+
+    const URL_PARCHES = "https://luiscalvo-chino.github.io/Chino-PC-Master/#parches";
+
     function esc(s) {
         return String(s == null ? "" : s)
             .replace(/&/g, "&amp;")
@@ -143,7 +147,68 @@
             .join("");
     }
 
-    function htmlParche(parche, productos, destacado, filtro) {
+    /**
+     * Texto del parche listo para pegar en WhatsApp (*negrita*, _cursiva_, viñetas «•»).
+     * Siempre lleva el parche completo, sin importar el filtro activo.
+     */
+    function textoWhatsApp(parche, productos) {
+        const ids = productosDe(parche);
+        const cambios = Array.isArray(parche.cambios) ? parche.cambios : [];
+        const nombre = (id) => (productos.get(id) ? productos.get(id).nombre : "Sitio web");
+        const bloque = (lista) =>
+            agrupaCambios(lista)
+                .map(
+                    (g) =>
+                        `${EMOJI_TIPOS[g.tipo]} *${TIPOS[g.tipo].etiqueta}*\n` +
+                        g.textos.map((t) => `• ${t}`).join("\n")
+                )
+                .join("\n\n");
+
+        const partes = [
+            `🛠️ *Parches y Noticias · Chino PC Master*`,
+            `📅 ${fechaLarga(parche.fecha)} · ${horaCorta(parche.fecha)}`,
+            `📌 ${ids.map(nombre).join(" · ")}`,
+            "",
+            `*${parche.titulo || ""}*`
+        ];
+        if (parche.resumen) partes.push(`_${parche.resumen}_`);
+        partes.push("");
+
+        if (ids.length < 2) {
+            partes.push(bloque(cambios));
+        } else {
+            partes.push(
+                ids
+                    .map((id) => {
+                        const propios = cambios.filter((c) => productoDeCambio(c, parche) === id);
+                        return propios.length ? `▸ *${nombre(id).toUpperCase()}*\n\n${bloque(propios)}` : "";
+                    })
+                    .filter(Boolean)
+                    .join("\n\n")
+            );
+        }
+        partes.push("", `🔗 Bitácora completa: ${URL_PARCHES}`);
+        return partes.join("\n");
+    }
+
+    async function copiarTexto(texto) {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(texto);
+            return;
+        }
+        const ta = document.createElement("textarea");
+        ta.value = texto;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        if (!ok) throw new Error("copy");
+    }
+
+    function htmlParche(parche, productos, destacado, filtro, admin) {
         const todos = productosDe(parche);
         const ids = filtro && filtro !== "todos" ? todos.filter((id) => id === filtro) : todos;
         const fecha = fechaLarga(parche.fecha);
@@ -155,6 +220,11 @@
                     <time class="patch-card__date tech-font" datetime="${esc(parche.fecha)}">
                         ${esc(fecha)}<span class="patch-card__hour"> · ${esc(hora)}</span>
                     </time>
+                    ${
+                        admin
+                            ? `<button type="button" class="patch-copy tech-font" data-copiar="${esc(parche.fecha)}" title="Copiar este parche como mensaje de WhatsApp">Copiar para WhatsApp</button>`
+                            : ""
+                    }
                 </header>
                 <h3 class="patch-card__title">${esc(parche.titulo || "")}</h3>
                 ${parche.resumen ? `<p class="patch-card__lead">${esc(parche.resumen)}</p>` : ""}
@@ -162,7 +232,7 @@
             </article>`;
     }
 
-    function render(data, filtro) {
+    function render(data, filtro, admin) {
         const productos = new Map((data.productos || []).map((p) => [p.id, p]));
         const parches = (data.parches || [])
             .slice()
@@ -179,7 +249,7 @@
             feed.innerHTML = '<p class="patch-empty">Todavía no hay parches publicados para esta aplicación.</p>';
         } else {
             feed.innerHTML = visibles
-                .map((p, i) => htmlParche(p, productos, i === 0, filtro))
+                .map((p, i) => htmlParche(p, productos, i === 0, filtro, admin))
                 .join("");
         }
 
@@ -244,6 +314,7 @@
 
     window.initParchesApp = async function initParchesApp(ctx) {
         const showMessage = (ctx && ctx.showMessage) || function () {};
+        const esAdmin = () => Boolean(ctx && typeof ctx.isAdmin === "function" && ctx.isAdmin());
         const feed = document.getElementById("patch-feed");
         try {
             const v = (typeof window !== "undefined" && window.CPM_ASSET_V) || "1";
@@ -252,9 +323,47 @@
             });
             if (!res.ok) throw new Error("No se pudo leer la bitácora.");
             const data = await res.json();
+            const productos = new Map((data.productos || []).map((p) => [p.id, p]));
+            let filtroActual = "todos";
+            const pinta = () => render(data, filtroActual, esAdmin());
             renderStats(data);
-            renderFiltros(data, (filtro) => render(data, filtro));
-            render(data, "todos");
+            renderFiltros(data, (filtro) => {
+                filtroActual = filtro;
+                pinta();
+            });
+            pinta();
+
+            // Solo admin: el botón copia el parche completo con formato de WhatsApp.
+            if (feed && !feed.dataset.copiaLista) {
+                feed.dataset.copiaLista = "1";
+                feed.addEventListener("click", async (ev) => {
+                    const btn = ev.target.closest("[data-copiar]");
+                    if (!btn || !esAdmin()) return;
+                    const parche = (data.parches || []).find((p) => p.fecha === btn.getAttribute("data-copiar"));
+                    if (!parche) return;
+                    try {
+                        await copiarTexto(textoWhatsApp(parche, productos));
+                        btn.textContent = "¡Copiado!";
+                        btn.classList.add("is-done");
+                        showMessage("Parche copiado. Ya puedes pegarlo en WhatsApp.", "success");
+                    } catch (e) {
+                        showMessage("No se pudo copiar el parche.", "error");
+                    }
+                    window.setTimeout(() => {
+                        btn.textContent = "Copiar para WhatsApp";
+                        btn.classList.remove("is-done");
+                    }, 2000);
+                });
+            }
+
+            // Al iniciar o cerrar sesión estando en la página, aparece o desaparece el botón.
+            if (window.__cpmParchesSesion) {
+                document.removeEventListener("cpm:session-change", window.__cpmParchesSesion);
+            }
+            window.__cpmParchesSesion = () => {
+                if (document.getElementById("patch-feed") === feed) pinta();
+            };
+            document.addEventListener("cpm:session-change", window.__cpmParchesSesion);
         } catch (e) {
             if (feed) {
                 feed.innerHTML =
