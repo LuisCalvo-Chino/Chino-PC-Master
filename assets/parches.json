@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-12T06:47:00-06:00",
+    "actualizado": "2026-10-16T11:10:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -34,6 +34,23 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-10-16-rifa-logotipo-ancho",
+            "fecha": "2026-10-16T11:10:00-06:00",
+            "producto": "rifa",
+            "titulo": "Logotipos horizontales a todo lo ancho",
+            "resumen": "Un logotipo horizontal ahora puede ocupar todo el ancho de la imagen de la rifa, manteniendo su proporción.",
+            "cambios": [
+                {
+                    "tipo": "corregido",
+                    "texto": "Con el encabezado en «Logotipo», un logotipo horizontal se quedaba en una franja de 420 px al centro aunque se subiera el «Alto del logotipo». Ahora crece con ese control hasta el ancho completo de la imagen (1000 px de los 1080 px, respetando los márgenes), sin deformarse."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Aplica igual en la vista previa y en la imagen que se descarga o comparte. Al llegar al ancho completo, subir el alto ya no lo agranda: así nunca se recorta ni se estira."
+                }
+            ]
+        },
         {
             "id": "2026-10-12-sitio-video-rifas",
             "fecha": "2026-10-12T06:47:00-06:00",

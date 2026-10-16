@@ -1315,7 +1315,8 @@
         let headHtml = "";
         if (b.head.mode === "logo" && b.head.logoUrl) {
             const logoH = tTitulo.size;
-            headHtml = `<img src="${escapeAttr(b.head.logoUrl)}" alt="" style="max-width:420px;height:${logoH}px;width:auto;object-fit:contain;" crossorigin="anonymous" />`;
+            // Mantiene la proporción; un logotipo horizontal puede ocupar todo el ancho útil (1000 px)
+            headHtml = `<img src="${escapeAttr(b.head.logoUrl)}" alt="" style="max-width:1000px;height:${logoH}px;width:auto;object-fit:contain;" crossorigin="anonymous" />`;
         } else {
             const title = b.head.title || project?.nombre_display || project?.sheet_name || "Rifa";
             headHtml = `<div style="font-family:${escapeAttr(tTitulo.font)};font-size:${tTitulo.size}px;font-weight:700;color:${escapeAttr(titleColor)};text-align:center;line-height:1.15;word-break:break-word;">${escapeHtml(title)}</div>`;
@@ -1829,7 +1830,8 @@
                 h: h + 16,
                 draw(y) {
                     if (!logo) return;
-                    const w = Math.min(420, (logo.naturalWidth / logo.naturalHeight) * h);
+                    // Ancho según la proporción del logotipo, hasta el ancho útil (1080 - 2×40 de margen)
+                    const w = Math.min(W - 80, (logo.naturalWidth / logo.naturalHeight) * h);
                     dibujarContenida(ctx, logo, (W - w) / 2, y, w, h);
                 }
             });
