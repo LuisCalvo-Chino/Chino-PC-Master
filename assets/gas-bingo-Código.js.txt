@@ -1,0 +1,1130 @@
+/**
+ * Chino PC Master — Apps Script Bingo Digital (multi-proyecto, versión Beta 1).
+ *
+ * Un solo Web App:
+ *   - Spreadsheet de registro (SPREADSHEET_ID): hoja «Bingos», una fila por bingo.
+ *   - Por cada bingo: un Spreadsheet propio y una carpeta en Drive (comprobantes y arte del cartón),
+ *     creados al momento de crear el bingo.
+ *   - Spreadsheet público «Bingo en vivo» (VIVO_SPREADSHEET_ID): SOLO las bolas cantadas de cada bingo,
+ *     para que los jugadores lo lean directo de Google sin pasar por este script.
+ *
+ * Script Properties:
+ *   SPREADSHEET_ID      — registro (obligatoria)
+ *   MASTER_ADMIN_PIN    — llave maestra del hub #bingo (obligatoria)
+ *   ROOT_FOLDER_ID      — carpeta de Drive donde se crean las carpetas de cada bingo (opcional)
+ *   VIVO_SPREADSHEET_ID — la crea «instalarBingo» (no la escribas a mano)
+ *
+ * Instalación: pega este archivo en Código.js, define las propiedades, ejecuta UNA VEZ «instalarBingo»
+ * desde el editor (crea el Spreadsheet público en vivo) y despliega como Aplicación web
+ * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
+ */
+
+var API_VERSION_ = 1;
+var MAX_CARTONES_ = 10000;
+var LOTE_DEFAULT_ = 100;
+
+var BINGOS_HEADERS_ = [
+  "bingo_id", "nombre", "public_id", "hash_admin", "hash_cantador", "seed",
+  "spreadsheet_id", "folder_id", "created_at", "activo", "fecha_archivo", "compartido_con"
+];
+
+var SHEETS_ = {
+  config: ["clave", "valor"],
+  cartones: ["serie", "estado", "entrada_id", "sector_id", "comprador", "fecha"],
+  entradas: ["entrada_id", "fecha", "nombre", "telefono", "correo", "modalidad", "cantidad", "monto",
+    "vendedor", "sector_id", "metodo", "comprobante_id", "estado", "cartones", "token", "nota",
+    "email_enviado", "wa_enviado", "fecha_completada"],
+  sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo"],
+  precios: ["cantidad", "precio"],
+  rondas: ["ronda_id", "orden", "nombre", "figura", "premio", "estado", "bolas", "ganadores", "inicio", "fin"]
+};
+
+var FIGURAS_ = {
+  linea: 1, horizontal: 1, vertical: 1, diagonal: 1, esquinas: 1, x: 1, l: 1, t: 1, marco: 1, lleno: 1
+};
+
+var CONFIG_DEFAULTS_ = {
+  nombre: "", fecha: "", hora: "", lugar: "", modalidad: "Mixta", whatsapp: "",
+  sinpe_numero: "", sinpe_nombre: "", iban: "", precio_unitario: "",
+  cartones_habilitados: String(LOTE_DEFAULT_), lote: String(LOTE_DEFAULT_),
+  arte_file_id: "", letras_sistema: "true", setup_done: "false",
+  plantilla_whatsapp: "Hola {{nombre}}, gracias por tu compra en {{bingo}}. Tus {{cantidad}} cartón(es): {{cartones}}. Juega en línea aquí: {{link}}",
+  plantilla_email_asunto: "Tus cartones para {{bingo}}",
+  plantilla_email: "<p>Hola {{nombre}}:</p><p>Gracias por tu compra en <b>{{bingo}}</b> ({{fecha}}).</p><p>Tus {{cantidad}} cartón(es): <b>{{cartones}}</b>.</p><p>Juega en línea y mira cada bola cantada aquí:<br><a href=\"{{link}}\">{{link}}</a></p>",
+  sitio_url: ""
+};
+
+/* ======================= Entrada HTTP ======================= */
+
+function doGet() {
+  return jsonOut_({ status: "SUCCESS", data: { service: "bingo_multi", version: API_VERSION_ } });
+}
+
+function doPost(e) {
+  try {
+    var data = parseBody_(e);
+    var action = String(data.action || "").trim();
+    if (!action) return jsonOut_({ status: "ERROR", message: "Acción vacía." });
+    if (action === "ping") return ok_({ pong: true, version: API_VERSION_ });
+
+    if (action.indexOf("super_") === 0) {
+      assertMaster_(data.masterPin);
+      if (action === "super_list") return ok_(superList_());
+      if (action === "super_create") return ok_(conLock_(function () { return superCreate_(data); }));
+      if (action === "super_update") return ok_(conLock_(function () { return superUpdate_(data); }));
+      if (action === "super_delete") return ok_(conLock_(function () { return superDelete_(data); }));
+      return fail_("Acción del hub no reconocida («" + action + "»).");
+    }
+
+    /* Público: compra, jugador, cartón suelto y estado en vivo */
+    if (action === "get_compra") return ok_(getCompra_(bingoPorPublico_(data.pub)));
+    if (action === "submit_compra") {
+      var bc = bingoPorPublico_(data.pub);
+      return ok_(conLock_(function () { return submitCompra_(bc, data); }));
+    }
+    if (action === "get_player") return ok_(getPlayer_(data.token));
+    if (action === "get_card") return ok_(getCard_(bingoPorPublico_(data.pub)));
+    if (action === "estado") return ok_(estadoVivo_(bingoPorPublico_(data.pub)));
+    if (action === "get_arte") return ok_(getArte_(bingoPorPublico_(data.pub)));
+
+    /* Vendedor o encargado de sector */
+    if (action.indexOf("sector_") === 0) {
+      var ctxS = bingoPorSector_(data.hash);
+      if (action === "sector_resolve") return ok_(sectorResolve_(ctxS));
+      if (action === "sector_vender") return ok_(conLock_(function () { return venderPresencial_(ctxS.bingo, data, ctxS.sector); }));
+      if (action === "sector_mark_sent") return ok_(conLock_(function () { return markSent_(ctxS.bingo, data, ctxS.sector); }));
+      return fail_("Acción de sector no reconocida.");
+    }
+
+    /* Juego: organizador o cantador */
+    if (action.indexOf("game_") === 0) {
+      var bg = bingoPorAdminOCantador_(data.hash);
+      if (action === "game_get") return ok_(gameGet_(bg));
+      if (action === "game_save_ronda") return ok_(conLock_(function () { return gameSaveRonda_(bg, data); }));
+      if (action === "game_delete_ronda") return ok_(conLock_(function () { return gameDeleteRonda_(bg, data); }));
+      if (action === "game_abrir") return ok_(conLock_(function () { return gameAbrir_(bg, data); }));
+      if (action === "game_cantar") return ok_(conLock_(function () { return gameCantar_(bg, data); }));
+      if (action === "game_deshacer") return ok_(conLock_(function () { return gameDeshacer_(bg, data); }));
+      if (action === "game_ganador") return ok_(conLock_(function () { return gameGanador_(bg, data); }));
+      if (action === "game_cerrar") return ok_(conLock_(function () { return gameCerrar_(bg, data); }));
+      if (action === "game_buscar") return ok_(gameBuscar_(bg, data));
+      return fail_("Acción de juego no reconocida.");
+    }
+
+    /* Organizador */
+    var b = bingoPorAdmin_(data.hash);
+    if (action === "resolve_admin") return ok_(resolveAdmin_(b));
+    if (action === "update_config") return ok_(conLock_(function () { return updateConfig_(b, data.config || {}); }));
+    if (action === "upload_arte") return ok_(conLock_(function () { return uploadArte_(b, data); }));
+    if (action === "delete_arte") return ok_(conLock_(function () { return updateConfig_(b, { arte_file_id: "" }); }));
+    if (action === "save_precios") return ok_(conLock_(function () { return savePrecios_(b, data.precios || []); }));
+    if (action === "save_sectores") return ok_(conLock_(function () { return saveSectores_(b, data.sectores || []); }));
+    if (action === "list_entradas") return ok_(listEntradas_(b));
+    if (action === "get_comprobante") return ok_(getComprobante_(b, data.entrada_id));
+    if (action === "approve_entrada") return ok_(conLock_(function () { return approveEntrada_(b, data); }));
+    if (action === "reject_entrada") return ok_(conLock_(function () { return setEstadoEntrada_(b, data.entrada_id, "Rechazada", data.nota, true); }));
+    if (action === "return_entrada") return ok_(conLock_(function () { return setEstadoEntrada_(b, data.entrada_id, "Pendiente", data.nota, true); }));
+    if (action === "complete_entrada") return ok_(conLock_(function () { return setEstadoEntrada_(b, data.entrada_id, "Completada", "", false); }));
+    if (action === "reopen_entrada") return ok_(conLock_(function () { return setEstadoEntrada_(b, data.entrada_id, "Aprobada", "", false); }));
+    if (action === "mark_sent") return ok_(conLock_(function () { return markSent_(b, data, null); }));
+    if (action === "send_email") return ok_(conLock_(function () { return sendEmail_(b, data.entrada_id); }));
+    if (action === "vender_presencial") return ok_(conLock_(function () { return venderPresencial_(b, data, null); }));
+    if (action === "ampliar_lote") return ok_(conLock_(function () { return ampliarLote_(b, data.cantidad); }));
+    if (action === "list_cartones") return ok_(listCartones_(b));
+    return fail_("Acción no reconocida («" + action + "»).");
+  } catch (err) {
+    return jsonOut_({ status: "ERROR", message: String(err && err.message ? err.message : err) });
+  }
+}
+
+function ok_(data) { return jsonOut_({ status: "SUCCESS", data: data }); }
+function fail_(msg) { return jsonOut_({ status: "ERROR", message: msg }); }
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function parseBody_(e) {
+  if (!e) return {};
+  var raw = e.postData && e.postData.contents ? String(e.postData.contents) : "";
+  if (raw && raw.charAt(0) !== "{" && e.parameter && e.parameter.payload) raw = String(e.parameter.payload);
+  if (!raw && e.parameter && e.parameter.payload) raw = String(e.parameter.payload);
+  if (!raw) return e.parameter || {};
+  try {
+    return JSON.parse(raw);
+  } catch (x) {
+    var m = raw.match(/(?:^|&)payload=([^&]*)/);
+    if (m) return JSON.parse(decodeURIComponent(m[1].replace(/\+/g, " ")));
+    throw new Error("Cuerpo de la petición no es JSON.");
+  }
+}
+
+function conLock_(fn) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) throw new Error("El servidor está ocupado. Intenta de nuevo en unos segundos.");
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ======================= Utilidades ======================= */
+
+function prop_(k) { return String(PropertiesService.getScriptProperties().getProperty(k) || "").trim(); }
+
+function assertMaster_(pin) {
+  var m = prop_("MASTER_ADMIN_PIN");
+  if (!m) throw new Error("Falta MASTER_ADMIN_PIN en las propiedades del script.");
+  if (String(pin || "") !== m) throw new Error("Llave maestra incorrecta.");
+}
+
+function registroSs_() {
+  var id = prop_("SPREADSHEET_ID");
+  if (!id) throw new Error("Falta SPREADSHEET_ID en las propiedades del script.");
+  return SpreadsheetApp.openById(id);
+}
+
+function hoyIso_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"); }
+function ahora_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"); }
+
+function fechaIso_(v) {
+  if (!v) return "";
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  return String(v).trim();
+}
+
+function bool_(v) {
+  if (v === true) return true;
+  var t = String(v || "").trim().toLowerCase();
+  return t === "true" || t === "1" || t === "si" || t === "sí";
+}
+
+function randomHash_(len) {
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  var out = "";
+  for (var i = 0; i < len; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+  return out;
+}
+
+function ensureSheet_(ss, name, headers) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function readObjects_(sh) {
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var headers = values[0].map(function (h) { return String(h).trim(); });
+  var out = [];
+  for (var r = 1; r < values.length; r++) {
+    var o = { _row: r + 1 };
+    for (var c = 0; c < headers.length; c++) o[headers[c]] = values[r][c];
+    out.push(o);
+  }
+  return out;
+}
+
+function writeObject_(sh, headers, obj, rowNumber) {
+  var row = headers.map(function (h) { return obj[h] === undefined || obj[h] === null ? "" : obj[h]; });
+  if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  else sh.appendRow(row);
+}
+
+function nextId_(items, key) {
+  var max = 0;
+  items.forEach(function (it) { max = Math.max(max, Number(it[key]) || 0); });
+  return max + 1;
+}
+
+/** Acepta "5, 8, 10-14" → [5, 8, 10, 11, 12, 13, 14] */
+function parseSeries_(input) {
+  var out = [];
+  var seen = {};
+  var parts = Array.isArray(input) ? input : String(input || "").split(/[,\s;]+/);
+  parts.forEach(function (p) {
+    var t = String(p).trim();
+    if (!t) return;
+    var m = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    var a = m ? Number(m[1]) : Number(t);
+    var z = m ? Number(m[2]) : Number(t);
+    if (!isFinite(a) || !isFinite(z)) throw new Error("Serie no válida: «" + t + "».");
+    if (z < a) { var tmp = a; a = z; z = tmp; }
+    if (z - a > 2000) throw new Error("Rango demasiado amplio: «" + t + "» (máximo 2000 por rango).");
+    for (var n = a; n <= z; n++) {
+      if (!seen[n]) { seen[n] = 1; out.push(n); }
+    }
+  });
+  return out;
+}
+
+function render_(tpl, vars) {
+  return String(tpl || "").replace(/\{\{(\w+)\}\}/g, function (_, k) {
+    return vars[k] === undefined ? "" : String(vars[k]);
+  });
+}
+
+/* ======================= Instalación ======================= */
+
+/** Ejecútala UNA VEZ desde el editor: crea el Spreadsheet público «Bingo en vivo». */
+function instalarBingo() {
+  var props = PropertiesService.getScriptProperties();
+  var reg = registroSs_();
+  ensureSheet_(reg, "Bingos", BINGOS_HEADERS_);
+  var vivoId = prop_("VIVO_SPREADSHEET_ID");
+  if (!vivoId) {
+    var vivo = SpreadsheetApp.create("Bingo en vivo (público, solo bolas cantadas)");
+    var sh = vivo.getSheets()[0];
+    sh.setName("vivo");
+    sh.getRange(1, 1, 1, 3).setValues([["public_id", "estado_json", "actualizado"]]);
+    DriveApp.getFileById(vivo.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var root = prop_("ROOT_FOLDER_ID");
+    if (root) DriveApp.getFileById(vivo.getId()).moveTo(DriveApp.getFolderById(root));
+    props.setProperty("VIVO_SPREADSHEET_ID", vivo.getId());
+    vivoId = vivo.getId();
+  }
+  Logger.log("Listo. VIVO_SPREADSHEET_ID = " + vivoId);
+}
+
+/* ======================= Registro de bingos ======================= */
+
+function bingosSheet_() { return ensureSheet_(registroSs_(), "Bingos", BINGOS_HEADERS_); }
+
+function listBingos_() {
+  return readObjects_(bingosSheet_()).map(function (b) {
+    b.activo = bool_(b.activo);
+    b.fecha_archivo = fechaIso_(b.fecha_archivo);
+    b.vencido = Boolean(b.fecha_archivo) && hoyIso_() > b.fecha_archivo;
+    return b;
+  });
+}
+
+function vigente_(b) { return b && b.activo && !b.vencido; }
+
+function bingoPor_(campo, valor, msg) {
+  var v = String(valor || "").trim();
+  if (!v) throw new Error(msg);
+  var found = listBingos_().filter(function (b) { return String(b[campo]) === v; })[0];
+  if (!found) throw new Error(msg);
+  if (!vigente_(found)) throw new Error("Este bingo ya no está activo.");
+  return found;
+}
+
+function bingoPorAdmin_(hash) { return bingoPor_("hash_admin", hash, "Link de organizador no válido."); }
+function bingoPorPublico_(pub) { return bingoPor_("public_id", pub, "Bingo no encontrado."); }
+
+function bingoPorAdminOCantador_(hash) {
+  var v = String(hash || "").trim();
+  var found = listBingos_().filter(function (b) { return v && (b.hash_admin === v || b.hash_cantador === v); })[0];
+  if (!found) throw new Error("Link no válido.");
+  if (!vigente_(found)) throw new Error("Este bingo ya no está activo.");
+  found._rol = found.hash_admin === v ? "organizador" : "cantador";
+  return found;
+}
+
+/** El link de sector lleva el public_id del bingo al inicio («pub.xxxx»): se abre solo ese Spreadsheet. */
+function bingoPorSector_(hash) {
+  var v = String(hash || "").trim();
+  var b = bingoPorPublico_(v.split(".")[0]);
+  var sectores = readObjects_(sheetDe_(b, "sectores"));
+  for (var j = 0; j < sectores.length; j++) {
+    if (String(sectores[j].hash) === v && bool_(sectores[j].activo)) {
+      return { bingo: b, sector: sectorObj_(sectores[j]) };
+    }
+  }
+  throw new Error("Link de sector no válido o desactivado.");
+}
+
+function bingoPublico_(b) {
+  return {
+    bingo_id: b.bingo_id, nombre: b.nombre, public_id: b.public_id, hash_admin: b.hash_admin,
+    hash_cantador: b.hash_cantador, created_at: fechaIso_(b.created_at), activo: b.activo,
+    fecha_archivo: b.fecha_archivo, vencido: b.vencido, compartido_con: b.compartido_con,
+    spreadsheet_url: b.spreadsheet_id ? "https://docs.google.com/spreadsheets/d/" + b.spreadsheet_id + "/edit" : "",
+    folder_url: b.folder_id ? "https://drive.google.com/drive/folders/" + b.folder_id : ""
+  };
+}
+
+function superList_() {
+  return { bingos: listBingos_().map(bingoPublico_), version: API_VERSION_ };
+}
+
+function superCreate_(data) {
+  var nombre = String(data.nombre || "").trim();
+  if (!nombre) throw new Error("Escribe el nombre del bingo.");
+  var sh = bingosSheet_();
+  var bingos = readObjects_(sh);
+  var id = nextId_(bingos, "bingo_id");
+  var usados = {};
+  bingos.forEach(function (x) { usados[x.public_id] = 1; usados[x.hash_admin] = 1; usados[x.hash_cantador] = 1; });
+  function unico(len) { var h; do { h = randomHash_(len); } while (usados[h]); usados[h] = 1; return h; }
+
+  var ss = SpreadsheetApp.create("Bingo " + id + " — " + nombre);
+  Object.keys(SHEETS_).forEach(function (name) { ensureSheet_(ss, name, SHEETS_[name]); });
+  var hoja1 = ss.getSheetByName("Hoja 1") || ss.getSheetByName("Sheet1");
+  if (hoja1 && ss.getSheets().length > 1) ss.deleteSheet(hoja1);
+
+  var rootId = prop_("ROOT_FOLDER_ID");
+  var root = rootId ? DriveApp.getFolderById(rootId) : DriveApp.getRootFolder();
+  var folder = root.createFolder("Bingo " + id + " — " + nombre);
+  folder.createFolder("comprobantes");
+  folder.createFolder("diseño");
+  DriveApp.getFileById(ss.getId()).moveTo(folder);
+
+  var cfg = {};
+  Object.keys(CONFIG_DEFAULTS_).forEach(function (k) { cfg[k] = CONFIG_DEFAULTS_[k]; });
+  cfg.nombre = nombre;
+  cfg.fecha = String(data.fecha || "").trim();
+  cfg.sitio_url = String(data.sitio_url || "").trim();
+  var cfgSh = ss.getSheetByName("config");
+  cfgSh.getRange(2, 1, Object.keys(cfg).length, 2).setValues(Object.keys(cfg).map(function (k) { return [k, cfg[k]]; }));
+
+  var preciosSh = ss.getSheetByName("precios");
+  var unit = Number(data.precio) || 0;
+  if (unit > 0) {
+    var filas = [];
+    for (var n = 1; n <= 20; n++) filas.push([n, unit * n]);
+    preciosSh.getRange(2, 1, filas.length, 2).setValues(filas);
+    cfgSh.getRange(2, 1, cfgSh.getLastRow() - 1, 2).getValues().forEach(function (r, i) {
+      if (r[0] === "precio_unitario") cfgSh.getRange(i + 2, 2).setValue(unit);
+    });
+  }
+
+  var correo = String(data.compartir_con || "").trim();
+  if (correo) {
+    try {
+      folder.addViewer(correo);
+    } catch (e) {
+      correo = "";
+    }
+  }
+
+  var obj = {
+    bingo_id: id, nombre: nombre, public_id: unico(8), hash_admin: unico(24), hash_cantador: unico(24),
+    seed: randomHash_(16), spreadsheet_id: ss.getId(), folder_id: folder.getId(), created_at: ahora_(),
+    activo: true, fecha_archivo: String(data.fecha_archivo || "").trim(), compartido_con: correo
+  };
+  writeObject_(sh, BINGOS_HEADERS_, obj);
+  obj.vencido = false;
+  return { bingo: bingoPublico_(obj) };
+}
+
+function superUpdate_(data) {
+  var sh = bingosSheet_();
+  var b = readObjects_(sh).filter(function (x) { return String(x.bingo_id) === String(data.bingo_id); })[0];
+  if (!b) throw new Error("Bingo no encontrado.");
+  if (data.nombre !== undefined) b.nombre = String(data.nombre).trim() || b.nombre;
+  if (data.activo !== undefined) b.activo = bool_(data.activo);
+  if (data.fecha_archivo !== undefined) b.fecha_archivo = String(data.fecha_archivo || "").trim();
+  if (data.nuevo_cantador) b.hash_cantador = randomHash_(24);
+  writeObject_(sh, BINGOS_HEADERS_, b, b._row);
+  b.activo = bool_(b.activo);
+  b.fecha_archivo = fechaIso_(b.fecha_archivo);
+  b.vencido = Boolean(b.fecha_archivo) && hoyIso_() > b.fecha_archivo;
+  return { bingo: bingoPublico_(b) };
+}
+
+/** Borrar solo quita la fila del registro: el Spreadsheet y la carpeta quedan en Drive como respaldo. */
+function superDelete_(data) {
+  var sh = bingosSheet_();
+  var b = readObjects_(sh).filter(function (x) { return String(x.bingo_id) === String(data.bingo_id); })[0];
+  if (!b) throw new Error("Bingo no encontrado.");
+  sh.deleteRow(b._row);
+  return { deleted: true };
+}
+
+/* ======================= Datos de cada bingo ======================= */
+
+var SS_CACHE_ = {};
+function bingoSs_(b) {
+  if (!SS_CACHE_[b.spreadsheet_id]) SS_CACHE_[b.spreadsheet_id] = SpreadsheetApp.openById(b.spreadsheet_id);
+  return SS_CACHE_[b.spreadsheet_id];
+}
+
+function sheetDe_(b, name) { return ensureSheet_(bingoSs_(b), name, SHEETS_[name]); }
+
+function readConfig_(b) {
+  var cfg = {};
+  Object.keys(CONFIG_DEFAULTS_).forEach(function (k) { cfg[k] = CONFIG_DEFAULTS_[k]; });
+  readObjects_(sheetDe_(b, "config")).forEach(function (r) {
+    var k = String(r.clave || "").trim();
+    if (!k) return;
+    var v = r.valor;
+    cfg[k] = Object.prototype.toString.call(v) === "[object Date]" ? fechaIso_(v) : String(v);
+  });
+  return cfg;
+}
+
+var CONFIG_EDITABLES_ = ["nombre", "fecha", "hora", "lugar", "modalidad", "whatsapp", "sinpe_numero", "sinpe_nombre",
+  "iban", "precio_unitario", "lote", "setup_done", "plantilla_whatsapp", "plantilla_email_asunto", "plantilla_email",
+  "arte_file_id", "letras_sistema", "sitio_url"];
+
+function updateConfig_(b, changes) {
+  var sh = sheetDe_(b, "config");
+  var rows = readObjects_(sh);
+  var byKey = {};
+  rows.forEach(function (r) { byKey[String(r.clave)] = r._row; });
+  Object.keys(changes).forEach(function (k) {
+    if (CONFIG_EDITABLES_.indexOf(k) === -1) return;
+    var v = changes[k] === null || changes[k] === undefined ? "" : String(changes[k]);
+    if (k === "lote") v = String(Math.min(1000, Math.max(10, Number(v) || LOTE_DEFAULT_)));
+    if (byKey[k]) sh.getRange(byKey[k], 2).setValue(v);
+    else { sh.appendRow([k, v]); byKey[k] = sh.getLastRow(); }
+  });
+  if (changes.nombre) {
+    var reg = bingosSheet_();
+    var fila = readObjects_(reg).filter(function (x) { return String(x.bingo_id) === String(b.bingo_id); })[0];
+    if (fila) reg.getRange(fila._row, BINGOS_HEADERS_.indexOf("nombre") + 1).setValue(String(changes.nombre).trim());
+  }
+  return { config: readConfig_(b) };
+}
+
+function setConfigValue_(b, key, value) {
+  var sh = sheetDe_(b, "config");
+  var row = readObjects_(sh).filter(function (r) { return String(r.clave) === key; })[0];
+  if (row) sh.getRange(row._row, 2).setValue(String(value));
+  else sh.appendRow([key, String(value)]);
+}
+
+function arteUrl_(cfg) {
+  return cfg.arte_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.arte_file_id : "";
+}
+
+function preciosObj_(b) {
+  return readObjects_(sheetDe_(b, "precios"))
+    .map(function (r) { return { cantidad: Number(r.cantidad), precio: Number(r.precio) }; })
+    .filter(function (r) { return r.cantidad > 0 && r.precio >= 0; })
+    .sort(function (a, z) { return a.cantidad - z.cantidad; });
+}
+
+function precioPara_(b, cfg, cantidad) {
+  var tabla = preciosObj_(b);
+  var fila = tabla.filter(function (r) { return r.cantidad === cantidad; })[0];
+  if (fila) return fila.precio;
+  var unit = Number(cfg.precio_unitario) || 0;
+  return unit * cantidad;
+}
+
+function sectorObj_(s) {
+  return {
+    sector_id: Number(s.sector_id), nombre: String(s.nombre || ""), encargado: String(s.encargado || ""),
+    telefono: String(s.telefono || ""), desde: Number(s.desde) || 0, hasta: Number(s.hasta) || 0,
+    hash: String(s.hash || ""), activo: bool_(s.activo)
+  };
+}
+
+function sectores_(b) { return readObjects_(sheetDe_(b, "sectores")).map(sectorObj_); }
+
+/** Configuración visible para jugadores y compradores (sin datos de otras personas). */
+function publicConfig_(b, cfg) {
+  return {
+    nombre: cfg.nombre, fecha: cfg.fecha, hora: cfg.hora, lugar: cfg.lugar, modalidad: cfg.modalidad,
+    whatsapp: cfg.whatsapp, public_id: b.public_id, seed: b.seed, arte_url: arteUrl_(cfg),
+    letras_sistema: cfg.letras_sistema !== "false",
+    vivo_id: prop_("VIVO_SPREADSHEET_ID")
+  };
+}
+
+/* ======================= Cartones ======================= */
+
+function cartonesVendidos_(b) {
+  return readObjects_(sheetDe_(b, "cartones")).map(function (r) {
+    return {
+      _row: r._row, serie: Number(r.serie), estado: String(r.estado || ""), entrada_id: Number(r.entrada_id) || 0,
+      sector_id: Number(r.sector_id) || 0, comprador: String(r.comprador || "")
+    };
+  });
+}
+
+function ampliarLote_(b, cantidad) {
+  var cfg = readConfig_(b);
+  var actual = Number(cfg.cartones_habilitados) || LOTE_DEFAULT_;
+  var extra = Number(cantidad) || Number(cfg.lote) || LOTE_DEFAULT_;
+  var nuevo = Math.min(MAX_CARTONES_, actual + Math.max(1, extra));
+  setConfigValue_(b, "cartones_habilitados", nuevo);
+  return { cartones_habilitados: nuevo };
+}
+
+/** Busca cartones libres del fondo general (fuera de los rangos de sectores); amplía el lote si hace falta. */
+function tomarLibres_(b, cantidad, sector) {
+  var cfg = readConfig_(b);
+  var habil = Number(cfg.cartones_habilitados) || LOTE_DEFAULT_;
+  var usados = {};
+  cartonesVendidos_(b).forEach(function (c) { usados[c.serie] = 1; });
+  var rangos = sector ? [] : sectores_(b).filter(function (s) { return s.desde && s.hasta; });
+  function enSector(n) {
+    for (var i = 0; i < rangos.length; i++) if (n >= rangos[i].desde && n <= rangos[i].hasta) return true;
+    return false;
+  }
+  var desde = sector ? sector.desde : 1;
+  var hasta = sector ? sector.hasta : MAX_CARTONES_;
+  var out = [];
+  for (var n = desde; n <= hasta && out.length < cantidad; n++) {
+    if (!sector && n > habil) {
+      habil = Math.min(MAX_CARTONES_, habil + (Number(cfg.lote) || LOTE_DEFAULT_));
+      if (n > habil) break;
+    }
+    if (!usados[n] && !enSector(n)) out.push(n);
+  }
+  if (out.length < cantidad) {
+    throw new Error(sector
+      ? "El sector «" + sector.nombre + "» no tiene " + cantidad + " cartones libres."
+      : "No quedan " + cantidad + " cartones libres (máximo " + MAX_CARTONES_ + ").");
+  }
+  if (!sector && habil !== (Number(cfg.cartones_habilitados) || LOTE_DEFAULT_)) setConfigValue_(b, "cartones_habilitados", habil);
+  return out;
+}
+
+function listCartones_(b) {
+  var cfg = readConfig_(b);
+  return {
+    cartones_habilitados: Number(cfg.cartones_habilitados) || LOTE_DEFAULT_,
+    vendidos: cartonesVendidos_(b).map(function (c) {
+      return { serie: c.serie, estado: c.estado, entrada_id: c.entrada_id, sector_id: c.sector_id, comprador: c.comprador };
+    })
+  };
+}
+
+function asignarCartones_(b, series, entrada, sectorId) {
+  var sh = sheetDe_(b, "cartones");
+  var fecha = ahora_();
+  var filas = series.map(function (n) {
+    return [n, "Vendido", entrada.entrada_id, sectorId || "", String(entrada.nombre || ""), fecha];
+  });
+  if (filas.length) sh.getRange(sh.getLastRow() + 1, 1, filas.length, filas[0].length).setValues(filas);
+}
+
+function liberarCartones_(b, entradaId) {
+  var sh = sheetDe_(b, "cartones");
+  var filas = cartonesVendidos_(b).filter(function (c) { return c.entrada_id === Number(entradaId); });
+  filas.sort(function (a, z) { return z._row - a._row; }).forEach(function (c) { sh.deleteRow(c._row); });
+  return filas.length;
+}
+
+/* ======================= Arte del cartón y comprobantes ======================= */
+
+function subcarpeta_(b, nombre) {
+  var folder = DriveApp.getFolderById(b.folder_id);
+  var it = folder.getFoldersByName(nombre);
+  return it.hasNext() ? it.next() : folder.createFolder(nombre);
+}
+
+function decodeDataUrl_(dataUrl, nombre) {
+  var m = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) throw new Error("Archivo no válido.");
+  var bytes = Utilities.base64Decode(m[2]);
+  if (bytes.length > 8 * 1024 * 1024) throw new Error("El archivo pesa más de 8 MB.");
+  return Utilities.newBlob(bytes, m[1], nombre);
+}
+
+function uploadArte_(b, data) {
+  var ext = /png/.test(String(data.archivo || "")) ? "png" : "jpg";
+  var blob = decodeDataUrl_(data.archivo, "arte-carton-" + Date.now() + "." + ext);
+  if (!/^image\/(png|jpe?g|webp)$/.test(blob.getContentType())) throw new Error("El arte debe ser PNG, JPG o WEBP.");
+  var file = subcarpeta_(b, "diseño").createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var cfg = readConfig_(b);
+  if (cfg.arte_file_id) {
+    try { DriveApp.getFileById(cfg.arte_file_id).setTrashed(true); } catch (e) { /* ya no existe */ }
+  }
+  setConfigValue_(b, "arte_file_id", file.getId());
+  return { arte_file_id: file.getId(), arte_url: "https://lh3.googleusercontent.com/d/" + file.getId() };
+}
+
+/** El arte en base64, para dibujarlo en el PDF sin problemas de CORS. */
+function getArte_(b) {
+  var cfg = readConfig_(b);
+  if (!cfg.arte_file_id) return { dataUrl: "" };
+  var blob = DriveApp.getFileById(cfg.arte_file_id).getBlob();
+  return { dataUrl: "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes()) };
+}
+
+function getComprobante_(b, entradaId) {
+  var e = entradaPorId_(b, entradaId);
+  if (!e.comprobante_id) throw new Error("Esta compra no tiene comprobante.");
+  var blob = DriveApp.getFileById(e.comprobante_id).getBlob();
+  return {
+    dataUrl: "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes()),
+    tipo: blob.getContentType()
+  };
+}
+
+/* ======================= Precios y sectores ======================= */
+
+function savePrecios_(b, precios) {
+  var sh = sheetDe_(b, "precios");
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+  var filas = precios
+    .map(function (p) { return [Number(p.cantidad), Number(p.precio)]; })
+    .filter(function (p) { return p[0] >= 1 && p[0] <= 100 && p[1] >= 0; });
+  if (filas.length) sh.getRange(2, 1, filas.length, 2).setValues(filas);
+  return { precios: preciosObj_(b) };
+}
+
+function saveSectores_(b, lista) {
+  var sh = sheetDe_(b, "sectores");
+  var actuales = sectores_(b);
+  var porId = {};
+  actuales.forEach(function (s) { porId[s.sector_id] = s; });
+  var nextId = nextId_(actuales, "sector_id");
+  var limpios = lista.map(function (s) {
+    var id = Number(s.sector_id) || nextId++;
+    var prev = porId[id] || {};
+    var desde = Number(s.desde) || 0;
+    var hasta = Number(s.hasta) || 0;
+    if (!String(s.nombre || "").trim()) throw new Error("Cada sector requiere un nombre.");
+    if (desde < 0 || hasta < 0 || hasta > MAX_CARTONES_ || (desde && hasta && hasta < desde)) {
+      throw new Error("Rango no válido en «" + s.nombre + "».");
+    }
+    return {
+      sector_id: id, nombre: String(s.nombre).trim(), encargado: String(s.encargado || "").trim(),
+      telefono: String(s.telefono || "").trim(), desde: desde, hasta: hasta,
+      hash: prev.hash || b.public_id + "." + randomHash_(16), activo: s.activo === undefined ? true : bool_(s.activo)
+    };
+  });
+  for (var i = 0; i < limpios.length; i++) {
+    for (var j = i + 1; j < limpios.length; j++) {
+      var a = limpios[i], z = limpios[j];
+      if (a.desde && z.desde && a.desde <= z.hasta && z.desde <= a.hasta) {
+        throw new Error("Los rangos de «" + a.nombre + "» y «" + z.nombre + "» se cruzan.");
+      }
+    }
+  }
+  var maxHasta = 0;
+  limpios.forEach(function (s) { maxHasta = Math.max(maxHasta, s.hasta); });
+  var cfg = readConfig_(b);
+  if (maxHasta > (Number(cfg.cartones_habilitados) || 0)) setConfigValue_(b, "cartones_habilitados", maxHasta);
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS_.sectores.length).clearContent();
+  if (limpios.length) {
+    sh.getRange(2, 1, limpios.length, SHEETS_.sectores.length)
+      .setValues(limpios.map(function (s) { return SHEETS_.sectores.map(function (h) { return s[h]; }); }));
+  }
+  return { sectores: sectores_(b) };
+}
+
+/* ======================= Compras ======================= */
+
+function entradaObj_(r) {
+  return {
+    entrada_id: Number(r.entrada_id), fecha: String(r.fecha instanceof Date ? Utilities.formatDate(r.fecha, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm") : r.fecha || ""),
+    nombre: String(r.nombre || ""), telefono: String(r.telefono || ""), correo: String(r.correo || ""),
+    modalidad: String(r.modalidad || ""), cantidad: Number(r.cantidad) || 0, monto: Number(r.monto) || 0,
+    vendedor: String(r.vendedor || ""), sector_id: Number(r.sector_id) || 0, metodo: String(r.metodo || ""),
+    tiene_comprobante: Boolean(r.comprobante_id), comprobante_id: String(r.comprobante_id || ""),
+    estado: String(r.estado || ""), cartones: String(r.cartones || ""), token: String(r.token || ""),
+    nota: String(r.nota || ""), email_enviado: bool_(r.email_enviado), wa_enviado: bool_(r.wa_enviado),
+    fecha_completada: String(r.fecha_completada || ""), _row: r._row
+  };
+}
+
+function entradas_(b) { return readObjects_(sheetDe_(b, "entradas")).map(entradaObj_); }
+
+function entradaPorId_(b, id) {
+  var e = entradas_(b).filter(function (x) { return x.entrada_id === Number(id); })[0];
+  if (!e) throw new Error("Compra no encontrada.");
+  return e;
+}
+
+function guardarEntrada_(b, e) {
+  writeObject_(sheetDe_(b, "entradas"), SHEETS_.entradas, e, e._row);
+}
+
+function tokenUnico_(b) {
+  var usados = {};
+  entradas_(b).forEach(function (e) { usados[e.token] = 1; });
+  var t;
+  do { t = b.public_id + "." + randomHash_(14); } while (usados[t]);
+  return t;
+}
+
+function getCompra_(b) {
+  var cfg = readConfig_(b);
+  return {
+    config: publicConfig_(b, cfg),
+    sinpe_numero: cfg.sinpe_numero, sinpe_nombre: cfg.sinpe_nombre, iban: cfg.iban,
+    precio_unitario: Number(cfg.precio_unitario) || 0,
+    precios: preciosObj_(b),
+    sectores: sectores_(b).filter(function (s) { return s.activo; }).map(function (s) {
+      return { sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado };
+    })
+  };
+}
+
+function submitCompra_(b, data) {
+  var cfg = readConfig_(b);
+  var nombre = String(data.nombre || "").trim();
+  var telefono = String(data.telefono || "").replace(/[^\d+]/g, "");
+  var correo = String(data.correo || "").trim();
+  var cantidad = Math.floor(Number(data.cantidad) || 0);
+  if (!nombre) throw new Error("Escribe tu nombre.");
+  if (telefono.length < 8) throw new Error("Escribe un número de WhatsApp válido.");
+  if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) throw new Error("El correo no es válido.");
+  if (cantidad < 1 || cantidad > 200) throw new Error("La cantidad debe ser de 1 a 200 cartones.");
+  if (!data.comprobante) throw new Error("Adjunta el comprobante de pago.");
+  var sectorId = Number(data.sector_id) || 0;
+  if (sectorId && !sectores_(b).some(function (s) { return s.sector_id === sectorId && s.activo; })) sectorId = 0;
+
+  var blob = decodeDataUrl_(data.comprobante, "comprobante-" + Date.now() + "-" + nombre.replace(/[^\w]+/g, "_").slice(0, 30));
+  var file = subcarpeta_(b, "comprobantes").createFile(blob);
+
+  var lista = entradas_(b);
+  var e = {
+    entrada_id: nextId_(lista, "entrada_id"), fecha: ahora_(), nombre: nombre, telefono: telefono, correo: correo,
+    modalidad: data.modalidad === "Presencial" ? "Presencial" : "Virtual", cantidad: cantidad,
+    monto: precioPara_(b, cfg, cantidad), vendedor: String(data.vendedor || "").trim(), sector_id: sectorId,
+    metodo: String(data.metodo || "SINPE").trim(), comprobante_id: file.getId(), estado: "Pendiente",
+    cartones: "", token: "", nota: "", email_enviado: false, wa_enviado: false, fecha_completada: ""
+  };
+  guardarEntrada_(b, e);
+  return { entrada_id: e.entrada_id, monto: e.monto, cantidad: cantidad };
+}
+
+function listEntradas_(b) {
+  return {
+    entradas: entradas_(b).map(function (e) { delete e._row; delete e.comprobante_id; return e; }).reverse()
+  };
+}
+
+function approveEntrada_(b, data) {
+  var e = entradaPorId_(b, data.entrada_id);
+  if (e.estado !== "Pendiente") throw new Error("Solo se aprueban compras pendientes.");
+  var sector = e.sector_id ? sectores_(b).filter(function (s) { return s.sector_id === e.sector_id; })[0] : null;
+  var series;
+  if (data.series) {
+    series = parseSeries_(data.series);
+    if (series.length !== e.cantidad) throw new Error("Indica exactamente " + e.cantidad + " cartones.");
+    validarLibres_(b, series, null);
+  } else {
+    series = tomarLibres_(b, e.cantidad, sector && sector.desde && sector.hasta ? sector : null);
+  }
+  asignarCartones_(b, series, e, e.sector_id);
+  e.cartones = series.join(",");
+  e.token = e.token || tokenUnico_(b);
+  e.estado = "Aprobada";
+  e.nota = "";
+  guardarEntrada_(b, e);
+  delete e._row;
+  return { entrada: e };
+}
+
+function validarLibres_(b, series, sector) {
+  var cfg = readConfig_(b);
+  var usados = {};
+  cartonesVendidos_(b).forEach(function (c) { usados[c.serie] = 1; });
+  series.forEach(function (n) {
+    if (n < 1 || n > MAX_CARTONES_) throw new Error("La serie " + n + " no existe.");
+    if (sector && (n < sector.desde || n > sector.hasta)) throw new Error("La serie " + n + " no es de tu sector (" + sector.desde + "–" + sector.hasta + ").");
+    if (usados[n]) throw new Error("La serie " + n + " ya está vendida.");
+  });
+  var max = Math.max.apply(null, series);
+  if (max > (Number(cfg.cartones_habilitados) || 0)) setConfigValue_(b, "cartones_habilitados", Math.min(MAX_CARTONES_, max));
+}
+
+function setEstadoEntrada_(b, id, estado, nota, liberar) {
+  var e = entradaPorId_(b, id);
+  if (liberar && e.cartones) {
+    liberarCartones_(b, e.entrada_id);
+    e.cartones = "";
+  }
+  e.estado = estado;
+  if (nota !== undefined) e.nota = String(nota || "");
+  e.fecha_completada = estado === "Completada" ? ahora_() : "";
+  guardarEntrada_(b, e);
+  delete e._row;
+  return { entrada: e };
+}
+
+function markSent_(b, data, sector) {
+  var e = entradaPorId_(b, data.entrada_id);
+  if (sector && e.sector_id !== sector.sector_id) throw new Error("Esta compra no es de tu sector.");
+  if (data.canal === "email") e.email_enviado = true;
+  else e.wa_enviado = true;
+  guardarEntrada_(b, e);
+  delete e._row;
+  return { entrada: e };
+}
+
+function linkJugador_(cfg, token) {
+  var base = String(cfg.sitio_url || "https://chinopcmaster.com/").replace(/#.*$/, "");
+  return base + "#bj/" + token;
+}
+
+function sendEmail_(b, id) {
+  var e = entradaPorId_(b, id);
+  if (!e.correo) throw new Error("Esta compra no tiene correo.");
+  if (!e.token) throw new Error("Aprueba la compra antes de enviar el correo.");
+  var cfg = readConfig_(b);
+  var vars = {
+    nombre: e.nombre, bingo: cfg.nombre, fecha: cfg.fecha, cantidad: e.cantidad, monto: e.monto,
+    cartones: e.cartones.split(",").join(", "), link: linkJugador_(cfg, e.token)
+  };
+  MailApp.sendEmail({
+    to: e.correo, subject: render_(cfg.plantilla_email_asunto, vars), htmlBody: render_(cfg.plantilla_email, vars),
+    name: cfg.nombre || "Bingo"
+  });
+  e.email_enviado = true;
+  guardarEntrada_(b, e);
+  delete e._row;
+  return { entrada: e };
+}
+
+/** Venta presencial: el vendedor entrega cartones impresos y anota las series. */
+function venderPresencial_(b, data, sector) {
+  var nombre = String(data.nombre || "").trim();
+  if (!nombre) throw new Error("Escribe el nombre del comprador.");
+  var series = parseSeries_(data.series);
+  if (!series.length) throw new Error("Indica las series de los cartones vendidos.");
+  validarLibres_(b, series, sector);
+  var cfg = readConfig_(b);
+  var lista = entradas_(b);
+  var e = {
+    entrada_id: nextId_(lista, "entrada_id"), fecha: ahora_(), nombre: nombre,
+    telefono: String(data.telefono || "").replace(/[^\d+]/g, ""), correo: String(data.correo || "").trim(),
+    modalidad: "Presencial", cantidad: series.length,
+    monto: data.monto !== undefined && data.monto !== "" ? Number(data.monto) || 0 : precioPara_(b, cfg, series.length),
+    vendedor: String(data.vendedor || (sector ? sector.encargado || sector.nombre : "")).trim(),
+    sector_id: sector ? sector.sector_id : Number(data.sector_id) || 0, metodo: String(data.metodo || "Efectivo"),
+    comprobante_id: "", estado: "Aprobada", cartones: series.join(","), token: "", nota: "",
+    email_enviado: false, wa_enviado: false, fecha_completada: ""
+  };
+  e.token = tokenUnico_(b);
+  asignarCartones_(b, series, e, e.sector_id);
+  guardarEntrada_(b, e);
+  return { entrada: e };
+}
+
+/* ======================= Organizador y sector ======================= */
+
+function resolveAdmin_(b) {
+  var cfg = readConfig_(b);
+  var entradas = entradas_(b);
+  var vendidos = cartonesVendidos_(b);
+  return {
+    bingo: bingoPublico_(b), seed: b.seed, config: cfg, arte_url: arteUrl_(cfg),
+    precios: preciosObj_(b), sectores: sectores_(b), vivo_id: prop_("VIVO_SPREADSHEET_ID"),
+    resumen: resumen_(entradas, vendidos, cfg)
+  };
+}
+
+function resumen_(entradas, vendidos, cfg) {
+  var porEstado = { Pendiente: 0, Aprobada: 0, Completada: 0, Rechazada: 0 };
+  var recaudado = 0, pendienteMonto = 0;
+  var porSector = {};
+  entradas.forEach(function (e) {
+    porEstado[e.estado] = (porEstado[e.estado] || 0) + 1;
+    if (e.estado === "Aprobada" || e.estado === "Completada") recaudado += e.monto;
+    if (e.estado === "Pendiente") pendienteMonto += e.monto;
+  });
+  vendidos.forEach(function (c) {
+    var k = c.sector_id || 0;
+    porSector[k] = (porSector[k] || 0) + 1;
+  });
+  return {
+    cartones_vendidos: vendidos.length, cartones_habilitados: Number(cfg.cartones_habilitados) || 0,
+    compras: porEstado, recaudado: recaudado, por_aprobar: pendienteMonto, por_sector: porSector
+  };
+}
+
+function sectorResolve_(ctx) {
+  var b = ctx.bingo, s = ctx.sector;
+  var cfg = readConfig_(b);
+  var vendidos = cartonesVendidos_(b).filter(function (c) { return c.serie >= s.desde && c.serie <= s.hasta; });
+  var entradas = entradas_(b).filter(function (e) { return e.sector_id === s.sector_id; })
+    .map(function (e) { delete e._row; delete e.comprobante_id; return e; }).reverse();
+  return {
+    sector: { sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado, desde: s.desde, hasta: s.hasta },
+    config: publicConfig_(b, cfg), plantilla_whatsapp: cfg.plantilla_whatsapp, sitio_url: cfg.sitio_url,
+    precios: preciosObj_(b), precio_unitario: Number(cfg.precio_unitario) || 0,
+    vendidos: vendidos.map(function (c) { return c.serie; }), entradas: entradas
+  };
+}
+
+/* ======================= Jugador ======================= */
+
+function getPlayer_(token) {
+  var t = String(token || "").trim();
+  var pub = t.split(".")[0];
+  var b = bingoPorPublico_(pub);
+  var e = entradas_(b).filter(function (x) { return x.token === t; })[0];
+  if (!e || (e.estado !== "Aprobada" && e.estado !== "Completada")) throw new Error("Este link de cartones no es válido.");
+  var cfg = readConfig_(b);
+  return {
+    config: publicConfig_(b, cfg), nombre: e.nombre.split(" ")[0],
+    cartones: e.cartones.split(",").map(Number).filter(Boolean), vivo: estadoVivo_(b)
+  };
+}
+
+function getCard_(b) {
+  var cfg = readConfig_(b);
+  return { config: publicConfig_(b, cfg), vivo: estadoVivo_(b) };
+}
+
+/* ======================= Juego ======================= */
+
+function rondaObj_(r) {
+  var ganadores = [];
+  try { ganadores = r.ganadores ? JSON.parse(String(r.ganadores)) : []; } catch (e) { ganadores = []; }
+  return {
+    ronda_id: Number(r.ronda_id), orden: Number(r.orden) || 0, nombre: String(r.nombre || ""),
+    figura: String(r.figura || "linea"), premio: String(r.premio || ""), estado: String(r.estado || "Pendiente"),
+    bolas: String(r.bolas || "").split(",").map(Number).filter(Boolean), ganadores: ganadores,
+    inicio: String(r.inicio || ""), fin: String(r.fin || ""), _row: r._row
+  };
+}
+
+function rondas_(b) {
+  return readObjects_(sheetDe_(b, "rondas")).map(rondaObj_).sort(function (a, z) { return a.orden - z.orden || a.ronda_id - z.ronda_id; });
+}
+
+function guardarRonda_(b, r) {
+  var copia = {};
+  Object.keys(r).forEach(function (k) { copia[k] = r[k]; });
+  copia.bolas = r.bolas.join(",");
+  copia.ganadores = JSON.stringify(r.ganadores || []);
+  writeObject_(sheetDe_(b, "rondas"), SHEETS_.rondas, copia, r._row);
+}
+
+function limpiaRonda_(r) { var c = {}; Object.keys(r).forEach(function (k) { if (k !== "_row") c[k] = r[k]; }); return c; }
+
+function gameGet_(b) {
+  var cfg = readConfig_(b);
+  return {
+    rol: b._rol, seed: b.seed, config: publicConfig_(b, cfg), rondas: rondas_(b).map(limpiaRonda_),
+    vivo: estadoVivo_(b), cartones_habilitados: Number(cfg.cartones_habilitados) || 0
+  };
+}
+
+function gameSaveRonda_(b, data) {
+  var r = data.ronda || {};
+  if (!FIGURAS_[r.figura]) throw new Error("Figura no válida.");
+  var lista = rondas_(b);
+  var existente = r.ronda_id ? lista.filter(function (x) { return x.ronda_id === Number(r.ronda_id); })[0] : null;
+  var obj = existente || {
+    ronda_id: nextId_(lista, "ronda_id"), orden: lista.length + 1, estado: "Pendiente", bolas: [], ganadores: [], inicio: "", fin: ""
+  };
+  obj.nombre = String(r.nombre || "").trim() || ("Ronda " + obj.ronda_id);
+  obj.figura = r.figura;
+  obj.premio = String(r.premio || "").trim();
+  guardarRonda_(b, obj);
+  if (obj.estado === "En juego") publicarVivo_(b, obj);
+  return { rondas: rondas_(b).map(limpiaRonda_) };
+}
+
+function gameDeleteRonda_(b, data) {
+  var r = rondas_(b).filter(function (x) { return x.ronda_id === Number(data.ronda_id); })[0];
+  if (!r) throw new Error("Ronda no encontrada.");
+  if (r.estado !== "Pendiente") throw new Error("Solo se borran rondas que no han empezado.");
+  sheetDe_(b, "rondas").deleteRow(r._row);
+  return { rondas: rondas_(b).map(limpiaRonda_) };
+}
+
+function rondaEnJuego_(b) {
+  return rondas_(b).filter(function (x) { return x.estado === "En juego"; })[0] || null;
+}
+
+function gameAbrir_(b, data) {
+  if (rondaEnJuego_(b)) throw new Error("Termina la ronda en juego antes de abrir otra.");
+  var r = rondas_(b).filter(function (x) { return x.ronda_id === Number(data.ronda_id); })[0];
+  if (!r) throw new Error("Ronda no encontrada.");
+  r.estado = "En juego";
+  r.inicio = r.inicio || ahora_();
+  r.fin = "";
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function gameCantar_(b, data) {
+  var r = rondaEnJuego_(b);
+  if (!r) throw new Error("Abre una ronda antes de cantar.");
+  var bola = Math.floor(Number(data.bola));
+  if (!(bola >= 1 && bola <= 75)) throw new Error("La bola debe ser de 1 a 75.");
+  if (r.bolas.indexOf(bola) !== -1) throw new Error("La bola " + bola + " ya salió en esta ronda.");
+  r.bolas.push(bola);
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function gameDeshacer_(b) {
+  var r = rondaEnJuego_(b);
+  if (!r || !r.bolas.length) throw new Error("No hay bolas para deshacer.");
+  r.bolas.pop();
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function gameGanador_(b, data) {
+  var r = rondaEnJuego_(b);
+  if (!r) throw new Error("No hay una ronda en juego.");
+  var serie = Number(data.serie);
+  if (!serie) throw new Error("Serie no válida.");
+  if (r.ganadores.some(function (g) { return g.serie === serie; })) throw new Error("Ese cartón ya está registrado como ganador.");
+  var venta = cartonesVendidos_(b).filter(function (c) { return c.serie === serie; })[0];
+  r.ganadores.push({
+    serie: serie, nombre: venta ? venta.comprador.split(" ")[0] : String(data.nombre || "").trim(),
+    bolas: r.bolas.length, hora: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm")
+  });
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function gameCerrar_(b) {
+  var r = rondaEnJuego_(b);
+  if (!r) throw new Error("No hay una ronda en juego.");
+  r.estado = "Terminada";
+  r.fin = ahora_();
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+/** Para verificar: quién compró la serie (sin datos de contacto). */
+function gameBuscar_(b, data) {
+  var serie = Number(data.serie);
+  var venta = cartonesVendidos_(b).filter(function (c) { return c.serie === serie; })[0];
+  return { serie: serie, vendido: Boolean(venta), comprador: venta ? venta.comprador : "" };
+}
+
+/* ======================= Estado en vivo ======================= */
+
+function vivoPayload_(b, r) {
+  var terminadas = rondas_(b).filter(function (x) { return x.estado === "Terminada"; }).map(function (x) {
+    return { n: x.nombre, p: x.premio, g: x.ganadores.map(function (g) { return { s: g.serie, n: g.nombre }; }) };
+  });
+  if (!r) return { r: 0, e: "Espera", b: [], h: terminadas, t: Date.now() };
+  return {
+    r: r.ronda_id, n: r.nombre, f: r.figura, p: r.premio, e: r.estado, b: r.bolas,
+    g: r.ganadores.map(function (g) { return { s: g.serie, n: g.nombre }; }), h: terminadas, t: Date.now()
+  };
+}
+
+function publicarVivo_(b, r) {
+  var payload = vivoPayload_(b, r && r.estado === "En juego" ? r : null);
+  if (r && r.estado === "Terminada") payload.ultima = { n: r.nombre, b: r.bolas.length };
+  var json = JSON.stringify(payload);
+  CacheService.getScriptCache().put("vivo_" + b.public_id, json, 21600);
+  var vivoId = prop_("VIVO_SPREADSHEET_ID");
+  if (vivoId) {
+    var sh = SpreadsheetApp.openById(vivoId).getSheetByName("vivo");
+    var ids = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues() : [];
+    var fila = 0;
+    for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === b.public_id) { fila = i + 2; break; }
+    var valores = [[b.public_id, json, ahora_()]];
+    if (fila) sh.getRange(fila, 1, 1, 3).setValues(valores);
+    else sh.appendRow(valores[0]);
+  }
+  return payload;
+}
+
+function estadoVivo_(b) {
+  var cached = CacheService.getScriptCache().get("vivo_" + b.public_id);
+  if (cached) return JSON.parse(cached);
+  var payload = vivoPayload_(b, rondaEnJuego_(b));
+  CacheService.getScriptCache().put("vivo_" + b.public_id, JSON.stringify(payload), 21600);
+  return payload;
+}

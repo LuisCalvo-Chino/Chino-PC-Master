@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "54"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "55"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -42,6 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
         "privacidad"
     ]);
 
+    /** Links públicos del Bingo Digital: #b/ organizador, #bk/ cantador, #bv/ sector, #bc/ compra, #bj/ jugador, #bt/ cartón. */
+    const BINGO_ROUTE_RE = /^(b|bk|bv|bc|bj|bt)\/(.+)$/;
+    const BINGO_MODES = { b: "admin", bk: "cantador", bv: "sector", bc: "compra", bj: "jugador", bt: "carton" };
+    const BINGO_PREFIX = { admin: "b", cantador: "bk", sector: "bv", compra: "bc", jugador: "bj", carton: "bt" };
+
     function applyFooterVisibility(pageName) {
         document.body.classList.toggle("cpm-no-footer", !FOOTER_PAGES.has(pageName));
     }
@@ -56,6 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const raw = String(window.location.hash || "").replace(/^#/, "").trim();
         if (/^r\/.+$/.test(raw)) {
             document.body.classList.add("cpm-rifa-standalone");
+        } else if (BINGO_ROUTE_RE.test(raw)) {
+            document.body.classList.add("cpm-bingo-standalone");
         } else if (/^(u|a)\/.+$/i.test(raw)) {
             document.body.classList.add("cpm-angels-standalone", "cpm-angels-route");
         }
@@ -239,6 +246,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (page === "angels-dashboard") {
             return Boolean(session && isAdminSession(session));
         }
+        // Bingo: el hub (#bingo) es solo para administradores; los links por rol son públicos.
+        if (page === "bingo") {
+            const mode = routeCtx?.bingo?.mode || "hub";
+            return mode !== "hub" || Boolean(session && isAdminSession(session));
+        }
         if (page === "admin" || page === "certificados") {
             return Boolean(session && isAdminSession(session));
         }
@@ -283,6 +295,10 @@ document.addEventListener("DOMContentLoaded", () => {
         menuRifa.hidden = !canRifa;
         menuCertificados.hidden = !canAdmin;
         menuAdmin.hidden = !canAdmin;
+        const menuBingo = dropdownMenu?.querySelector('[data-page="bingo"]');
+        if (menuBingo) menuBingo.hidden = !canAdmin;
+        const mobileMenuBingo = mobileSidebar?.querySelector('[data-page="bingo"]');
+        if (mobileMenuBingo) mobileMenuBingo.hidden = !canAdmin;
         const menuAngelsDash = dropdownMenu?.querySelector('[data-page="angels-dashboard"]');
         if (menuAngelsDash) menuAngelsDash.hidden = !canAdmin;
         dropdownBtn.disabled = false;
@@ -604,6 +620,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (adminMatch) {
             return { page: "angels", angels: { mode: "a", hash: adminMatch[1] }, rifa: null };
         }
+        const bingoMatch = raw.match(BINGO_ROUTE_RE);
+        if (bingoMatch) {
+            let hash = bingoMatch[2];
+            try {
+                hash = decodeURIComponent(hash);
+            } catch (e) {
+                /* keep raw */
+            }
+            return { page: "bingo", angels: null, rifa: null, bingo: { mode: BINGO_MODES[bingoMatch[1]], hash } };
+        }
         const rifaAdminMatch = raw.match(/^r\/(.+)$/);
         if (rifaAdminMatch) {
             let hash = rifaAdminMatch[1];
@@ -625,6 +651,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (clean === "rifa") {
             return { page: "rifa", angels: null, rifa: { mode: "hub" } };
         }
+        if (clean === "bingo") {
+            return { page: "bingo", angels: null, rifa: null, bingo: { mode: "hub" } };
+        }
         return { page: clean || "home", angels: null, rifa: null };
     }
 
@@ -633,8 +662,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return page;
     }
 
-    function hashStringForRoute(page, angels, rifa) {
+    function hashStringForRoute(page, angels, rifa, bingo) {
         if (page === "angels-dashboard") return "#angels-dashboard";
+        if (page === "bingo" && bingo?.mode && bingo.mode !== "hub" && bingo.hash) {
+            return `#${BINGO_PREFIX[bingo.mode]}/${bingo.hash}`;
+        }
         if (page === "angels" && angels?.mode && angels?.hash) {
             const prefix = angels.mode === "a" ? "a" : "u";
             return `#${prefix}/${angels.hash}`;
@@ -664,7 +696,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadPage(page, options = {}) {
         const pageName = resolvePage(page);
         const session = getSession();
-        const routeCtx = { rifa: options.rifa || null, angels: options.angels || null };
+        const routeCtx = { rifa: options.rifa || null, angels: options.angels || null, bingo: options.bingo || null };
         if (!options.skipGuard && !canAccessPage(pageName, session, routeCtx)) {
             finishAppLoadingTransition();
             return routeDenied(pageName);
@@ -694,6 +726,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     document.body.classList.remove("cpm-rifa-standalone");
                 }
                 await handleRifaAnimation(rifaCtx);
+            } else if (pageName === "bingo") {
+                const bingoCtx = options.bingo || { mode: "hub" };
+                document.body.classList.toggle("cpm-bingo-standalone", bingoCtx.mode !== "hub");
+                await loadBingoScripts();
+                if (typeof window.initBingoApp === "function") {
+                    pageReady = window.initBingoApp({ showMessage, getSession, bingo: bingoCtx });
+                }
             } else if (pageName === "certificados") {
                 await loadCertificadosScript();
                 if (typeof window.initCertificadosAdminApp === "function") {
@@ -759,6 +798,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (pageName !== "rifa") {
                 document.body.classList.remove("cpm-rifa-standalone");
             }
+            if (pageName !== "bingo") {
+                document.body.classList.remove("cpm-bingo-standalone");
+            }
 
             setupContactFormOnCurrentPage();
             applyProtectedLinksState();
@@ -785,14 +827,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 : pageName === "rifa"
                   ? { mode: "hub" }
                   : null;
-        if (!options.skipGuard && !protectRoutes(pageName, { rifa, angels })) {
+        const bingo =
+            options.bingo != null
+                ? options.bingo
+                : pageName === "bingo"
+                  ? { mode: "hub" }
+                  : null;
+        if (!options.skipGuard && !protectRoutes(pageName, { rifa, angels, bingo })) {
             finishAppLoadingTransition();
             return;
         }
-        const ok = await loadPage(pageName, { ...options, angels, rifa });
+        const ok = await loadPage(pageName, { ...options, angels, rifa, bingo });
         if (!ok) return;
-        const state = { page: pageName, angels, rifa };
-        const url = hashStringForRoute(pageName, angels, rifa);
+        const state = { page: pageName, angels, rifa, bingo };
+        const url = hashStringForRoute(pageName, angels, rifa, bingo);
         if (options.replaceHistory) {
             window.history.replaceState(state, "", url);
         } else if (!options.fromPopState) {
@@ -812,6 +860,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     scrollTarget: String(link.getAttribute("data-scroll-target") || "").trim() || "",
                     angels: route.angels,
                     rifa: null
+                };
+            }
+            if (route.page === "bingo" && route.bingo) {
+                return {
+                    page: "bingo",
+                    scrollTarget: "",
+                    angels: null,
+                    rifa: null,
+                    bingo: route.bingo
                 };
             }
             if (route.page === "rifa" && route.rifa) {
@@ -882,6 +939,42 @@ document.addEventListener("DOMContentLoaded", () => {
             p.textContent = textoPlano;
             splash.appendChild(p);
         }
+    }
+
+    /** Bingo Digital: hoja de estilos + motor de cartones + cliente del Web App + app (en ese orden). */
+    function loadBingoScripts() {
+        const v = encodeURIComponent(ASSET_V);
+        if (!document.getElementById("bingo-css")) {
+            const link = document.createElement("link");
+            link.id = "bingo-css";
+            link.rel = "stylesheet";
+            link.href = `assets/bingo.css?v=${v}`;
+            document.head.appendChild(link);
+        }
+        const files = [
+            ["bingo-core-script", `assets/bingo-core.js?v=${v}`],
+            ["bingo-api-script", `assets/bingo-api.js?v=${v}`],
+            ["bingo-script", `assets/bingo.js?v=${v}`]
+        ];
+        return files.reduce(
+            (chain, [id, src]) =>
+                chain.then(
+                    () =>
+                        new Promise((resolve) => {
+                            if (document.getElementById(id)) return resolve();
+                            const s = document.createElement("script");
+                            s.id = id;
+                            s.src = src;
+                            s.onload = () => resolve();
+                            s.onerror = () => {
+                                console.error("Error cargando", src);
+                                resolve();
+                            };
+                            document.body.appendChild(s);
+                        })
+                ),
+            Promise.resolve()
+        );
     }
 
     function loadCertificadosScript() {
@@ -1159,6 +1252,7 @@ document.addEventListener("DOMContentLoaded", () => {
             navTarget.page === currentPage &&
             !navTarget.angels &&
             !navTarget.rifa &&
+            !navTarget.bingo &&
             document.getElementById(navTarget.scrollTarget)
         ) {
             scrollToTarget(navTarget.scrollTarget);
@@ -1167,7 +1261,8 @@ document.addEventListener("DOMContentLoaded", () => {
         navigateTo(navTarget.page, {
             scrollTarget: navTarget.scrollTarget,
             angels: navTarget.angels || null,
-            rifa: navTarget.rifa || null
+            rifa: navTarget.rifa || null,
+            bingo: navTarget.bingo || null
         });
     });
 
@@ -1236,7 +1331,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const raw = window.location.hash.slice(1) || "";
         const route =
             st && st.page
-                ? { page: st.page, angels: st.angels || null, rifa: st.rifa || null }
+                ? { page: st.page, angels: st.angels || null, rifa: st.rifa || null, bingo: st.bingo || null }
                 : parseRouteFromHash(raw);
         if (!protectRoutes(route.page, route)) {
             finishAppLoadingTransition();
@@ -1245,7 +1340,8 @@ document.addEventListener("DOMContentLoaded", () => {
         void navigateTo(route.page, {
             fromPopState: true,
             angels: route.angels,
-            rifa: route.rifa
+            rifa: route.rifa,
+            bingo: route.bingo || null
         });
     });
 
@@ -1258,7 +1354,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 await navigateTo(initialRoute.page, {
                     replaceHistory: true,
                     angels: initialRoute.angels,
-                    rifa: initialRoute.rifa
+                    rifa: initialRoute.rifa,
+                    bingo: initialRoute.bingo || null
                 });
             } else {
                 finishAppLoadingTransition();

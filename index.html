@@ -74,6 +74,7 @@
                     <button type="button" class="dropdown-btn" id="webapps-menu-btn" aria-expanded="false" aria-haspopup="true" aria-controls="webapps-dropdown-menu">WebApps</button>
                     <div id="webapps-dropdown-menu" class="dropdown-menu" role="menu">
                         <a href="#rifa" class="dropdown-item" data-page="rifa" data-requires-permission="rifa" role="menuitem" hidden>Rifa</a>
+                        <a href="#bingo" class="dropdown-item" data-page="bingo" data-requires-admin="true" role="menuitem" hidden>Bingo</a>
                         <a href="#certificados" class="dropdown-item" data-page="certificados" data-requires-admin="true" role="menuitem" hidden>Certificados</a>
                         <a href="#admin" class="dropdown-item" data-page="admin" data-requires-admin="true" role="menuitem" hidden>Panel Admin</a>
                         <a href="#angels-dashboard" class="dropdown-item" data-page="angels-dashboard" data-requires-admin="true" role="menuitem" hidden>Ángeles (Maestro)</a>
@@ -113,6 +114,7 @@
                     <span class="mobile-sidebar__label">WebApps</span>
                     <ul class="mobile-sidebar__sublist">
                         <li><a href="#rifa" class="mobile-sidebar__link" data-page="rifa" data-requires-permission="rifa" hidden>Rifa</a></li>
+                        <li><a href="#bingo" class="mobile-sidebar__link" data-page="bingo" data-requires-admin="true" hidden>Bingo</a></li>
                         <li><a href="#certificados" class="mobile-sidebar__link" data-page="certificados" data-requires-admin="true" hidden>Certificados</a></li>
                         <li><a href="#admin" class="mobile-sidebar__link" data-page="admin" data-requires-admin="true" hidden>Panel Admin</a></li>
                         <li><a href="#angels-dashboard" class="mobile-sidebar__link" data-page="angels-dashboard" data-requires-admin="true" hidden>Ángeles (Maestro)</a></li>
@@ -297,10 +299,12 @@
     <!-- Web App Maestro Ángeles / Rifa multi: URL .../macros/s/.../exec -->
     <script>
         /** Subir este número al cambiar HTML parcial (rifa.html, etc.) o JS dinámico — evita caché en GitHub Pages */
-        window.CPM_ASSET_V = "54";
+        window.CPM_ASSET_V = "55";
         window.CPM_ANGELS_MASTER_GAS_URL = "https://script.google.com/macros/s/AKfycbxLoQNdHqetK7cBzYCp3XEILGjH7KPWAbdadaEioOqSctUJ_gJOJJVQ0TKMP3itmT7FuQ/exec";
         /** Rifa multi-proyecto: Web App /exec */
         window.CPM_RIFA_GAS_URL = "https://script.google.com/macros/s/AKfycbyWYEfJevJ_vi9JffQeXgFB8Ru2VDOzXOQvlo29wp2qUTDi5vxzOlrybkQ1WsKXYiA/exec";
+        /** Bingo Digital multi-proyecto: Web App /exec (pasos en docs/bingo-implementacion.md) */
+        window.CPM_BINGO_GAS_URL = "";
         /** Rifa (#r/…): guardar el aviso de instalación de Android para ofrecerlo con el botón «Agregar a mi pantalla de inicio». */
         window.addEventListener("beforeinstallprompt", function (e) {
             if (/^#r\//.test(window.location.hash)) {
@@ -311,7 +315,7 @@
         /** Opcional: clave API ImgBB (Ángeles + Rifa banner). Si no se define, se usa la clave por defecto del proyecto. */
         // window.CPM_IMGBB_API_KEY = "TU_CLAVE_IMGBB";
     </script>
-    <script src="assets/app.js?v=39"></script>
+    <script src="assets/app.js?v=40"></script>
 
 </body>
 </html>
