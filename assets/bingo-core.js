@@ -1,7 +1,8 @@
 /**
  * Bingo Digital — motor de cartones (sin dependencias del sitio).
  *
- * - Cartón americano de 75 bolas, 5×5, centro libre. B 1–15 · I 16–30 · N 31–45 · G 46–60 · O 61–75.
+ * - Cartón americano de 75 bolas, 5×5. B 1–15 · I 16–30 · N 31–45 · G 46–60 · O 61–75.
+ *   El centro es libre (0) o, si el bingo lo elige, lleva el quinto número de la columna N.
  * - Cada cartón se calcula de la semilla del bingo y su serie (1–10 000): nunca se guarda como imagen.
  * - El template (1200 × 1680 px = 10 × 14 cm a 304,8 ppp) fija dónde van título, BINGO, casillas,
  *   serie, QR y código. El arte del cliente se pinta debajo y el sistema dibuja encima.
@@ -46,7 +47,7 @@
         };
     }
 
-    /** grid[fila][columna]; el centro es 0 (libre). */
+    /** grid[fila][columna]; el centro es 0 (libre) y su número queda aparte para los bingos sin espacio libre. */
     function generarIntento(seed, serie, intento) {
         const rnd = mulberry32(hashStr(`${seed}|${serie}|${intento}`) >>> 0);
         const cols = [];
@@ -61,8 +62,9 @@
         }
         const grid = [];
         for (let f = 0; f < 5; f++) grid.push(cols.map((col) => col[f]));
+        const centro = grid[2][2];
         grid[2][2] = 0;
-        return grid;
+        return { grid, centro };
     }
 
     /* Cartones únicos: se generan en orden 1..N; si una combinación repite, la serie toma el siguiente intento. */
@@ -70,29 +72,34 @@
     function libreta(seed) {
         let lib = cache.get(seed);
         if (!lib) {
-            lib = { cartones: [null], vistos: new Set() };
+            lib = { cartones: [null], centros: [0], vistos: new Set() };
             cache.set(seed, lib);
         }
         return lib;
     }
 
-    function carton(seed, serie) {
+    /** centroNumero = true: el centro lleva su número en lugar del espacio libre (copia; la libreta no cambia). */
+    function carton(seed, serie, centroNumero) {
         const n = Math.floor(Number(serie));
         if (!(n >= 1 && n <= MAX_CARTONES)) throw new Error(`La serie ${serie} no existe (1 a ${MAX_CARTONES}).`);
         const lib = libreta(seed);
         while (lib.cartones.length <= n) {
             const s = lib.cartones.length;
             let intento = 0;
-            let grid;
+            let gen;
             let clave;
             do {
-                grid = generarIntento(seed, s, intento++);
-                clave = grid.flat().join(",");
+                gen = generarIntento(seed, s, intento++);
+                clave = gen.grid.flat().join(",");
             } while (lib.vistos.has(clave));
             lib.vistos.add(clave);
-            lib.cartones.push(grid);
+            lib.cartones.push(gen.grid);
+            lib.centros.push(gen.centro);
         }
-        return lib.cartones[n];
+        if (!centroNumero) return lib.cartones[n];
+        const copia = lib.cartones[n].map((row) => row.slice());
+        copia[2][2] = lib.centros[n];
+        return copia;
     }
 
     const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -132,8 +139,45 @@
         l: { nombre: "Letra L", alternativas: [unir(columna(0), fila(4))] },
         t: { nombre: "Letra T", alternativas: [unir(fila(0), columna(2))] },
         marco: { nombre: "Marco", alternativas: [unir(fila(0), fila(4), columna(0), columna(4))] },
-        lleno: { nombre: "Cartón lleno", alternativas: [filas.flatMap((f) => fila(f))] }
+        lleno: { nombre: "Cartón lleno", alternativas: [filas.flatMap((f) => fila(f))] },
+        col_b: { nombre: "Vertical de la B", alternativas: [columna(0)] },
+        col_i: { nombre: "Vertical de la I", alternativas: [columna(1)] },
+        col_n: { nombre: "Vertical de la N", alternativas: [columna(2)] },
+        col_g: { nombre: "Vertical de la G", alternativas: [columna(3)] },
+        col_o: { nombre: "Vertical de la O", alternativas: [columna(4)] },
+        fila_1: { nombre: "Horizontal de arriba (fila 1)", alternativas: [fila(0)] },
+        fila_2: { nombre: "Horizontal fila 2", alternativas: [fila(1)] },
+        fila_3: { nombre: "Horizontal del centro (fila 3)", alternativas: [fila(2)] },
+        fila_4: { nombre: "Horizontal fila 4", alternativas: [fila(3)] },
+        fila_5: { nombre: "Horizontal de abajo (fila 5)", alternativas: [fila(4)] },
+        diag_1: { nombre: "Diagonal ↘ (de B arriba a O abajo)", alternativas: [diag1] },
+        diag_2: { nombre: "Diagonal ↙ (de O arriba a B abajo)", alternativas: [diag2] },
+        custom: { nombre: "Figura personalizada", alternativas: [] }
     };
+
+    /** Orden para los selectores: primero las de cualquier posición, luego las fijas. */
+    const ORDEN_FIGURAS = ["linea", "horizontal", "vertical", "diagonal", "esquinas", "x", "l", "t", "marco", "lleno",
+        "col_b", "col_i", "col_n", "col_g", "col_o", "fila_1", "fila_2", "fila_3", "fila_4", "fila_5", "diag_1", "diag_2", "custom"];
+
+    /** Casillas «f,c;f,c» de una figura personalizada → [[f, c], …]. */
+    function celdasDe(texto) {
+        return String(texto || "").split(";").map((p) => p.split(",").map(Number)).filter((x) => x.length === 2 && x.every((v) => v >= 0 && v <= 4));
+    }
+
+    function alternativasDe(figura, celdas) {
+        if (figura === "custom") {
+            const c = celdasDe(celdas);
+            return c.length ? [c] : [];
+        }
+        return (FIGURAS[figura] || FIGURAS.linea).alternativas;
+    }
+
+    function nombreFigura(figura, celdas) {
+        if (figura === "custom") return `Figura personalizada (${celdasDe(celdas).length} casillas)`;
+        if (figura === "salado") return "El cartón más salado";
+        if (figura === "eliminacion") return "Eliminación";
+        return (FIGURAS[figura] || FIGURAS.linea).nombre;
+    }
 
     function marcadas(grid, bolas) {
         const set = bolas instanceof Set ? bolas : new Set(bolas || []);
@@ -141,11 +185,10 @@
     }
 
     /** Casillas que faltan para completar la figura (0 = ¡BINGO!). */
-    function faltan(grid, bolas, figura) {
-        const fig = FIGURAS[figura] || FIGURAS.linea;
+    function faltan(grid, bolas, figura, celdas) {
         const m = marcadas(grid, bolas);
         let min = 25;
-        fig.alternativas.forEach((alt) => {
+        alternativasDe(figura, celdas).forEach((alt) => {
             const f = alt.filter(([r, c]) => !m[r][c]).length;
             if (f < min) min = f;
         });
@@ -153,11 +196,24 @@
     }
 
     /** Casillas de la alternativa ganadora (para resaltarla al verificar). */
-    function casillasGanadoras(grid, bolas, figura) {
-        const fig = FIGURAS[figura] || FIGURAS.linea;
+    function casillasGanadoras(grid, bolas, figura, celdas) {
         const m = marcadas(grid, bolas);
-        const alt = fig.alternativas.find((a) => a.every(([r, c]) => m[r][c]));
+        const alt = alternativasDe(figura, celdas).find((a) => a.every(([r, c]) => m[r][c]));
         return alt || null;
+    }
+
+    /** «El cartón más salado»: casillas con número que siguen sin marcar. */
+    function blancos(grid, bolas) {
+        const set = bolas instanceof Set ? bolas : new Set(bolas || []);
+        let n = 0;
+        grid.forEach((row) => row.forEach((v) => { if (v !== 0 && !set.has(v)) n++; }));
+        return n;
+    }
+
+    /** Eliminación: la primera bola cantada que el cartón tiene (0 = sigue en pie). */
+    function eliminadoPor(grid, bolas) {
+        const nums = new Set(grid.flat());
+        return (bolas || []).find((b) => nums.has(b)) || 0;
     }
 
     /* ---------- Dibujo ---------- */
@@ -222,14 +278,14 @@
     /**
      * Dibuja un cartón completo en un canvas de 1200 × 1680.
      * opts: { seed, serie, arte (Image|null), titulo, subtitulo, letras (bool), marcas (grid bool|null),
-     *         resaltar ([[f,c]]|null), qrTexto, familia }
+     *         resaltar ([[f,c]]|null), qrTexto, familia, centroNumero (bool), centroImg (Image|null), sello (texto) }
      */
     function dibujarCarton(canvas, opts) {
         const ctx = canvas.getContext("2d");
         canvas.width = G.W;
         canvas.height = G.H;
         const familia = opts.familia || "'Montserrat', Arial, sans-serif";
-        const grid = carton(opts.seed, opts.serie);
+        const grid = carton(opts.seed, opts.serie, opts.centroNumero);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, G.W, G.H);
 
@@ -272,7 +328,10 @@
                 ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
                 const n = grid[f][c];
                 ctx.fillStyle = TINTA;
-                if (n === 0) {
+                if (n === 0 && opts.centroImg) {
+                    ctx.drawImage(opts.centroImg, r.x, r.y, r.w, r.h);
+                    ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+                } else if (n === 0) {
                     ctx.font = `800 34px ${familia}`;
                     ctx.fillText("LIBRE", r.x + r.w / 2, r.y + r.h / 2);
                 } else {
@@ -293,6 +352,25 @@
             }
         );
         if (opts.qrTexto) dibujarQR(ctx, opts.qrTexto, G.qr);
+        if (opts.sello) {
+            const cz = G.casillas;
+            ctx.save();
+            ctx.translate(cz.x + cz.celda * 2.5, cz.y + cz.celda * 2.5);
+            ctx.rotate(-Math.PI / 9);
+            ctx.font = `900 130px ${familia}`;
+            const w = ctx.measureText(opts.sello).width + 60;
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-w / 2, -95, w, 190);
+            ctx.strokeStyle = ROJO;
+            ctx.lineWidth = 12;
+            ctx.strokeRect(-w / 2, -95, w, 190);
+            ctx.fillStyle = ROJO;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(opts.sello, 0, 8);
+            ctx.restore();
+        }
         return canvas;
     }
 
@@ -345,9 +423,10 @@
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.font = `700 26px ${familia}`;
-                ctx.fillText(f === 2 && c === 2 ? "LIBRE" : LETRAS[c], r.x + r.w / 2, r.y + r.h / 2 - 12);
+                const centro = f === 2 && c === 2;
+                ctx.fillText(centro ? "LIBRE o N" : LETRAS[c], r.x + r.w / 2, r.y + r.h / 2 - 12);
                 ctx.font = `400 18px ${familia}`;
-                ctx.fillText("casilla blanca", r.x + r.w / 2, r.y + r.h / 2 + 20);
+                ctx.fillText(centro ? `imagen ${r.w} × ${r.h} px` : "casilla blanca", r.x + r.w / 2, r.y + r.h / 2 + 20);
             }
         }
         const cz = G.casillas;
@@ -406,6 +485,11 @@
         LETRAS,
         GEOMETRIA: G,
         FIGURAS,
+        ORDEN_FIGURAS,
+        alternativasDe,
+        nombreFigura,
+        blancos,
+        eliminadoPor,
         carton,
         codigo,
         serieTexto,

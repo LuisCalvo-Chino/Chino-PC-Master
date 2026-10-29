@@ -1,4 +1,4 @@
-# Bingo Digital (Beta 1) — Instrucciones de implementación
+# Bingo Digital (Beta 2) — Instrucciones de implementación
 
 Sistema para que cada cliente administre su propio bingo desde un link, con cartones propios (hasta 10 000), ventas en línea y presenciales por sectores, y juego en vivo para jugadores presenciales y virtuales.
 
@@ -35,7 +35,7 @@ Los cartones **no se guardan como imagen**: cada uno se calcula de la semilla de
 
 4. En el editor elige la función **`instalarBingo`** y pulsa **Ejecutar** una vez. Acepta los permisos (Sheets, Drive, correo). Crea el Spreadsheet público «Bingo en vivo» y guarda `VIVO_SPREADSHEET_ID`.
 5. **Implementar → Nueva implementación → Aplicación web**: Ejecutar como **Yo** · Acceso **Cualquiera**. Copia la URL `/exec`.
-6. Para actualizar el código después: **Administrar implementaciones → Editar → Versión: Nueva versión**. La URL no cambia.
+6. Para actualizar el código después: pega el archivo completo de nuevo, guarda y ve a **Administrar implementaciones → Editar → Versión: Nueva versión**. La URL no cambia. Los bingos que ya existen reciben solos las columnas nuevas de sus hojas la primera vez que se abren.
 
 ## 3. Conectar el sitio
 
@@ -54,23 +54,30 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
 | `#bingo` | Tú (admin) | Crear, archivar, reactivar y quitar bingos; copiar los links |
 | `#b/<código>` | Organizador | Resumen, Ventas, Cartones, Sectores, Juego, Ajustes |
 | `#bk/<código>` | Cantador | Solo el juego |
-| `#bv/<pub>.<código>` | Encargado de sector | Registrar ventas de su bloque, enviar links, imprimir su bloque |
+| `#bv/<pub>.<código>` | Encargado de sector (uno por encargado) o link general del sector | Registrar ventas con comprador, correo y comprobante; enviar links; imprimir su bloque |
 | `#bc/<pub>` | Público | Comprar con comprobante |
-| `#bj/<pub>.<token>` | Jugador | Sus cartones con la bola en vivo |
+| `#bj/<pub>.<token>` | Jugador | Todos sus cartones con la bola en vivo: las compras con el mismo correo comparten link |
 | `#bt/<pub>-<serie>-<código>` | Quien escanea el QR | Un cartón suelto en vivo; el código impide inventar series |
 
 ## 5. Uso
 
 1. **Hub → + Nuevo bingo**: nombre, fecha, precio por cartón y (opcional) el correo Google del cliente, al que se le comparte la carpeta del bingo. Envía el link de organizador por WhatsApp.
-2. **Ajustes** (primera vez): fecha, hora, lugar, SINPE, precios de 1 a 20 cartones (de 21 en adelante se usa el precio por cartón) y los mensajes de WhatsApp y correo.
-3. **Cartones**: descargar el template (PNG, PNG transparente o PDF de 10 × 14 cm), subir el arte (1200 × 1680 px), ver la vista previa, ampliar el lote, imprimir PDF por rango (1, 2, 4 o 6 por hoja carta, máximo 100 cartones por archivo) y buscar un cartón.
-4. **Sectores**: bloques de series por sector con su link. Los rangos no se cruzan; las compras en línea usan las series fuera de ellos.
-5. **Ventas**: Pendientes → Aprobar (asigna los siguientes libres o las series que elijas) → Por enviar (WhatsApp, correo, copiar link) → Historial. «Devolver a pendientes» libera los cartones.
-6. **Juego**: crear rondas (figura + premio), Empezar, Sacar bola (azar) o anotar la bola del bombo físico, Deshacer, Verificar una serie, Registrar ganador, Terminar ronda.
+2. **Ajustes** (primera vez): fecha y hora (se muestran como «15 de nov de 2026 a las 19:00»), lugar, SINPE, **combos de precios**, marcado del jugador y los mensajes.
+   - **Combos**: cantidad de cartones + precio. El total de cualquier cantidad es la combinación de combos más barata que suma exactamente esa cantidad (combos 1 = ₡3 000 y 10 = ₡19 000 → 21 cartones = ₡41 000). El combo de 1 cartón es obligatorio. Si comprar un cartón más cuesta lo mismo o menos, el panel avisa que los precios no están escalonados y pide confirmar. No hay límite de 20: hasta 1000 cartones por compra.
+   - **Marcado**: «Solo tocando la casilla» (por defecto; el jugador no ve el menú de marcado ni los avisos de «te faltan») o «Automático disponible» (se marcan solos y el jugador puede cambiar a manual).
+   - **Mensajes**: WhatsApp con formato y emojis, con vista previa de chat. Correo con editor visual (o HTML) y vista previa de bandeja de entrada; los emojis del correo se avisan y se quitan al guardar.
+3. **Cartones**: template (PNG, PNG transparente o PDF de 10 × 14 cm), arte (1200 × 1680 px), **centro del cartón** (espacio libre o número; con espacio libre, imagen PNG de exactamente 190 × 190 px), vista previa, lote, PDF por rango y buscar un cartón.
+4. **Sectores**: bloque de series por sector y **varios encargados**, cada uno con su link. El resumen desglosa cartones, monto y ventas por sector y por encargado. En la compra pública, el comprador elige al encargado que le vendió.
+5. **Ventas**: Pendientes → Aprobar → Por enviar (WhatsApp, correo, copiar link) → Historial. El correo es obligatorio y une las compras de una persona en un solo link. Los vendedores registran ventas con comprador, correo, series impresas o cartones asignados, pago y comprobante (obligatorio en SINPE y transferencia).
+6. **Juego**: rondas de tres tipos:
+   - **Figuras y premios**: varios premios por ronda, cada uno con su figura (incluye verticales B/I/N/G/O, horizontales por fila, diagonales y figura personalizada). El panel muestra qué cartones vendidos ya completaron cada premio.
+   - **El cartón más salado**: ranking en vivo de los cartones vendidos con más espacios en blanco.
+   - **Eliminación**: cada bola elimina los cartones que la tienen; el panel cuenta los que siguen en pie y avisa cuando queda uno (o si una bola saca a todos).
+   Las rondas se ordenan con ↑ ↓; un ganador mal registrado se puede quitar.
 
 ### Figuras
 
-Línea (cualquiera), línea horizontal, vertical, diagonal, 4 esquinas, X, L, T, marco y cartón lleno. El centro libre cuenta como marcado.
+Línea (cualquiera), línea horizontal, vertical, diagonal, 4 esquinas, X, L, T, marco, cartón lleno, vertical de cada letra, horizontal de cada fila, cada diagonal y figura personalizada. El centro libre cuenta como marcado; con número en el centro se marca solo si sale su bola.
 
 ### Template del cartón (px, 1200 × 1680)
 
@@ -79,6 +86,7 @@ Línea (cualquiera), línea horizontal, vertical, diagonal, 4 esquinas, X, L, T,
 | Título (arte libre) | 60 | 50 | 1080 × 330 |
 | Letras B I N G O | 125 | 395 | 950 × 110 |
 | Casillas 5 × 5 (190 px c/u, blancas) | 125 | 515 | 950 × 950 |
+| Centro (imagen opcional del espacio libre) | 505 | 895 | 190 × 190 |
 | Serie | 125 | 1515 | 360 × 110 |
 | QR | 530 | 1495 | 140 × 140 |
 | Código | 715 | 1515 | 360 × 110 |
@@ -92,10 +100,10 @@ Al cantar, el script escribe el estado en `CacheService` y en la hoja pública �
 ## 7. Acciones API (POST JSON)
 
 - Hub (`masterPin`): `super_list`, `super_create`, `super_update`, `super_delete`
-- Público: `get_compra`, `submit_compra`, `get_player`, `get_card`, `estado`, `get_arte`
-- Organizador (`hash`): `resolve_admin`, `update_config`, `upload_arte`, `delete_arte`, `save_precios`, `save_sectores`, `list_entradas`, `get_comprobante`, `approve_entrada`, `reject_entrada`, `return_entrada`, `complete_entrada`, `reopen_entrada`, `mark_sent`, `send_email`, `vender_presencial`, `ampliar_lote`, `list_cartones`
-- Sector (`hash`): `sector_resolve`, `sector_vender`, `sector_mark_sent`
-- Juego (`hash` del organizador o del cantador): `game_get`, `game_save_ronda`, `game_delete_ronda`, `game_abrir`, `game_cantar`, `game_deshacer`, `game_ganador`, `game_cerrar`, `game_buscar`
+- Público: `get_compra`, `submit_compra`, `get_player`, `get_card`, `estado`, `get_arte` (arte y centro)
+- Organizador (`hash`): `resolve_admin`, `update_config`, `upload_arte`, `delete_arte`, `upload_centro`, `delete_centro`, `save_precios`, `save_sectores`, `list_entradas`, `get_comprobante`, `approve_entrada`, `reject_entrada`, `return_entrada`, `complete_entrada`, `reopen_entrada`, `mark_sent`, `send_email`, `vender_presencial`, `ampliar_lote`, `list_cartones`
+- Sector o encargado (`hash`): `sector_resolve`, `sector_vender`, `sector_mark_sent`, `sector_comprobante`
+- Juego (`hash` del organizador o del cantador): `game_get`, `game_save_ronda`, `game_delete_ronda`, `game_mover_ronda`, `game_abrir`, `game_cantar`, `game_deshacer`, `game_ganador`, `game_quitar_ganador`, `game_cerrar`, `game_buscar`
 
 Respuesta: `{ "status": "SUCCESS", "data": { … } }` o `{ "status": "ERROR", "message": "…" }`.
 
@@ -111,3 +119,7 @@ Respuesta: `{ "status": "SUCCESS", "data": { … } }` o `{ "status": "ERROR", "m
 - [ ] PDF de 4 por hoja con QR; el QR abre el cartón suelto
 - [ ] Ronda: sacar bolas, el jugador ve la última bola en menos de ~10 s, verificar y registrar ganador
 - [ ] Medir el retraso de la lectura directa con 2–3 teléfonos
+- [ ] Beta 2: combos (21 cartones con combos 1 y 10), aviso de escalonado, compra de 2 veces con el mismo correo → un solo link
+- [ ] Beta 2: encargado registra venta con comprobante; el resumen la cuenta para ese encargado
+- [ ] Beta 2: ronda con 3 premios, ronda «más salado» y eliminación; marcado manual y automático; centro con número y con imagen
+- [ ] Beta 2: vista previa del correo y de WhatsApp; correo real recibido sin emojis

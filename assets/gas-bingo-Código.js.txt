@@ -1,5 +1,5 @@
 /**
- * Chino PC Master — Apps Script Bingo Digital (multi-proyecto, versión Beta 1).
+ * Chino PC Master — Apps Script Bingo Digital (multi-proyecto, versión Beta 2).
  *
  * Un solo Web App:
  *   - Spreadsheet de registro (SPREADSHEET_ID): hoja «Bingos», una fila por bingo.
@@ -19,9 +19,10 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 1;
+var API_VERSION_ = 2;
 var MAX_CARTONES_ = 10000;
 var LOTE_DEFAULT_ = 100;
+var MAX_POR_COMPRA_ = 1000;
 
 var BINGOS_HEADERS_ = [
   "bingo_id", "nombre", "public_id", "hash_admin", "hash_cantador", "seed",
@@ -33,24 +34,30 @@ var SHEETS_ = {
   cartones: ["serie", "estado", "entrada_id", "sector_id", "comprador", "fecha"],
   entradas: ["entrada_id", "fecha", "nombre", "telefono", "correo", "modalidad", "cantidad", "monto",
     "vendedor", "sector_id", "metodo", "comprobante_id", "estado", "cartones", "token", "nota",
-    "email_enviado", "wa_enviado", "fecha_completada"],
-  sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo"],
+    "email_enviado", "wa_enviado", "fecha_completada", "encargado_id"],
+  sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo", "encargados"],
   precios: ["cantidad", "precio"],
-  rondas: ["ronda_id", "orden", "nombre", "figura", "premio", "estado", "bolas", "ganadores", "inicio", "fin"]
+  rondas: ["ronda_id", "orden", "nombre", "figura", "premio", "estado", "bolas", "ganadores", "inicio", "fin",
+    "tipo", "premios", "extra"]
 };
 
+/** Figuras con nombre (las mismas de bingo-core.js); «custom» lleva sus casillas en «celdas». */
 var FIGURAS_ = {
-  linea: 1, horizontal: 1, vertical: 1, diagonal: 1, esquinas: 1, x: 1, l: 1, t: 1, marco: 1, lleno: 1
+  linea: 1, horizontal: 1, vertical: 1, diagonal: 1, esquinas: 1, x: 1, l: 1, t: 1, marco: 1, lleno: 1,
+  col_b: 1, col_i: 1, col_n: 1, col_g: 1, col_o: 1, fila_1: 1, fila_2: 1, fila_3: 1, fila_4: 1, fila_5: 1,
+  diag_1: 1, diag_2: 1, custom: 1
 };
+var TIPOS_RONDA_ = { figuras: 1, salado: 1, eliminacion: 1 };
 
 var CONFIG_DEFAULTS_ = {
   nombre: "", fecha: "", hora: "", lugar: "", modalidad: "Mixta", whatsapp: "",
   sinpe_numero: "", sinpe_nombre: "", iban: "", precio_unitario: "",
   cartones_habilitados: String(LOTE_DEFAULT_), lote: String(LOTE_DEFAULT_),
   arte_file_id: "", letras_sistema: "true", setup_done: "false",
-  plantilla_whatsapp: "Hola {{nombre}}, gracias por tu compra en {{bingo}}. Tus {{cantidad}} cartón(es): {{cartones}}. Juega en línea aquí: {{link}}",
+  marcado: "manual", centro: "libre", centro_file_id: "",
+  plantilla_whatsapp: "Hola *{{nombre}}* 🎉\nGracias por tu compra en *{{bingo}}* ({{fecha}}).\nTus cartones: {{cartones}}\n\n👇 Aquí juegas en línea y ves cada bola cantada:\n{{link}}",
   plantilla_email_asunto: "Tus cartones para {{bingo}}",
-  plantilla_email: "<p>Hola {{nombre}}:</p><p>Gracias por tu compra en <b>{{bingo}}</b> ({{fecha}}).</p><p>Tus {{cantidad}} cartón(es): <b>{{cartones}}</b>.</p><p>Juega en línea y mira cada bola cantada aquí:<br><a href=\"{{link}}\">{{link}}</a></p>",
+  plantilla_email: "<p>Hola {{nombre}}:</p><p>Gracias por tu compra en <b>{{bingo}}</b>, que se juega el {{fecha}}.</p><p>Tus {{cantidad}} cartones: <b>{{cartones}}</b>.</p><p>Aquí juegas en línea y ves cada bola cantada:</p><p><a href=\"{{link}}\" style=\"display:inline-block;padding:12px 22px;background:#0097a7;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold\">Ver mis cartones</a></p><p>Si compras más cartones con este mismo correo, aparecen en este mismo link.</p>",
   sitio_url: ""
 };
 
@@ -91,7 +98,8 @@ function doPost(e) {
     if (action.indexOf("sector_") === 0) {
       var ctxS = bingoPorSector_(data.hash);
       if (action === "sector_resolve") return ok_(sectorResolve_(ctxS));
-      if (action === "sector_vender") return ok_(conLock_(function () { return venderPresencial_(ctxS.bingo, data, ctxS.sector); }));
+      if (action === "sector_vender") return ok_(conLock_(function () { return venderPresencial_(ctxS.bingo, data, ctxS.sector, ctxS.encargado); }));
+      if (action === "sector_comprobante") return ok_(getComprobante_(ctxS.bingo, data.entrada_id, ctxS.sector));
       if (action === "sector_mark_sent") return ok_(conLock_(function () { return markSent_(ctxS.bingo, data, ctxS.sector); }));
       return fail_("Acción de sector no reconocida.");
     }
@@ -105,6 +113,8 @@ function doPost(e) {
       if (action === "game_abrir") return ok_(conLock_(function () { return gameAbrir_(bg, data); }));
       if (action === "game_cantar") return ok_(conLock_(function () { return gameCantar_(bg, data); }));
       if (action === "game_deshacer") return ok_(conLock_(function () { return gameDeshacer_(bg, data); }));
+      if (action === "game_mover_ronda") return ok_(conLock_(function () { return gameMoverRonda_(bg, data); }));
+      if (action === "game_quitar_ganador") return ok_(conLock_(function () { return gameQuitarGanador_(bg, data); }));
       if (action === "game_ganador") return ok_(conLock_(function () { return gameGanador_(bg, data); }));
       if (action === "game_cerrar") return ok_(conLock_(function () { return gameCerrar_(bg, data); }));
       if (action === "game_buscar") return ok_(gameBuscar_(bg, data));
@@ -117,6 +127,8 @@ function doPost(e) {
     if (action === "update_config") return ok_(conLock_(function () { return updateConfig_(b, data.config || {}); }));
     if (action === "upload_arte") return ok_(conLock_(function () { return uploadArte_(b, data); }));
     if (action === "delete_arte") return ok_(conLock_(function () { return updateConfig_(b, { arte_file_id: "" }); }));
+    if (action === "upload_centro") return ok_(conLock_(function () { return uploadCentro_(b, data); }));
+    if (action === "delete_centro") return ok_(conLock_(function () { return updateConfig_(b, { centro_file_id: "" }); }));
     if (action === "save_precios") return ok_(conLock_(function () { return savePrecios_(b, data.precios || []); }));
     if (action === "save_sectores") return ok_(conLock_(function () { return saveSectores_(b, data.sectores || []); }));
     if (action === "list_entradas") return ok_(listEntradas_(b));
@@ -195,6 +207,32 @@ function fechaIso_(v) {
   }
   return String(v).trim();
 }
+
+/** Sheets convierte «19:00» en una fecha de 1899: se devuelve como hora. */
+function valorTexto_(v) {
+  if (Object.prototype.toString.call(v) !== "[object Date]") return String(v);
+  if (v.getFullYear() < 1901) return Utilities.formatDate(v, Session.getScriptTimeZone(), "HH:mm");
+  return fechaIso_(v);
+}
+
+var MESES_ = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «2026-11-15» + «19:00» → «15 de nov de 2026 a las 19:00». */
+function fechaLarga_(fecha, hora) {
+  var m = String(fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  var h = String(hora || "").match(/^(\d{1,2}):(\d{2})/);
+  var t = m ? Number(m[3]) + " de " + MESES_[Number(m[2]) - 1] + " de " + m[1] : String(fecha || "");
+  if (h) t += (t ? " a las " : "") + ("0" + h[1]).slice(-2) + ":" + h[2];
+  return t;
+}
+
+/** Los emojis se ven como cuadros en muchos lectores de correo: se quitan del asunto y del cuerpo. */
+function sinEmojis_(t) {
+  return String(t || "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu, "");
+}
+
+function correoClave_(c) { return String(c || "").trim().toLowerCase(); }
+function correoValido_(c) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(c || "").trim()); }
 
 function bool_(v) {
   if (v === true) return true;
@@ -333,10 +371,13 @@ function bingoPorAdminOCantador_(hash) {
 function bingoPorSector_(hash) {
   var v = String(hash || "").trim();
   var b = bingoPorPublico_(v.split(".")[0]);
-  var sectores = readObjects_(sheetDe_(b, "sectores"));
+  var sectores = sectores_(b);
   for (var j = 0; j < sectores.length; j++) {
-    if (String(sectores[j].hash) === v && bool_(sectores[j].activo)) {
-      return { bingo: b, sector: sectorObj_(sectores[j]) };
+    var s = sectores[j];
+    if (!s.activo) continue;
+    if (s.hash === v) return { bingo: b, sector: s, encargado: null };
+    for (var k = 0; k < s.encargados.length; k++) {
+      if (s.encargados[k].hash === v && s.encargados[k].activo) return { bingo: b, sector: s, encargado: s.encargados[k] };
     }
   }
   throw new Error("Link de sector no válido o desactivado.");
@@ -389,9 +430,7 @@ function superCreate_(data) {
   var preciosSh = ss.getSheetByName("precios");
   var unit = Number(data.precio) || 0;
   if (unit > 0) {
-    var filas = [];
-    for (var n = 1; n <= 20; n++) filas.push([n, unit * n]);
-    preciosSh.getRange(2, 1, filas.length, 2).setValues(filas);
+    preciosSh.getRange(2, 1, 1, 2).setValues([[1, unit]]);
     cfgSh.getRange(2, 1, cfgSh.getLastRow() - 1, 2).getValues().forEach(function (r, i) {
       if (r[0] === "precio_unitario") cfgSh.getRange(i + 2, 2).setValue(unit);
     });
@@ -448,7 +487,25 @@ function bingoSs_(b) {
   return SS_CACHE_[b.spreadsheet_id];
 }
 
-function sheetDe_(b, name) { return ensureSheet_(bingoSs_(b), name, SHEETS_[name]); }
+var HOJAS_REVISADAS_ = {};
+
+/** Abre la hoja y, en bingos creados con una versión anterior, agrega al final las columnas nuevas. */
+function sheetDe_(b, name) {
+  var sh = ensureSheet_(bingoSs_(b), name, SHEETS_[name]);
+  var clave = b.spreadsheet_id + "|" + name;
+  if (!HOJAS_REVISADAS_[clave]) {
+    HOJAS_REVISADAS_[clave] = 1;
+    var ancho = Math.max(1, sh.getLastColumn ? sh.getLastColumn() : SHEETS_[name].length);
+    var actuales = sh.getRange(1, 1, 1, ancho).getValues()[0].map(function (h) { return String(h).trim(); });
+    var faltan = SHEETS_[name].filter(function (h) { return actuales.indexOf(h) === -1; });
+    if (faltan.length) {
+      var ultima = 0;
+      actuales.forEach(function (h, i) { if (h) ultima = i + 1; });
+      sh.getRange(1, ultima + 1, 1, faltan.length).setValues([faltan]).setFontWeight("bold");
+    }
+  }
+  return sh;
+}
 
 function readConfig_(b) {
   var cfg = {};
@@ -456,15 +513,14 @@ function readConfig_(b) {
   readObjects_(sheetDe_(b, "config")).forEach(function (r) {
     var k = String(r.clave || "").trim();
     if (!k) return;
-    var v = r.valor;
-    cfg[k] = Object.prototype.toString.call(v) === "[object Date]" ? fechaIso_(v) : String(v);
+    cfg[k] = valorTexto_(r.valor);
   });
   return cfg;
 }
 
 var CONFIG_EDITABLES_ = ["nombre", "fecha", "hora", "lugar", "modalidad", "whatsapp", "sinpe_numero", "sinpe_nombre",
   "iban", "precio_unitario", "lote", "setup_done", "plantilla_whatsapp", "plantilla_email_asunto", "plantilla_email",
-  "arte_file_id", "letras_sistema", "sitio_url"];
+  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "centro", "centro_file_id"];
 
 function updateConfig_(b, changes) {
   var sh = sheetDe_(b, "config");
@@ -475,6 +531,9 @@ function updateConfig_(b, changes) {
     if (CONFIG_EDITABLES_.indexOf(k) === -1) return;
     var v = changes[k] === null || changes[k] === undefined ? "" : String(changes[k]);
     if (k === "lote") v = String(Math.min(1000, Math.max(10, Number(v) || LOTE_DEFAULT_)));
+    if (k === "plantilla_email" || k === "plantilla_email_asunto") v = sinEmojis_(v);
+    if (k === "marcado") v = v === "auto" ? "auto" : "manual";
+    if (k === "centro") v = v === "numero" ? "numero" : "libre";
     if (byKey[k]) sh.getRange(byKey[k], 2).setValue(v);
     else { sh.appendRow([k, v]); byKey[k] = sh.getLastRow(); }
   });
@@ -504,19 +563,50 @@ function preciosObj_(b) {
     .sort(function (a, z) { return a.cantidad - z.cantidad; });
 }
 
+/**
+ * Combos: el total de N cartones es la combinación de combos más barata que suma exactamente N
+ * (ej. combos 1 = 3000 y 10 = 19000 → 21 cartones = 10 + 10 + 1 = 41000). Igual que precioCombos() en bingo.js.
+ */
+function precioCombos_(combos, unitario, cantidad) {
+  var n = Math.floor(Number(cantidad) || 0);
+  if (n <= 0) return 0;
+  var lista = (combos || []).filter(function (c) { return c.cantidad > 0 && c.precio >= 0; });
+  var unit = Number(unitario) || 0;
+  if (!lista.some(function (c) { return c.cantidad === 1; }) && unit > 0) lista = lista.concat([{ cantidad: 1, precio: unit }]);
+  if (!lista.length) return 0;
+  var mejor = [0];
+  for (var i = 1; i <= n; i++) {
+    var m = Infinity;
+    for (var j = 0; j < lista.length; j++) {
+      var c = lista[j];
+      if (c.cantidad <= i && mejor[i - c.cantidad] + c.precio < m) m = mejor[i - c.cantidad] + c.precio;
+    }
+    mejor.push(m);
+  }
+  if (!isFinite(mejor[n])) throw new Error("Con los combos actuales no se pueden vender " + n + " cartones. Agrega el combo de 1 cartón.");
+  return mejor[n];
+}
+
 function precioPara_(b, cfg, cantidad) {
-  var tabla = preciosObj_(b);
-  var fila = tabla.filter(function (r) { return r.cantidad === cantidad; })[0];
-  if (fila) return fila.precio;
-  var unit = Number(cfg.precio_unitario) || 0;
-  return unit * cantidad;
+  return precioCombos_(preciosObj_(b), cfg.precio_unitario, cantidad);
+}
+
+function encargadosDe_(raw) {
+  var lista = [];
+  try { lista = raw ? JSON.parse(String(raw)) : []; } catch (e) { lista = []; }
+  return (Array.isArray(lista) ? lista : []).map(function (x) {
+    return {
+      id: Number(x.id) || 0, nombre: String(x.nombre || ""), telefono: String(x.telefono || ""),
+      hash: String(x.hash || ""), activo: x.activo === undefined ? true : bool_(x.activo)
+    };
+  }).filter(function (x) { return x.id; });
 }
 
 function sectorObj_(s) {
   return {
     sector_id: Number(s.sector_id), nombre: String(s.nombre || ""), encargado: String(s.encargado || ""),
     telefono: String(s.telefono || ""), desde: Number(s.desde) || 0, hasta: Number(s.hasta) || 0,
-    hash: String(s.hash || ""), activo: bool_(s.activo)
+    hash: String(s.hash || ""), activo: bool_(s.activo), encargados: encargadosDe_(s.encargados)
   };
 }
 
@@ -528,6 +618,8 @@ function publicConfig_(b, cfg) {
     nombre: cfg.nombre, fecha: cfg.fecha, hora: cfg.hora, lugar: cfg.lugar, modalidad: cfg.modalidad,
     whatsapp: cfg.whatsapp, public_id: b.public_id, seed: b.seed, arte_url: arteUrl_(cfg),
     letras_sistema: cfg.letras_sistema !== "false",
+    marcado_auto: cfg.marcado === "auto", centro_numero: cfg.centro === "numero",
+    centro_url: cfg.centro !== "numero" && cfg.centro_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.centro_file_id : "",
     vivo_id: prop_("VIVO_SPREADSHEET_ID")
   };
 }
@@ -638,16 +730,43 @@ function uploadArte_(b, data) {
   return { arte_file_id: file.getId(), arte_url: "https://lh3.googleusercontent.com/d/" + file.getId() };
 }
 
-/** El arte en base64, para dibujarlo en el PDF sin problemas de CORS. */
-function getArte_(b) {
+/** Imagen del espacio libre: PNG de exactamente 190 × 190 px (lo valida el panel antes de subir). */
+function uploadCentro_(b, data) {
+  var blob = decodeDataUrl_(data.archivo, "centro-libre-" + Date.now() + ".png");
+  if (blob.getContentType() !== "image/png") throw new Error("La imagen del centro debe ser PNG.");
+  if (blob.getBytes().length > 1024 * 1024) throw new Error("La imagen del centro pesa más de 1 MB.");
+  var file = subcarpeta_(b, "diseño").createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   var cfg = readConfig_(b);
-  if (!cfg.arte_file_id) return { dataUrl: "" };
-  var blob = DriveApp.getFileById(cfg.arte_file_id).getBlob();
-  return { dataUrl: "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes()) };
+  if (cfg.centro_file_id) {
+    try { DriveApp.getFileById(cfg.centro_file_id).setTrashed(true); } catch (e) { /* ya no existe */ }
+  }
+  setConfigValue_(b, "centro_file_id", file.getId());
+  return { centro_file_id: file.getId(), centro_url: "https://lh3.googleusercontent.com/d/" + file.getId() };
 }
 
-function getComprobante_(b, entradaId) {
+function dataUrlDe_(fileId) {
+  if (!fileId) return "";
+  try {
+    var blob = DriveApp.getFileById(fileId).getBlob();
+    return "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    return "";
+  }
+}
+
+/** El arte y la imagen del centro en base64, para dibujarlos en el PDF sin problemas de CORS. */
+function getArte_(b) {
+  var cfg = readConfig_(b);
+  return {
+    dataUrl: dataUrlDe_(cfg.arte_file_id),
+    centroDataUrl: cfg.centro !== "numero" ? dataUrlDe_(cfg.centro_file_id) : ""
+  };
+}
+
+function getComprobante_(b, entradaId, sector) {
   var e = entradaPorId_(b, entradaId);
+  if (sector && e.sector_id !== sector.sector_id) throw new Error("Esta compra no es de tu sector.");
   if (!e.comprobante_id) throw new Error("Esta compra no tiene comprobante.");
   var blob = DriveApp.getFileById(e.comprobante_id).getBlob();
   return {
@@ -660,12 +779,18 @@ function getComprobante_(b, entradaId) {
 
 function savePrecios_(b, precios) {
   var sh = sheetDe_(b, "precios");
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+  var vistos = {};
   var filas = precios
-    .map(function (p) { return [Number(p.cantidad), Number(p.precio)]; })
-    .filter(function (p) { return p[0] >= 1 && p[0] <= 100 && p[1] >= 0; });
-  if (filas.length) sh.getRange(2, 1, filas.length, 2).setValues(filas);
-  return { precios: preciosObj_(b) };
+    .map(function (p) { return [Math.floor(Number(p.cantidad)), Number(p.precio)]; })
+    .filter(function (p) { return p[0] >= 1 && p[0] <= MAX_POR_COMPRA_ && p[1] >= 0 && !vistos[p[0]] && (vistos[p[0]] = 1); })
+    .sort(function (a, z) { return a[0] - z[0]; });
+  if (filas.length && filas[0][0] !== 1) throw new Error("Agrega el combo de 1 cartón: con él se arma cualquier cantidad.");
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+  if (filas.length) {
+    sh.getRange(2, 1, filas.length, 2).setValues(filas);
+    setConfigValue_(b, "precio_unitario", filas[0][1]);
+  }
+  return { precios: preciosObj_(b), config: readConfig_(b) };
 }
 
 function saveSectores_(b, lista) {
@@ -683,10 +808,25 @@ function saveSectores_(b, lista) {
     if (desde < 0 || hasta < 0 || hasta > MAX_CARTONES_ || (desde && hasta && hasta < desde)) {
       throw new Error("Rango no válido en «" + s.nombre + "».");
     }
+    var prevEnc = {};
+    (prev.encargados || []).forEach(function (x) { prevEnc[x.id] = x; });
+    var nextEnc = nextId_(prev.encargados || [], "id");
+    var encargados = (Array.isArray(s.encargados) ? s.encargados : []).map(function (x) {
+      var eid = Number(x.id) && prevEnc[Number(x.id)] ? Number(x.id) : nextEnc++;
+      var nombreEnc = String(x.nombre || "").trim();
+      if (!nombreEnc) throw new Error("Cada encargado de «" + s.nombre + "» requiere un nombre.");
+      return {
+        id: eid, nombre: nombreEnc, telefono: String(x.telefono || "").trim(),
+        hash: (prevEnc[eid] && prevEnc[eid].hash) || b.public_id + "." + randomHash_(16),
+        activo: x.activo === undefined ? true : bool_(x.activo)
+      };
+    });
     return {
-      sector_id: id, nombre: String(s.nombre).trim(), encargado: String(s.encargado || "").trim(),
+      sector_id: id, nombre: String(s.nombre).trim(),
+      encargado: encargados.map(function (x) { return x.nombre; }).join(", ") || String(s.encargado || "").trim(),
       telefono: String(s.telefono || "").trim(), desde: desde, hasta: hasta,
-      hash: prev.hash || b.public_id + "." + randomHash_(16), activo: s.activo === undefined ? true : bool_(s.activo)
+      hash: prev.hash || b.public_id + "." + randomHash_(16), activo: s.activo === undefined ? true : bool_(s.activo),
+      encargados: JSON.stringify(encargados)
     };
   });
   for (var i = 0; i < limpios.length; i++) {
@@ -720,7 +860,7 @@ function entradaObj_(r) {
     tiene_comprobante: Boolean(r.comprobante_id), comprobante_id: String(r.comprobante_id || ""),
     estado: String(r.estado || ""), cartones: String(r.cartones || ""), token: String(r.token || ""),
     nota: String(r.nota || ""), email_enviado: bool_(r.email_enviado), wa_enviado: bool_(r.wa_enviado),
-    fecha_completada: String(r.fecha_completada || ""), _row: r._row
+    fecha_completada: String(r.fecha_completada || ""), encargado_id: Number(r.encargado_id) || 0, _row: r._row
   };
 }
 
@@ -736,9 +876,19 @@ function guardarEntrada_(b, e) {
   writeObject_(sheetDe_(b, "entradas"), SHEETS_.entradas, e, e._row);
 }
 
-function tokenUnico_(b) {
+/**
+ * El correo identifica al jugador: todas sus compras comparten el mismo link (token),
+ * así juega todos sus cartones en una sola pantalla aunque los comprara en varias compras.
+ */
+function tokenPara_(b, correo) {
+  var lista = entradas_(b);
+  var clave = correoClave_(correo);
+  if (clave) {
+    var previa = lista.filter(function (e) { return e.token && correoClave_(e.correo) === clave; })[0];
+    if (previa) return previa.token;
+  }
   var usados = {};
-  entradas_(b).forEach(function (e) { usados[e.token] = 1; });
+  lista.forEach(function (e) { usados[e.token] = 1; });
   var t;
   do { t = b.public_id + "." + randomHash_(14); } while (usados[t]);
   return t;
@@ -752,7 +902,10 @@ function getCompra_(b) {
     precio_unitario: Number(cfg.precio_unitario) || 0,
     precios: preciosObj_(b),
     sectores: sectores_(b).filter(function (s) { return s.activo; }).map(function (s) {
-      return { sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado };
+      return {
+        sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado,
+        encargados: s.encargados.filter(function (x) { return x.activo; }).map(function (x) { return { id: x.id, nombre: x.nombre }; })
+      };
     })
   };
 }
@@ -765,11 +918,15 @@ function submitCompra_(b, data) {
   var cantidad = Math.floor(Number(data.cantidad) || 0);
   if (!nombre) throw new Error("Escribe tu nombre.");
   if (telefono.length < 8) throw new Error("Escribe un número de WhatsApp válido.");
-  if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) throw new Error("El correo no es válido.");
-  if (cantidad < 1 || cantidad > 200) throw new Error("La cantidad debe ser de 1 a 200 cartones.");
+  if (!correoValido_(correo)) throw new Error("Escribe un correo válido: con él se juntan todos tus cartones en un solo link.");
+  if (cantidad < 1 || cantidad > MAX_POR_COMPRA_) throw new Error("La cantidad debe ser de 1 a " + MAX_POR_COMPRA_ + " cartones.");
   if (!data.comprobante) throw new Error("Adjunta el comprobante de pago.");
   var sectorId = Number(data.sector_id) || 0;
-  if (sectorId && !sectores_(b).some(function (s) { return s.sector_id === sectorId && s.activo; })) sectorId = 0;
+  var encargadoId = Number(data.encargado_id) || 0;
+  var sectorElegido = sectores_(b).filter(function (s) { return s.sector_id === sectorId && s.activo; })[0];
+  if (!sectorElegido) sectorId = 0;
+  var encElegido = sectorElegido ? sectorElegido.encargados.filter(function (x) { return x.id === encargadoId; })[0] : null;
+  if (!encElegido) encargadoId = 0;
 
   var blob = decodeDataUrl_(data.comprobante, "comprobante-" + Date.now() + "-" + nombre.replace(/[^\w]+/g, "_").slice(0, 30));
   var file = subcarpeta_(b, "comprobantes").createFile(blob);
@@ -778,9 +935,9 @@ function submitCompra_(b, data) {
   var e = {
     entrada_id: nextId_(lista, "entrada_id"), fecha: ahora_(), nombre: nombre, telefono: telefono, correo: correo,
     modalidad: data.modalidad === "Presencial" ? "Presencial" : "Virtual", cantidad: cantidad,
-    monto: precioPara_(b, cfg, cantidad), vendedor: String(data.vendedor || "").trim(), sector_id: sectorId,
+    monto: precioPara_(b, cfg, cantidad), vendedor: encElegido ? encElegido.nombre : String(data.vendedor || "").trim(), sector_id: sectorId,
     metodo: String(data.metodo || "SINPE").trim(), comprobante_id: file.getId(), estado: "Pendiente",
-    cartones: "", token: "", nota: "", email_enviado: false, wa_enviado: false, fecha_completada: ""
+    cartones: "", token: "", nota: "", email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargadoId
   };
   guardarEntrada_(b, e);
   return { entrada_id: e.entrada_id, monto: e.monto, cantidad: cantidad };
@@ -806,7 +963,7 @@ function approveEntrada_(b, data) {
   }
   asignarCartones_(b, series, e, e.sector_id);
   e.cartones = series.join(",");
-  e.token = e.token || tokenUnico_(b);
+  e.token = e.token || tokenPara_(b, e.correo);
   e.estado = "Aprobada";
   e.nota = "";
   guardarEntrada_(b, e);
@@ -862,11 +1019,12 @@ function sendEmail_(b, id) {
   if (!e.token) throw new Error("Aprueba la compra antes de enviar el correo.");
   var cfg = readConfig_(b);
   var vars = {
-    nombre: e.nombre, bingo: cfg.nombre, fecha: cfg.fecha, cantidad: e.cantidad, monto: e.monto,
-    cartones: e.cartones.split(",").join(", "), link: linkJugador_(cfg, e.token)
+    nombre: e.nombre.split(" ")[0], bingo: cfg.nombre, fecha: fechaLarga_(cfg.fecha, cfg.hora), lugar: cfg.lugar,
+    cantidad: e.cantidad, monto: "₡" + Number(e.monto || 0).toLocaleString("es-CR"),
+    cartones: e.cartones.split(",").map(function (x) { return ("0000" + x).slice(-5); }).join(", "), link: linkJugador_(cfg, e.token)
   };
   MailApp.sendEmail({
-    to: e.correo, subject: render_(cfg.plantilla_email_asunto, vars), htmlBody: render_(cfg.plantilla_email, vars),
+    to: e.correo, subject: sinEmojis_(render_(cfg.plantilla_email_asunto, vars)), htmlBody: sinEmojis_(render_(cfg.plantilla_email, vars)),
     name: cfg.nombre || "Bingo"
   });
   e.email_enviado = true;
@@ -875,28 +1033,54 @@ function sendEmail_(b, id) {
   return { entrada: e };
 }
 
-/** Venta presencial: el vendedor entrega cartones impresos y anota las series. */
-function venderPresencial_(b, data, sector) {
+/**
+ * Venta de un vendedor (organizador o encargado de sector): queda aprobada.
+ * Con «series» anota los cartones impresos que entregó; con «cantidad» el sistema toma los siguientes libres
+ * del bloque del sector (o del fondo general). El comprobante es opcional en efectivo.
+ */
+function venderPresencial_(b, data, sector, encargado) {
   var nombre = String(data.nombre || "").trim();
+  var correo = String(data.correo || "").trim();
   if (!nombre) throw new Error("Escribe el nombre del comprador.");
-  var series = parseSeries_(data.series);
-  if (!series.length) throw new Error("Indica las series de los cartones vendidos.");
-  validarLibres_(b, series, sector);
+  if (!correoValido_(correo)) throw new Error("Escribe el correo del comprador: con él se juntan todos sus cartones en un solo link.");
+  var metodo = String(data.metodo || "Efectivo").trim();
+  if (metodo !== "Efectivo" && !data.comprobante) throw new Error("Adjunta el comprobante del " + metodo + ".");
   var cfg = readConfig_(b);
+  var desdeLink = Boolean(sector);
+  if (!sector && Number(data.sector_id)) sector = sectores_(b).filter(function (s) { return s.sector_id === Number(data.sector_id); })[0] || null;
+  var conBloque = sector && sector.desde && sector.hasta ? sector : null;
+  var series;
+  if (String(data.series || "").trim()) {
+    series = parseSeries_(data.series);
+    validarLibres_(b, series, desdeLink ? conBloque : null);
+  } else {
+    var cantidad = Math.floor(Number(data.cantidad) || 0);
+    if (cantidad < 1 || cantidad > MAX_POR_COMPRA_) throw new Error("Indica las series entregadas o la cantidad de cartones (1 a " + MAX_POR_COMPRA_ + ").");
+    series = tomarLibres_(b, cantidad, conBloque);
+  }
+  if (!series.length) throw new Error("Indica las series de los cartones vendidos.");
+  var comprobanteId = "";
+  if (data.comprobante) {
+    var blob = decodeDataUrl_(data.comprobante, "comprobante-" + Date.now() + "-" + nombre.replace(/[^\w]+/g, "_").slice(0, 30));
+    comprobanteId = subcarpeta_(b, "comprobantes").createFile(blob).getId();
+  }
   var lista = entradas_(b);
   var e = {
     entrada_id: nextId_(lista, "entrada_id"), fecha: ahora_(), nombre: nombre,
-    telefono: String(data.telefono || "").replace(/[^\d+]/g, ""), correo: String(data.correo || "").trim(),
-    modalidad: "Presencial", cantidad: series.length,
+    telefono: String(data.telefono || "").replace(/[^\d+]/g, ""), correo: correo,
+    modalidad: data.modalidad === "Virtual" ? "Virtual" : "Presencial", cantidad: series.length,
     monto: data.monto !== undefined && data.monto !== "" ? Number(data.monto) || 0 : precioPara_(b, cfg, series.length),
-    vendedor: String(data.vendedor || (sector ? sector.encargado || sector.nombre : "")).trim(),
-    sector_id: sector ? sector.sector_id : Number(data.sector_id) || 0, metodo: String(data.metodo || "Efectivo"),
-    comprobante_id: "", estado: "Aprobada", cartones: series.join(","), token: "", nota: "",
-    email_enviado: false, wa_enviado: false, fecha_completada: ""
+    vendedor: String(encargado ? encargado.nombre : data.vendedor || (sector ? sector.encargado || sector.nombre : "")).trim(),
+    sector_id: sector ? sector.sector_id : 0, metodo: metodo,
+    comprobante_id: comprobanteId, estado: "Aprobada", cartones: series.join(","), token: "", nota: "",
+    email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargado ? encargado.id : Number(data.encargado_id) || 0
   };
-  e.token = tokenUnico_(b);
+  e.token = tokenPara_(b, correo);
   asignarCartones_(b, series, e, e.sector_id);
   guardarEntrada_(b, e);
+  delete e._row;
+  delete e.comprobante_id;
+  e.tiene_comprobante = Boolean(comprobanteId);
   return { entrada: e };
 }
 
@@ -917,9 +1101,22 @@ function resumen_(entradas, vendidos, cfg) {
   var porEstado = { Pendiente: 0, Aprobada: 0, Completada: 0, Rechazada: 0 };
   var recaudado = 0, pendienteMonto = 0;
   var porSector = {};
+  var montoSector = {};
+  var porEncargado = {};
+  var compradores = {};
   entradas.forEach(function (e) {
     porEstado[e.estado] = (porEstado[e.estado] || 0) + 1;
-    if (e.estado === "Aprobada" || e.estado === "Completada") recaudado += e.monto;
+    if (e.estado === "Aprobada" || e.estado === "Completada") {
+      recaudado += e.monto;
+      var s = e.sector_id || 0;
+      montoSector[s] = (montoSector[s] || 0) + e.monto;
+      var k = s + ":" + (e.encargado_id || 0);
+      var x = porEncargado[k] || (porEncargado[k] = { cartones: 0, monto: 0, compras: 0 });
+      x.cartones += e.cantidad;
+      x.monto += e.monto;
+      x.compras += 1;
+      compradores[correoClave_(e.correo) || "tel:" + e.telefono] = 1;
+    }
     if (e.estado === "Pendiente") pendienteMonto += e.monto;
   });
   vendidos.forEach(function (c) {
@@ -928,21 +1125,28 @@ function resumen_(entradas, vendidos, cfg) {
   });
   return {
     cartones_vendidos: vendidos.length, cartones_habilitados: Number(cfg.cartones_habilitados) || 0,
-    compras: porEstado, recaudado: recaudado, por_aprobar: pendienteMonto, por_sector: porSector
+    compras: porEstado, recaudado: recaudado, por_aprobar: pendienteMonto, por_sector: porSector,
+    monto_sector: montoSector, por_encargado: porEncargado, compradores: Object.keys(compradores).length
   };
 }
 
+/** Link de sector: el general ve todas las ventas del sector; el de un encargado, solo las suyas. */
 function sectorResolve_(ctx) {
-  var b = ctx.bingo, s = ctx.sector;
+  var b = ctx.bingo, s = ctx.sector, enc = ctx.encargado;
   var cfg = readConfig_(b);
-  var vendidos = cartonesVendidos_(b).filter(function (c) { return c.serie >= s.desde && c.serie <= s.hasta; });
-  var entradas = entradas_(b).filter(function (e) { return e.sector_id === s.sector_id; })
+  var vendidos = cartonesVendidos_(b).filter(function (c) { return s.desde && c.serie >= s.desde && c.serie <= s.hasta; });
+  var delSector = entradas_(b).filter(function (e) { return e.sector_id === s.sector_id; });
+  var entradas = delSector.filter(function (e) { return !enc || e.encargado_id === enc.id; })
     .map(function (e) { delete e._row; delete e.comprobante_id; return e; }).reverse();
   return {
-    sector: { sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado, desde: s.desde, hasta: s.hasta },
+    sector: { sector_id: s.sector_id, nombre: s.nombre, encargado: enc ? enc.nombre : s.encargado, desde: s.desde, hasta: s.hasta },
+    encargado: enc ? { id: enc.id, nombre: enc.nombre } : null,
     config: publicConfig_(b, cfg), plantilla_whatsapp: cfg.plantilla_whatsapp, sitio_url: cfg.sitio_url,
+    sinpe_numero: cfg.sinpe_numero, sinpe_nombre: cfg.sinpe_nombre, iban: cfg.iban,
     precios: preciosObj_(b), precio_unitario: Number(cfg.precio_unitario) || 0,
-    vendidos: vendidos.map(function (c) { return c.serie; }), entradas: entradas
+    vendidos: vendidos.map(function (c) { return c.serie; }), entradas: entradas,
+    sector_monto: delSector.filter(function (e) { return e.estado === "Aprobada" || e.estado === "Completada"; })
+      .reduce(function (a, e) { return a + e.monto; }, 0)
   };
 }
 
@@ -952,12 +1156,24 @@ function getPlayer_(token) {
   var t = String(token || "").trim();
   var pub = t.split(".")[0];
   var b = bingoPorPublico_(pub);
-  var e = entradas_(b).filter(function (x) { return x.token === t; })[0];
-  if (!e || (e.estado !== "Aprobada" && e.estado !== "Completada")) throw new Error("Este link de cartones no es válido.");
+  var todas = entradas_(b);
+  var validas = function (x) { return x.estado === "Aprobada" || x.estado === "Completada"; };
+  var base = todas.filter(function (x) { return x.token === t; });
+  if (!base.length) throw new Error("Este link de cartones no es válido.");
+  /* Mismo correo = mismo jugador: se juntan las compras aunque sean de antes de unificar los links. */
+  var correos = {};
+  base.forEach(function (x) { if (correoClave_(x.correo)) correos[correoClave_(x.correo)] = 1; });
+  var suyas = todas.filter(function (x) { return validas(x) && (x.token === t || correos[correoClave_(x.correo)]); });
+  if (!suyas.length) throw new Error("Esta compra todavía no está aprobada. Cuando se confirme el pago, aquí aparecen tus cartones.");
+  var series = [];
+  suyas.forEach(function (x) {
+    x.cartones.split(",").map(Number).filter(Boolean).forEach(function (n) { if (series.indexOf(n) === -1) series.push(n); });
+  });
+  series.sort(function (a, z) { return a - z; });
   var cfg = readConfig_(b);
   return {
-    config: publicConfig_(b, cfg), nombre: e.nombre.split(" ")[0],
-    cartones: e.cartones.split(",").map(Number).filter(Boolean), vivo: estadoVivo_(b)
+    config: publicConfig_(b, cfg), nombre: suyas[0].nombre.split(" ")[0],
+    cartones: series, compras: suyas.length, vivo: estadoVivo_(b)
   };
 }
 
@@ -968,14 +1184,31 @@ function getCard_(b) {
 
 /* ======================= Juego ======================= */
 
+function jsonDe_(raw, def) {
+  try { return raw ? JSON.parse(String(raw)) : def; } catch (e) { return def; }
+}
+
+/**
+ * Ronda: tipo «figuras» (varios premios, cada uno con su figura), «salado» (gana el cartón con más
+ * casillas sin marcar) o «eliminacion» (cada bola elimina los cartones que la tienen; gana el último en pie).
+ * Las rondas de la versión anterior (una figura y un premio) se leen como una ronda de figuras con un premio.
+ */
 function rondaObj_(r) {
-  var ganadores = [];
-  try { ganadores = r.ganadores ? JSON.parse(String(r.ganadores)) : []; } catch (e) { ganadores = []; }
+  var tipo = TIPOS_RONDA_[String(r.tipo || "")] ? String(r.tipo) : "figuras";
+  var premios = jsonDe_(r.premios, null);
+  if (!Array.isArray(premios) || !premios.length) {
+    premios = [{ id: 1, figura: tipo === "figuras" ? String(r.figura || "linea") : tipo, celdas: "", premio: String(r.premio || ""), ganadores: jsonDe_(r.ganadores, []) }];
+  }
   return {
-    ronda_id: Number(r.ronda_id), orden: Number(r.orden) || 0, nombre: String(r.nombre || ""),
-    figura: String(r.figura || "linea"), premio: String(r.premio || ""), estado: String(r.estado || "Pendiente"),
-    bolas: String(r.bolas || "").split(",").map(Number).filter(Boolean), ganadores: ganadores,
-    inicio: String(r.inicio || ""), fin: String(r.fin || ""), _row: r._row
+    ronda_id: Number(r.ronda_id), orden: Number(r.orden) || 0, nombre: String(r.nombre || ""), tipo: tipo,
+    premios: premios.map(function (p, i) {
+      return {
+        id: Number(p.id) || i + 1, figura: String(p.figura || "linea"), celdas: String(p.celdas || ""),
+        premio: String(p.premio || ""), ganadores: Array.isArray(p.ganadores) ? p.ganadores : []
+      };
+    }),
+    estado: String(r.estado || "Pendiente"), bolas: String(r.bolas || "").split(",").map(Number).filter(Boolean),
+    extra: jsonDe_(r.extra, {}) || {}, inicio: String(r.inicio || ""), fin: String(r.fin || ""), _row: r._row
   };
 }
 
@@ -984,10 +1217,12 @@ function rondas_(b) {
 }
 
 function guardarRonda_(b, r) {
-  var copia = {};
-  Object.keys(r).forEach(function (k) { copia[k] = r[k]; });
-  copia.bolas = r.bolas.join(",");
-  copia.ganadores = JSON.stringify(r.ganadores || []);
+  var primero = r.premios[0] || {};
+  var copia = {
+    ronda_id: r.ronda_id, orden: r.orden, nombre: r.nombre, figura: primero.figura, premio: primero.premio,
+    estado: r.estado, bolas: r.bolas.join(","), ganadores: JSON.stringify(primero.ganadores || []),
+    inicio: r.inicio, fin: r.fin, tipo: r.tipo, premios: JSON.stringify(r.premios), extra: JSON.stringify(r.extra || {})
+  };
   writeObject_(sheetDe_(b, "rondas"), SHEETS_.rondas, copia, r._row);
 }
 
@@ -997,21 +1232,55 @@ function gameGet_(b) {
   var cfg = readConfig_(b);
   return {
     rol: b._rol, seed: b.seed, config: publicConfig_(b, cfg), rondas: rondas_(b).map(limpiaRonda_),
-    vivo: estadoVivo_(b), cartones_habilitados: Number(cfg.cartones_habilitados) || 0
+    vivo: estadoVivo_(b), cartones_habilitados: Number(cfg.cartones_habilitados) || 0,
+    vendidos: cartonesVendidos_(b).map(function (c) { return c.serie; })
   };
+}
+
+/** Texto «0,0;0,4;4,0» → casillas válidas de la figura personalizada. */
+function celdasValidas_(txt) {
+  var vistas = {};
+  String(txt || "").split(";").forEach(function (p) {
+    var m = p.match(/^([0-4]),([0-4])$/);
+    if (m) vistas[m[1] + "," + m[2]] = 1;
+  });
+  return Object.keys(vistas).join(";");
 }
 
 function gameSaveRonda_(b, data) {
   var r = data.ronda || {};
-  if (!FIGURAS_[r.figura]) throw new Error("Figura no válida.");
+  var tipo = TIPOS_RONDA_[r.tipo] ? r.tipo : "figuras";
   var lista = rondas_(b);
   var existente = r.ronda_id ? lista.filter(function (x) { return x.ronda_id === Number(r.ronda_id); })[0] : null;
+  if (existente && existente.estado === "Terminada") throw new Error("Esta ronda ya terminó.");
+  var previos = {};
+  if (existente) existente.premios.forEach(function (p) { previos[p.id] = p; });
+  var entrada = Array.isArray(r.premios) ? r.premios : [];
+  var premios;
+  if (tipo === "figuras") {
+    if (!entrada.length) throw new Error("Agrega al menos un premio con su figura.");
+    var siguiente = 1;
+    entrada.forEach(function (p) { siguiente = Math.max(siguiente, (Number(p.id) || 0) + 1); });
+    premios = entrada.map(function (p) {
+      if (!FIGURAS_[p.figura] || TIPOS_RONDA_[p.figura] || (p.figura === "custom" && !celdasValidas_(p.celdas))) {
+        throw new Error("Revisa la figura de cada premio.");
+      }
+      var id = Number(p.id) && previos[Number(p.id)] ? Number(p.id) : siguiente++;
+      return {
+        id: id, figura: p.figura, celdas: p.figura === "custom" ? celdasValidas_(p.celdas) : "",
+        premio: String(p.premio || "").trim(), ganadores: previos[id] ? previos[id].ganadores : []
+      };
+    });
+  } else {
+    var unico = entrada[0] || {};
+    premios = [{ id: 1, figura: tipo, celdas: "", premio: String(unico.premio || "").trim(), ganadores: previos[1] ? previos[1].ganadores : [] }];
+  }
   var obj = existente || {
-    ronda_id: nextId_(lista, "ronda_id"), orden: lista.length + 1, estado: "Pendiente", bolas: [], ganadores: [], inicio: "", fin: ""
+    ronda_id: nextId_(lista, "ronda_id"), orden: lista.length + 1, estado: "Pendiente", bolas: [], extra: {}, inicio: "", fin: ""
   };
   obj.nombre = String(r.nombre || "").trim() || ("Ronda " + obj.ronda_id);
-  obj.figura = r.figura;
-  obj.premio = String(r.premio || "").trim();
+  obj.tipo = tipo;
+  obj.premios = premios;
   guardarRonda_(b, obj);
   if (obj.estado === "En juego") publicarVivo_(b, obj);
   return { rondas: rondas_(b).map(limpiaRonda_) };
@@ -1022,6 +1291,21 @@ function gameDeleteRonda_(b, data) {
   if (!r) throw new Error("Ronda no encontrada.");
   if (r.estado !== "Pendiente") throw new Error("Solo se borran rondas que no han empezado.");
   sheetDe_(b, "rondas").deleteRow(r._row);
+  return { rondas: rondas_(b).map(limpiaRonda_) };
+}
+
+/** Cambia el orden de una ronda (dir = -1 sube, 1 baja). */
+function gameMoverRonda_(b, data) {
+  var lista = rondas_(b);
+  var i = lista.map(function (x) { return x.ronda_id; }).indexOf(Number(data.ronda_id));
+  var j = i + (Number(data.dir) < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= lista.length) return { rondas: lista.map(limpiaRonda_) };
+  var tmp = lista[i];
+  lista[i] = lista[j];
+  lista[j] = tmp;
+  lista.forEach(function (x, k) {
+    if (x.orden !== k + 1) { x.orden = k + 1; guardarRonda_(b, x); }
+  });
   return { rondas: rondas_(b).map(limpiaRonda_) };
 }
 
@@ -1036,8 +1320,17 @@ function gameAbrir_(b, data) {
   r.estado = "En juego";
   r.inicio = r.inicio || ahora_();
   r.fin = "";
+  anotarQuedan_(r, data);
   guardarRonda_(b, r);
   return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+/** En eliminación el cantador manda cuántos cartones vendidos siguen en pie (lo calcula su navegador). */
+function anotarQuedan_(r, data) {
+  if (r.tipo === "eliminacion" && data && data.quedan !== undefined && data.quedan !== null && data.quedan !== "") {
+    r.extra = r.extra || {};
+    r.extra.quedan = Math.max(0, Math.floor(Number(data.quedan) || 0));
+  }
 }
 
 function gameCantar_(b, data) {
@@ -1047,16 +1340,24 @@ function gameCantar_(b, data) {
   if (!(bola >= 1 && bola <= 75)) throw new Error("La bola debe ser de 1 a 75.");
   if (r.bolas.indexOf(bola) !== -1) throw new Error("La bola " + bola + " ya salió en esta ronda.");
   r.bolas.push(bola);
+  anotarQuedan_(r, data);
   guardarRonda_(b, r);
   return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
 }
 
-function gameDeshacer_(b) {
+function gameDeshacer_(b, data) {
   var r = rondaEnJuego_(b);
   if (!r || !r.bolas.length) throw new Error("No hay bolas para deshacer.");
   r.bolas.pop();
+  anotarQuedan_(r, data);
   guardarRonda_(b, r);
   return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function premioDe_(r, premioId) {
+  var p = premioId ? r.premios.filter(function (x) { return x.id === Number(premioId); })[0] : r.premios.length === 1 ? r.premios[0] : null;
+  if (!p) throw new Error("Elige a qué premio corresponde el ganador.");
+  return p;
 }
 
 function gameGanador_(b, data) {
@@ -1064,12 +1365,23 @@ function gameGanador_(b, data) {
   if (!r) throw new Error("No hay una ronda en juego.");
   var serie = Number(data.serie);
   if (!serie) throw new Error("Serie no válida.");
-  if (r.ganadores.some(function (g) { return g.serie === serie; })) throw new Error("Ese cartón ya está registrado como ganador.");
+  var p = premioDe_(r, data.premio_id);
+  if (p.ganadores.some(function (g) { return g.serie === serie; })) throw new Error("Ese cartón ya está registrado como ganador de este premio.");
   var venta = cartonesVendidos_(b).filter(function (c) { return c.serie === serie; })[0];
-  r.ganadores.push({
+  p.ganadores.push({
     serie: serie, nombre: venta ? venta.comprador.split(" ")[0] : String(data.nombre || "").trim(),
-    bolas: r.bolas.length, hora: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm")
+    bolas: r.bolas.length, hora: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "HH:mm"),
+    dato: data.dato !== undefined && data.dato !== null ? String(data.dato) : ""
   });
+  guardarRonda_(b, r);
+  return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
+}
+
+function gameQuitarGanador_(b, data) {
+  var r = rondaEnJuego_(b);
+  if (!r) throw new Error("No hay una ronda en juego.");
+  var p = premioDe_(r, data.premio_id);
+  p.ganadores = p.ganadores.filter(function (g) { return g.serie !== Number(data.serie); });
   guardarRonda_(b, r);
   return { ronda: limpiaRonda_(r), vivo: publicarVivo_(b, r) };
 }
@@ -1092,15 +1404,22 @@ function gameBuscar_(b, data) {
 
 /* ======================= Estado en vivo ======================= */
 
+function premiosVivo_(r) {
+  return r.premios.map(function (p) {
+    var x = { i: p.id, f: p.figura, p: p.premio, g: p.ganadores.map(function (g) { return { s: g.serie, n: g.nombre, d: g.dato || undefined }; }) };
+    if (p.celdas) x.c = p.celdas;
+    return x;
+  });
+}
+
 function vivoPayload_(b, r) {
   var terminadas = rondas_(b).filter(function (x) { return x.estado === "Terminada"; }).map(function (x) {
-    return { n: x.nombre, p: x.premio, g: x.ganadores.map(function (g) { return { s: g.serie, n: g.nombre }; }) };
+    return { n: x.nombre, tp: x.tipo, ps: premiosVivo_(x) };
   });
   if (!r) return { r: 0, e: "Espera", b: [], h: terminadas, t: Date.now() };
-  return {
-    r: r.ronda_id, n: r.nombre, f: r.figura, p: r.premio, e: r.estado, b: r.bolas,
-    g: r.ganadores.map(function (g) { return { s: g.serie, n: g.nombre }; }), h: terminadas, t: Date.now()
-  };
+  var out = { r: r.ronda_id, n: r.nombre, tp: r.tipo, ps: premiosVivo_(r), e: r.estado, b: r.bolas, h: terminadas, t: Date.now() };
+  if (r.tipo === "eliminacion" && r.extra && r.extra.quedan !== undefined) out.q = r.extra.quedan;
+  return out;
 }
 
 function publicarVivo_(b, r) {
