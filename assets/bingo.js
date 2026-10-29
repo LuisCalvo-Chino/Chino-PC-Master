@@ -754,8 +754,23 @@
             }
             const vistas = { resumen: vistaResumen, ventas: vistaVentas, cartones: vistaCartones, sectores: vistaSectores, juego: vistaJuego, ajustes: vistaAjustes };
             cuerpo.replaceChildren();
-            vistas[tab](cuerpo);
+            try {
+                const p = vistas[tab](cuerpo);
+                if (p && typeof p.catch === "function") p.catch((e) => fallaVista(e));
+            } catch (e) {
+                fallaVista(e);
+            }
             window.scrollTo(0, 0);
+        }
+
+        /** Un error en una pestaña no tumba el panel: se muestra ahí y las demás siguen funcionando. */
+        function fallaVista(e) {
+            console.error(e);
+            cuerpo.replaceChildren(el("section", { class: "bn-card" },
+                el("h2", { text: "Esta sección no se pudo mostrar" }),
+                el("p", { class: "bn-note", text: (e && e.message) || String(e) }),
+                el("p", { class: "bn-note", text: "Tus datos no se tocaron. Usa las otras pestañas y reporta este mensaje." })
+            ));
         }
 
         TABS.forEach(([k, label, icon]) => nav.appendChild(el("button", { dataset: { tab: k }, onclick: () => ir(k) }, el("span", { class: "bn-nav-icon", "aria-hidden": "true", text: icon }), el("span", { text: label }))));
@@ -1180,8 +1195,8 @@
                 }));
             }
 
-            const agregar = el("button", { class: "bn-btn", text: "+ Agregar sector" });
-            agregar.addEventListener("click", () => {
+            const btnAgregar = el("button", { class: "bn-btn", text: "+ Agregar sector" });
+            btnAgregar.addEventListener("click", () => {
                 const max = filas.reduce((m, s) => Math.max(m, Number(s.hasta) || 0), 0);
                 filas.push({ sector_id: 0, nombre: `Sector ${filas.length + 1}`, encargado: "", telefono: "", desde: max + 1, hasta: max + 100, activo: true });
                 pintar();
@@ -1201,7 +1216,7 @@
                     el("p", { class: "bn-note", text: "Cada sector recibe un bloque de series (para imprimir y vender en persona) y un link donde su encargado anota las ventas. Los rangos no pueden cruzarse; las compras en línea usan los cartones fuera de estos rangos." })
                 ),
                 tabla,
-                el("div", { class: "bn-toolbar" }, agregar, guardar)
+                el("div", { class: "bn-toolbar" }, btnAgregar, guardar)
             );
             pintar();
         }
