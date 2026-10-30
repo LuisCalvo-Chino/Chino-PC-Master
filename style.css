@@ -9327,6 +9327,17 @@ body.cpm-no-footer .site-footer {
     border-bottom: 1px solid rgba(0, 255, 255, 0.4);
 }
 
+.doc-page .doc-list a,
+.doc-page .doc-grid a {
+    color: var(--neon-cyan);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.4);
+}
+
+.doc-page .doc-list a:hover,
+.doc-page .doc-list a:focus-visible,
+.doc-page .doc-grid a:hover,
+.doc-page .doc-grid a:focus-visible,
 .doc-callout__text a:hover,
 .doc-callout__text a:focus-visible,
 .doc-callout__foot a:hover,
