@@ -21,7 +21,7 @@
 
     const EMOJI_TIPOS = { nuevo: "🆕", mejorado: "✨", corregido: "🔧", nota: "📝" };
 
-    const URL_PARCHES = "https://luiscalvo-chino.github.io/Chino-PC-Master/#parches";
+    const URL_PARCHES = "https://chinopcmaster.com/#parches";
 
     function esc(s) {
         return String(s == null ? "" : s)

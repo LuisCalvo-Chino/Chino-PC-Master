@@ -3,7 +3,7 @@
 Documento de referencia interno: qué hace la app, separado por los dos paneles que usan las personas del equipo.
 
 > **La versión canónica y publicada de este documento vive en el sitio:**
-> [`#angeles-secretos`](https://luiscalvo-chino.github.io/Chino-PC-Master/#angeles-secretos).
+> [`#angeles-secretos`](https://chinopcmaster.com/#angeles-secretos).
 > Ahí están además la petición de donaciones, el canal de soporte y el origen del proyecto.
 > Este archivo se queda como referencia rápida de funciones.
 >
