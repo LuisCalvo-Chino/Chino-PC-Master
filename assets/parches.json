@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-30T15:08:00-06:00",
+    "actualizado": "2026-10-30T15:35:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -42,14 +42,14 @@
     "parches": [
         {
             "id": "2026-10-30-bingo-consolacion",
-            "fecha": "2026-10-30T15:08:00-06:00",
+            "fecha": "2026-10-30T15:35:00-06:00",
             "producto": [
                 "bingo",
                 "sitio",
                 "admin"
             ],
-            "titulo": "Dominio chinopcmaster.com, correo de soporte y Bingo Digital con rifas de consolación",
-            "resumen": "Después de rifar un premio, la rifa sigue entre los demás cartones para los premios de consolación. En la página de Bingo Digital, el soporte premium para diseñar y organizar su evento. Además, los links del bingo ahora tienen su propia imagen: nombre, ícono y vista previa al compartir. El sitio estrena su dominio chinopcmaster.com y el correo soporte@chinopcmaster.com.",
+            "titulo": "Dominio chinopcmaster.com, correo de soporte, cuentas con seguridad reforzada y Bingo Digital con rifas de consolación",
+            "resumen": "El sitio estrena su dominio chinopcmaster.com con conexión segura y el correo soporte@chinopcmaster.com; los links anteriores siguen funcionando. Bingo Digital suma rifas de consolación, su propia imagen al compartir los links y un lugar destacado en la página de inicio. Además, las cuentas del sitio guardan las contraseñas cifradas.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -74,7 +74,17 @@
                 {
                     "tipo": "mejorado",
                     "producto": "bingo",
-                    "texto": "Los links del bingo (organizador, cantador, vendedores, compra y jugadores) se abren en su propia página de Bingo Digital, con su ícono en la pestaña y su imagen al compartirlos por WhatsApp o redes sociales. Los links que ya se enviaron siguen funcionando y pasan solos a la página nueva."
+                    "texto": "Los links del bingo (organizador, cantador, vendedores, compra y jugadores) se abren en su propia página de Bingo Digital, con su ícono en la pestaña y su imagen al compartirlos por WhatsApp, Facebook o Instagram. Los links que ya se enviaron siguen funcionando y pasan solos a la página nueva, y los correos a los jugadores ya llevan el link nuevo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "El sitio ahora vive en chinopcmaster.com, con conexión segura (candado en el navegador). Los links anteriores, incluidos los que ya se compartieron en publicidad, siguen funcionando y pasan solos a la dirección nueva."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "Bingo Digital aparece en la página de inicio, junto a Rifas Digitales, con su precio y el botón para pedirlo por WhatsApp."
                 },
                 {
                     "tipo": "nuevo",
@@ -89,16 +99,6 @@
                 {
                     "tipo": "nuevo",
                     "producto": "sitio",
-                    "texto": "Bingo Digital aparece en la página de inicio, junto a Rifas Digitales, con su precio y el botón para pedirlo por WhatsApp."
-                },
-                {
-                    "tipo": "nuevo",
-                    "producto": "sitio",
-                    "texto": "El sitio ahora vive en chinopcmaster.com, con conexión segura. Los links anteriores siguen funcionando y pasan solos a la dirección nueva."
-                },
-                {
-                    "tipo": "nuevo",
-                    "producto": "sitio",
                     "texto": "Puede enviar sus preguntas a soporte@chinopcmaster.com; el correo está en el pie de página, en Contacto."
                 },
                 {
@@ -107,9 +107,19 @@
                     "texto": "El formulario de Contacto llega directo a soporte@chinopcmaster.com; al responderle, la respuesta le llega a su correo."
                 },
                 {
+                    "tipo": "corregido",
+                    "producto": "sitio",
+                    "texto": "Los números de teléfono con enlace en las páginas de las aplicaciones se leían con dificultad: ahora se ven en cian, claros sobre el fondo oscuro."
+                },
+                {
                     "tipo": "mejorado",
                     "producto": "admin",
-                    "texto": "Cuentas con seguridad reforzada: las contraseñas se guardan cifradas, cada inicio de sesión recibe una llave temporal y, después de 5 intentos fallidos, el ingreso se pausa 15 minutos."
+                    "texto": "Cuentas con seguridad reforzada: las contraseñas se guardan cifradas, cada inicio de sesión recibe una llave temporal que el servidor verifica y, después de 5 intentos fallidos, el ingreso se pausa 15 minutos."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "admin",
+                    "texto": "El panel de usuarios ya no muestra contraseñas: para cambiar una, se escribe la nueva en «Nueva contraseña»; si queda vacía, se conserva la actual."
                 }
             ]
         },
