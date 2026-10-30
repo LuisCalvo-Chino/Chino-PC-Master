@@ -1215,7 +1215,8 @@ function rondaObj_(r) {
     premios: premios.map(function (p, i) {
       return {
         id: Number(p.id) || i + 1, figura: String(p.figura || "linea"), celdas: String(p.celdas || ""),
-        premio: String(p.premio || ""), ganadores: Array.isArray(p.ganadores) ? p.ganadores : []
+        premio: String(p.premio || ""), consuelo: String(p.consuelo || ""),
+        ganadores: Array.isArray(p.ganadores) ? p.ganadores : []
       };
     }),
     estado: String(r.estado || "Pendiente"), bolas: String(r.bolas || "").split(",").map(Number).filter(Boolean),
@@ -1279,12 +1280,13 @@ function gameSaveRonda_(b, data) {
       var id = Number(p.id) && previos[Number(p.id)] ? Number(p.id) : siguiente++;
       return {
         id: id, figura: p.figura, celdas: p.figura === "custom" ? celdasValidas_(p.celdas) : "",
-        premio: String(p.premio || "").trim(), ganadores: previos[id] ? previos[id].ganadores : []
+        premio: String(p.premio || "").trim(), consuelo: String(p.consuelo || "").trim(),
+        ganadores: previos[id] ? previos[id].ganadores : []
       };
     });
   } else {
     var unico = entrada[0] || {};
-    premios = [{ id: 1, figura: tipo, celdas: "", premio: String(unico.premio || "").trim(), ganadores: previos[1] ? previos[1].ganadores : [] }];
+    premios = [{ id: 1, figura: tipo, celdas: "", premio: String(unico.premio || "").trim(), consuelo: String(unico.consuelo || "").trim(), ganadores: previos[1] ? previos[1].ganadores : [] }];
   }
   var obj = existente || {
     ronda_id: nextId_(lista, "ronda_id"), orden: lista.length + 1, estado: "Pendiente", bolas: [], extra: {}, inicio: "", fin: ""

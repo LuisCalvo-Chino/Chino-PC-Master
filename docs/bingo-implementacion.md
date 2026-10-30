@@ -79,6 +79,7 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
    Las rondas se ordenan con ↑ ↓; un ganador mal registrado se puede quitar.
    - **Verificar**: dice si el cartón cumple cada premio y con qué bola lo completó («la última cantada» o «hace N bolas»).
    - **Rifa**: los cartones que cantaron BINGO se agregan a la rifa desde la verificación (en automático aparecen solos). Con 2 o más, «Rifar entre N cartones» elige uno al azar y se registra con el dato «rifa entre …». La lista se guarda en el equipo del cantador.
+   - **Consolación**: cada premio puede llevar `consuelo` (texto «₡5 000; canasta», se guarda en el JSON de `premios`). Tras registrar al ganador, la serie se retira y la rifa sigue con los demás; cada consolación se registra en el mismo premio con el dato «Consolación: <nombre> · rifa entre …». Los cartones que quedan siguen en la lista del equipo y aparecen en «Premios de consolación».
    - **Pantalla**: «⧉ Abrir pantalla» abre otra ventana con solo las bolas cantadas; al rifar, muestra la rifa y la serie ganadora. Debe abrirse en el mismo navegador y equipo del cantador.
 
 ### Figuras
@@ -130,3 +131,4 @@ Respuesta: `{ "status": "SUCCESS", "data": { … } }` o `{ "status": "ERROR", "m
 - [ ] Beta 2: ronda con 3 premios, ronda «más salado» y eliminación; marcado manual y automático; centro con número y con imagen
 - [ ] Beta 2: vista previa del correo y de WhatsApp; correo real recibido sin emojis
 - [ ] Beta 3: BINGO manual (ganadores ocultos, verificar y rifar) y automático (ganadores a la vista); tómbola vs. bolas de la app; pantalla con rifa; series de 3 dígitos; «↻ Actualizar» en Resumen
+- [ ] Consolación: premios de consolación por premio, la rifa sigue sin el ganador (requiere publicar la nueva versión del Apps Script para guardar `consuelo`)

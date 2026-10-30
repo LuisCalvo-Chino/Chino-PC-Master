@@ -9312,12 +9312,23 @@ body.cpm-no-footer .site-footer {
     color: var(--text-muted);
 }
 
+.doc-callout__text {
+    margin: 0;
+    color: var(--text-body);
+    line-height: 1.7;
+}
+
+.rd-offer + .doc-callout { margin: 22px 0 0; }
+
+.doc-callout__text a,
 .doc-callout__foot a {
     color: var(--neon-cyan);
     text-decoration: none;
     border-bottom: 1px solid rgba(0, 255, 255, 0.4);
 }
 
+.doc-callout__text a:hover,
+.doc-callout__text a:focus-visible,
 .doc-callout__foot a:hover,
 .doc-callout__foot a:focus-visible {
     border-bottom-color: var(--neon-cyan);

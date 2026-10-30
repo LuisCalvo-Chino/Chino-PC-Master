@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-29T23:50:00-06:00",
+    "actualizado": "2026-10-30T01:07:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -40,6 +40,48 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-10-30-bingo-consolacion",
+            "fecha": "2026-10-30T01:07:00-06:00",
+            "producto": [
+                "bingo",
+                "sitio"
+            ],
+            "titulo": "Bingo Digital: rifas de consolación y soporte premium",
+            "resumen": "Después de rifar un premio, la rifa sigue entre los demás cartones para los premios de consolación. En la página de Bingo Digital, el soporte premium para diseñar y organizar su evento.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Cada premio de una ronda puede llevar premios de consolación, por ejemplo «₡5 000; una canasta»."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Al registrar al ganador de una rifa, su serie se retira y la rifa sigue entre los demás cartones para cada premio de consolación. La pantalla para proyectar muestra cada consolación."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Si no configuró consolaciones, «Rifar otro premio de consolación» permite agregarlas en el momento. Si cierra la rifa antes, los cartones que quedaron siguen disponibles en «Premios de consolación»."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "bingo",
+                    "texto": "Los ganadores de consolación aparecen marcados como tales para el cantador y para los jugadores."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "Soporte premium de Bingo Digital (₡35 000, aparte del bingo): diseño gráfico de los cartones, correos en HTML, mensajes de WhatsApp y apoyo para organizar la compra y la impresión de los cartones."
+                },
+                {
+                    "tipo": "nota",
+                    "producto": "sitio",
+                    "texto": "La impresión de cartones se paga aparte. Recomendamos a El Punto Digital (WhatsApp +506 8687 0382), con quien manejamos un buen precio en conjunto."
+                }
+            ]
+        },
         {
             "id": "2026-10-29-bingo-beta",
             "fecha": "2026-10-29T23:50:00-06:00",
