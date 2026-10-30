@@ -8350,7 +8350,8 @@ body.cpm-no-footer .site-footer {
     gap: 9px;
 }
 
-.site-footer__contact-line img {
+.site-footer__contact-line img,
+.site-footer__contact-line svg {
     width: 18px;
     height: 18px;
     object-fit: contain;
