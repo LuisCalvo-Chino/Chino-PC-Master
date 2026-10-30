@@ -1668,15 +1668,25 @@ a.card.spa-page-link {
 
 .home-spotlight__media--video .rd-video__credit { text-align: center; }
 
+/* Bingo Digital: mismo cuadro con la imagen a la izquierda */
+.home-spotlight--reverse { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); }
+.home-spotlight--reverse .home-spotlight__media { order: -1; transform: rotate(-2deg); }
+.home-spotlight--reverse .home-spotlight__media:hover,
+.home-spotlight--reverse .home-spotlight__media:focus-visible { transform: rotate(0deg) scale(1.02); }
+
 @media (max-width: 760px) {
-    .home-spotlight { grid-template-columns: 1fr; }
+    .home-spotlight,
+    .home-spotlight--reverse { grid-template-columns: 1fr; }
+    .home-spotlight--reverse .home-spotlight__media { order: 0; }
     .home-spotlight__media { width: min(70%, 240px); }
     .home-spotlight__media--video { width: min(100%, 290px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .home-spotlight__media,
-    .home-spotlight__media:hover { transform: none; }
+    .home-spotlight__media:hover,
+    .home-spotlight--reverse .home-spotlight__media,
+    .home-spotlight--reverse .home-spotlight__media:hover { transform: none; }
 }
 
 /* «Escríbame por»: WhatsApp, Instagram y Messenger en la bienvenida */

@@ -89,6 +89,11 @@
                 {
                     "tipo": "nuevo",
                     "producto": "sitio",
+                    "texto": "Bingo Digital aparece en la página de inicio, junto a Rifas Digitales, con su precio y el botón para pedirlo por WhatsApp."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
                     "texto": "El sitio ahora vive en chinopcmaster.com, con conexión segura. Los links anteriores siguen funcionando y pasan solos a la dirección nueva."
                 },
                 {
