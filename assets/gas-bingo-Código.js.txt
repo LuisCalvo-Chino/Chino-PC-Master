@@ -1021,6 +1021,8 @@ function markSent_(b, data, sector) {
 
 function linkJugador_(cfg, token) {
   var base = String(cfg.sitio_url || "https://chinopcmaster.com/").replace(/#.*$/, "");
+  // Los links del bingo viven en su propia página (bingo/), con su imagen al compartir
+  if (!/\/bingo\/$/.test(base)) base = base.replace(/[^\/]*$/, "") + "bingo/";
   return base + "#bj/" + token;
 }
 
