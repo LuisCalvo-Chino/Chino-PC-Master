@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Bingo Digital</title>
+    <meta name="description" content="Compre sus cartones, siga las bolas en vivo y juegue desde el teléfono.">
+    <!-- Los links del bingo son privados: se comparten, pero no se indexan -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="../imagenes/bingo/marca/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../imagenes/bingo/marca/icon-16.png">
+    <link rel="apple-touch-icon" href="../imagenes/bingo/marca/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#14161c">
+
+    <!-- Vista previa al compartir: igual para todos los links del bingo (la parte después de # no llega a las redes) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Bingo Digital">
+    <meta property="og:locale" content="es_CR">
+    <meta property="og:url" content="https://luiscalvo-chino.github.io/Chino-PC-Master/bingo/">
+    <meta property="og:title" content="Bingo Digital">
+    <meta property="og:description" content="Compre sus cartones, siga las bolas en vivo y juegue desde el teléfono.">
+    <meta property="og:image" content="https://luiscalvo-chino.github.io/Chino-PC-Master/imagenes/bingo/marca/og-bingo.jpg">
+    <meta property="og:image:secure_url" content="https://luiscalvo-chino.github.io/Chino-PC-Master/imagenes/bingo/marca/og-bingo.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Bolas de bingo B, I, N, G y O con el título Bingo Digital">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bingo Digital">
+    <meta name="twitter:description" content="Compre sus cartones, siga las bolas en vivo y juegue desde el teléfono.">
+    <meta name="twitter:image" content="https://luiscalvo-chino.github.io/Chino-PC-Master/imagenes/bingo/marca/og-bingo.jpg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Mismas fuentes que el sitio: el diseño del cartón puede usar cualquiera -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Nunito:wght@400;700&family=Open+Sans:wght@400;700&family=Orbitron:wght@700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&family=Source+Sans+3:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #14161c;
+            color: #eceef3;
+            font-family: "Inter", system-ui, sans-serif;
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+        main {
+            padding: 12px max(16px, env(safe-area-inset-right, 0px)) 2rem max(16px, env(safe-area-inset-left, 0px));
+        }
+        .bn-shell-msg { max-width: 460px; margin: 18vh auto 0; text-align: center; }
+        .bn-shell-msg img { width: 72px; height: 72px; }
+        .bn-shell-msg h1 { margin: 16px 0 8px; font: 800 1.5rem "Montserrat", sans-serif; letter-spacing: 0.04em; }
+        .bn-shell-msg p { margin: 0; color: #a3a8b5; }
+
+        /* Avisos (mismo comportamiento que en el sitio) */
+        .auth-message {
+            position: fixed; right: 20px; bottom: 20px; z-index: 4000;
+            min-width: 240px; max-width: min(420px, calc(100vw - 40px));
+            padding: 12px 14px; border-radius: 10px;
+            border: 1px solid #0047ab; background: rgba(33, 33, 33, 0.95); color: #fff;
+            opacity: 0; transform: translateY(8px); pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .auth-message.show { opacity: 1; transform: translateY(0); }
+        .auth-message.success { border-color: #00ffff; background: rgba(18, 108, 54, 0.92); color: #dcffe9; }
+        .auth-message.error { border-color: #ff7a00; background: rgba(144, 24, 24, 0.94); color: #ffe5e5; }
+        .auth-message.info { border-color: #0047ab; background: rgba(0, 71, 171, 0.92); color: #e8f2ff; }
+    </style>
+
+    <script>
+        /** Igual que en index.html: subirlo al cambiar los JS/CSS del bingo. */
+        window.CPM_ASSET_V = "61";
+        window.CPM_BINGO_GAS_URL = "https://script.google.com/macros/s/AKfycbwh5GKUlr6WAg3EJiGo79maMndJLeMPoZ64W6cw1Yn5Dg-Orrgy07UVHSI2fpMJlBhf/exec";
+    </script>
+</head>
+<body class="cpm-bingo-standalone">
+    <main>
+        <section id="bingo-app" class="bn-app" aria-label="Bingo Digital">
+            <div class="bn-loading">
+                <div class="bn-spinner"></div>
+                <p>Cargando…</p>
+            </div>
+        </section>
+    </main>
+    <div id="auth-message" class="auth-message" aria-live="polite"></div>
+
+    <script>
+        /* Entrada propia de los links del bingo: #b/ organizador, #bk/ cantador, #bp/ pantalla, #bv/ sector, #bc/ compra, #bj/ jugador, #bt/ cartón. */
+        (function () {
+            const v = encodeURIComponent(window.CPM_ASSET_V);
+            const MODOS = { b: "admin", bk: "cantador", bp: "pantalla", bv: "sector", bc: "compra", bj: "jugador", bt: "carton" };
+            const TITULOS = { admin: "Organizador", cantador: "Cantador", pantalla: "Pantalla", sector: "Ventas del sector", compra: "Comprar cartones", jugador: "Mis cartones", carton: "Cartón" };
+            const aviso = document.getElementById("auth-message");
+            let temporizador = null;
+
+            function showMessage(texto, tipo = "info", ms = 4200) {
+                aviso.textContent = texto;
+                aviso.className = `auth-message show ${tipo}`;
+                clearTimeout(temporizador);
+                if (ms > 0) temporizador = setTimeout(() => aviso.classList.remove("show"), ms);
+            }
+
+            function cargar(src) {
+                return new Promise((resolve) => {
+                    const s = document.createElement("script");
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = () => { console.error("Error cargando", src); resolve(); };
+                    document.body.appendChild(s);
+                });
+            }
+
+            function sinLink() {
+                document.title = "Bingo Digital";
+                const app = document.getElementById("bingo-app");
+                app.innerHTML = '<div class="bn-shell-msg"><img src="../imagenes/bingo/marca/icon-192.png" alt="" width="72" height="72"><h1>BINGO DIGITAL</h1><p>Abra el link completo que le enviaron para ver sus cartones o su bingo.</p></div>';
+            }
+
+            function ruta() {
+                const raw = String(location.hash || "").replace(/^#/, "").trim();
+                const m = raw.match(/^(b|bk|bp|bv|bc|bj|bt)\/(.+)$/);
+                if (!m) return null;
+                let hash = m[2];
+                try {
+                    hash = decodeURIComponent(hash);
+                } catch (e) {
+                    /* se usa tal cual */
+                }
+                return { mode: MODOS[m[1]], hash };
+            }
+
+            function iniciar() {
+                const r = ruta();
+                if (!r) return sinLink();
+                document.title = `${TITULOS[r.mode]} · Bingo Digital`;
+                window.initBingoApp({ showMessage, getSession: () => null, bingo: r });
+            }
+
+            const css = document.createElement("link");
+            css.rel = "stylesheet";
+            css.href = `../assets/bingo.css?v=${v}`;
+            document.head.appendChild(css);
+            cargar(`../assets/bingo-core.js?v=${v}`)
+                .then(() => cargar(`../assets/bingo-api.js?v=${v}`))
+                .then(() => cargar(`../assets/bingo.js?v=${v}`))
+                .then(() => {
+                    iniciar();
+                    window.addEventListener("hashchange", iniciar);
+                });
+        })();
+    </script>
+</body>
+</html>

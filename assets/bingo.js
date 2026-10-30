@@ -58,8 +58,10 @@
 
     const colones = (n) => "₡" + Math.round(Number(n) || 0).toLocaleString("es-CR");
 
+    /** Los links del bingo viven en su propia entrada (bingo/), con su ícono y su vista previa al compartir. */
     function baseUrl() {
-        return `${window.location.origin}${window.location.pathname}`;
+        const dir = window.location.pathname.replace(/[^/]*$/, "");
+        return `${window.location.origin}${/\/bingo\/$/.test(dir) ? dir : dir + "bingo/"}`;
     }
 
     const links = {

@@ -60,6 +60,8 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
 | `#bj/<pub>.<token>` | Jugador | Todos sus cartones con la bola en vivo: las compras con el mismo correo comparten link |
 | `#bt/<pub>-<serie>-<código>` | Quien escanea el QR | Un cartón suelto en vivo; el código impide inventar series |
 
+Los links por rol se abren en `bingo/index.html` (entrada propia: título, ícono e imagen para compartir en `imagenes/bingo/marca/`). `baseUrl()` en bingo.js siempre arma `…/bingo/#…`, y app.js pasa a `bingo/` los links viejos que llegan al inicio del sitio. Al subir `CPM_ASSET_V` en index.html, súbalo también en bingo/index.html.
+
 ## 5. Uso
 
 1. **Hub → + Nuevo bingo**: nombre, fecha, precio por cartón y (opcional) el correo Google del cliente, al que se le comparte la carpeta del bingo. Envía el link de organizador por WhatsApp.

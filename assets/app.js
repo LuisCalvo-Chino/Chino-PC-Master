@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "60"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "61"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -64,6 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (/^r\/.+$/.test(raw)) {
             document.body.classList.add("cpm-rifa-standalone");
         } else if (BINGO_ROUTE_RE.test(raw)) {
+            // Links del bingo enviados antes de tener su propia entrada: se pasan a bingo/ con el mismo enlace
+            window.location.replace(`${window.location.pathname.replace(/[^/]*$/, "")}bingo/${window.location.hash}`);
             document.body.classList.add("cpm-bingo-standalone");
         } else if (/^(u|a)\/.+$/i.test(raw)) {
             document.body.classList.add("cpm-angels-standalone", "cpm-angels-route");
