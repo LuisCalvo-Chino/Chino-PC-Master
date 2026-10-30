@@ -8628,6 +8628,12 @@ body.cpm-no-footer .site-footer {
     color: #ffcbb8;
 }
 
+.patch-tag--bingo {
+    border-color: rgba(255, 196, 0, 0.6);
+    background: rgba(255, 196, 0, 0.14);
+    color: #ffe7a3;
+}
+
 .patch-tag--certificados {
     border-color: rgba(95, 211, 154, 0.6);
     background: rgba(95, 211, 154, 0.15);

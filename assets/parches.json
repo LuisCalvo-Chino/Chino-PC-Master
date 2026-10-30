@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-10-16T11:10:00-06:00",
+    "actualizado": "2026-10-29T23:50:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -13,6 +13,12 @@
             "nombre": "Sistema de Rifa",
             "tipo": "webapp",
             "descripcion": "Rifas con cuadrícula de números, control de vendidos y afiche descargable."
+        },
+        {
+            "id": "bingo",
+            "nombre": "Bingo Digital",
+            "tipo": "webapp",
+            "descripcion": "Bingo con venta de cartones por combos, vendedores por sector, cartones impresos y juego en vivo con rifa de desempate."
         },
         {
             "id": "certificados",
@@ -34,6 +40,98 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-10-29-bingo-beta",
+            "fecha": "2026-10-29T23:50:00-06:00",
+            "producto": [
+                "bingo",
+                "sitio"
+            ],
+            "titulo": "Llega Bingo Digital (Beta)",
+            "resumen": "Una app nueva para organizar bingos completos: venta de cartones con comprobante, precios por combos, vendedores por sector, cartones para imprimir y un juego en vivo con verificación, rifa de desempate y pantalla para proyectar. En el sitio, su página con el instructivo completo y el precio: ₡65 000 por bingo.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Un enlace para cada persona: organizador, cantador, encargados de sector, compra en línea y jugadores. Sin registros ni instalaciones."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Precios por combos: la app arma el total de cualquier cantidad con la combinación más barata (con combos de 1 y de 10, 21 cartones = 2 combos de 10 + 1 cartón) y avisa si los precios no están escalonados. Sin límite de cartones por compra."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Compra en línea con SINPE Móvil y comprobante. El organizador aprueba, rechaza o asigna series impresas, y envía el enlace de cartones por WhatsApp o por correo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "El correo identifica a cada jugador: todas las compras de una persona aparecen en un solo enlace."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Sectores con varios encargados, cada uno con su enlace para registrar ventas con comprador y comprobante. El Resumen desglosa cartones y dinero por sector y por encargado."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Hasta 10 000 cartones únicos por bingo, distintos a los de cualquier otro bingo. Diseño propio sobre un template, centro libre (con imagen opcional de 190 × 190 px) o con número, PDF por rango, QR y código de verificación."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Rondas de figuras con varios premios (verticales, horizontales, diagonales, 4 esquinas, cartón lleno, figura personalizada y otras), «El cartón más salado» y eliminación."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Verificación de cartones: dice si cumple cada premio y con qué bola lo completó, para saber si cantó a tiempo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "BINGO manual o automático: con el manual, el cantador solo ve que ya hay alguien con el premio, sin saber qué cartón; con el automático, ve los ganadores de inmediato."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Rifa de desempate entre los cartones que cantaron BINGO en el mismo premio, con el ganador registrado y la nota de entre quiénes se rifó."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Pantalla para proyectar: otra ventana con las bolas cantadas que, al rifar, muestra la rifa y la serie ganadora en grande."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Bolas de la app o tómbola física: con la app solo se sacan bolas al azar; con tómbola solo se escribe el número que salió."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Jugadores en línea con la bola en vivo sobre sus cartones, marcando cada número con una X roja."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Mensajes de WhatsApp con emojis y correo con editor visual, cada uno con su vista previa."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Series de 3, 4 o 5 dígitos, fechas como «15 de nov de 2026 a las 19:00» y un botón para actualizar el Resumen con las ventas nuevas."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "sitio",
+                    "texto": "Página «Bingo Digital» con el instructivo completo, capturas de la app, preguntas frecuentes y el precio (₡65 000 por bingo) con el botón para pedirlo por WhatsApp, en el menú principal y en el pie de página."
+                }
+            ]
+        },
         {
             "id": "2026-10-16-rifa-logotipo-ancho",
             "fecha": "2026-10-16T11:10:00-06:00",

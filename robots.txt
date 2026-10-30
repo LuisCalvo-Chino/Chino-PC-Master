@@ -4,6 +4,8 @@
 User-agent: *
 Disallow: /angeles-secretos.html
 Disallow: /rifas-digitales.html
+Disallow: /bingo-digital.html
+Disallow: /bingo.html
 Disallow: /angels.html
 Disallow: /rifa.html
 Disallow: /admin.html
