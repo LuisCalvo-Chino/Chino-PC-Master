@@ -1,4 +1,4 @@
-# Bingo Digital (Beta 2) — Instrucciones de implementación
+# Bingo Digital (Beta 3) — Instrucciones de implementación
 
 Sistema para que cada cliente administre su propio bingo desde un link, con cartones propios (hasta 10 000), ventas en línea y presenciales por sectores, y juego en vivo para jugadores presenciales y virtuales.
 
@@ -54,6 +54,7 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
 | `#bingo` | Tú (admin) | Crear, archivar, reactivar y quitar bingos; copiar los links |
 | `#b/<código>` | Organizador | Resumen, Ventas, Cartones, Sectores, Juego, Ajustes |
 | `#bk/<código>` | Cantador | Solo el juego |
+| `#bp/<código>` | Pantalla para proyectar | Se abre desde el juego («⧉ Abrir pantalla»): bolas cantadas y la rifa en vivo, en otra ventana del mismo equipo |
 | `#bv/<pub>.<código>` | Encargado de sector (uno por encargado) o link general del sector | Registrar ventas con comprador, correo y comprobante; enviar links; imprimir su bloque |
 | `#bc/<pub>` | Público | Comprar con comprobante |
 | `#bj/<pub>.<token>` | Jugador | Todos sus cartones con la bola en vivo: las compras con el mismo correo comparten link |
@@ -64,7 +65,9 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
 1. **Hub → + Nuevo bingo**: nombre, fecha, precio por cartón y (opcional) el correo Google del cliente, al que se le comparte la carpeta del bingo. Envía el link de organizador por WhatsApp.
 2. **Ajustes** (primera vez): fecha y hora (se muestran como «15 de nov de 2026 a las 19:00»), lugar, SINPE, **combos de precios**, marcado del jugador y los mensajes.
    - **Combos**: cantidad de cartones + precio. El total de cualquier cantidad es la combinación de combos más barata que suma exactamente esa cantidad (combos 1 = ₡3 000 y 10 = ₡19 000 → 21 cartones = ₡41 000). El combo de 1 cartón es obligatorio. Si comprar un cartón más cuesta lo mismo o menos, el panel avisa que los precios no están escalonados y pide confirmar. No hay límite de 20: hasta 1000 cartones por compra.
-   - **Marcado**: «Solo tocando la casilla» (por defecto; el jugador no ve el menú de marcado ni los avisos de «te faltan») o «Automático disponible» (se marcan solos y el jugador puede cambiar a manual).
+   - **Juego y BINGO → Marcado y ganadores**: «BINGO manual» (por defecto: el jugador marca tocando la casilla; el cantador no ve qué cartones ganaron, solo «¡Ya hay alguien con este premio!», y revisa cada cartón que cante BINGO) o «BINGO automático» (se marcan solos y el jugador puede cambiar a manual; el cantador ve de inmediato los cartones ganadores).
+   - **Juego y BINGO → Bolas**: «Bolas de la app» (solo «Sacar bola», sin escribir números) o «Tómbola física» (solo se escribe el número que salió).
+   - **Dígitos de la serie**: 3, 4 o 5 (001 / 0001 / 00001). Una serie más larga nunca se recorta.
    - **Mensajes**: WhatsApp con formato y emojis, con vista previa de chat. Correo con editor visual (o HTML) y vista previa de bandeja de entrada; los emojis del correo se avisan y se quitan al guardar.
 3. **Cartones**: template (PNG, PNG transparente o PDF de 10 × 14 cm), arte (1200 × 1680 px), **centro del cartón** (espacio libre o número; con espacio libre, imagen PNG de exactamente 190 × 190 px), vista previa, lote, PDF por rango y buscar un cartón.
 4. **Sectores**: bloque de series por sector y **varios encargados**, cada uno con su link. El resumen desglosa cartones, monto y ventas por sector y por encargado. En la compra pública, el comprador elige al encargado que le vendió.
@@ -74,6 +77,9 @@ Publica el sitio. En **WebApps → Bingo** (solo cuentas admin) escribe la llave
    - **El cartón más salado**: ranking en vivo de los cartones vendidos con más espacios en blanco.
    - **Eliminación**: cada bola elimina los cartones que la tienen; el panel cuenta los que siguen en pie y avisa cuando queda uno (o si una bola saca a todos).
    Las rondas se ordenan con ↑ ↓; un ganador mal registrado se puede quitar.
+   - **Verificar**: dice si el cartón cumple cada premio y con qué bola lo completó («la última cantada» o «hace N bolas»).
+   - **Rifa**: los cartones que cantaron BINGO se agregan a la rifa desde la verificación (en automático aparecen solos). Con 2 o más, «Rifar entre N cartones» elige uno al azar y se registra con el dato «rifa entre …». La lista se guarda en el equipo del cantador.
+   - **Pantalla**: «⧉ Abrir pantalla» abre otra ventana con solo las bolas cantadas; al rifar, muestra la rifa y la serie ganadora. Debe abrirse en el mismo navegador y equipo del cantador.
 
 ### Figuras
 
@@ -123,3 +129,4 @@ Respuesta: `{ "status": "SUCCESS", "data": { … } }` o `{ "status": "ERROR", "m
 - [ ] Beta 2: encargado registra venta con comprobante; el resumen la cuenta para ese encargado
 - [ ] Beta 2: ronda con 3 premios, ronda «más salado» y eliminación; marcado manual y automático; centro con número y con imagen
 - [ ] Beta 2: vista previa del correo y de WhatsApp; correo real recibido sin emojis
+- [ ] Beta 3: BINGO manual (ganadores ocultos, verificar y rifar) y automático (ganadores a la vista); tómbola vs. bolas de la app; pantalla con rifa; series de 3 dígitos; «↻ Actualizar» en Resumen

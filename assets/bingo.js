@@ -2,6 +2,7 @@
  * Bingo Digital — hub (#bingo) y links por rol:
  *   #b/<hash>   organizador (todo su bingo)
  *   #bk/<hash>  cantador (solo el juego)
+ *   #bp/<hash>  pantalla para proyectar (bolas cantadas y rifa), abierta desde el juego
  *   #bv/<hash>  vendedor o encargado de sector
  *   #bc/<pub>   compra pública
  *   #bj/<token> jugador (todos sus cartones: las compras con el mismo correo comparten link)
@@ -64,6 +65,7 @@
     const links = {
         organizador: (h) => `${baseUrl()}#b/${h}`,
         cantador: (h) => `${baseUrl()}#bk/${h}`,
+        pantalla: (h) => `${baseUrl()}#bp/${h}`,
         sector: (h) => `${baseUrl()}#bv/${h}`,
         compra: (p) => `${baseUrl()}#bc/${p}`,
         jugador: (t) => `${baseUrl()}#bj/${t}`,
@@ -187,7 +189,11 @@
 
     async function llamar(payload, opts) {
         const res = await window.CPMBingoApi.post(payload, opts);
-        return res.data || {};
+        const d = res.data || {};
+        /* Los dígitos de la serie vienen en la configuración del bingo (Ajustes). */
+        const cfg = d.config || (d.juego && d.juego.config);
+        if (cfg && cfg.digitos) C.setDigitos(cfg.digitos);
+        return d;
     }
 
     /** Ejecuta una acción con el botón deshabilitado y mensaje de error legible. */
@@ -265,6 +271,20 @@
             ]);
         });
     }
+
+    /** Opciones grandes (radio) con título y explicación; el contenedor expone .value como un select. */
+    function opcionesGrandes(nombre, opciones, valor) {
+        const caja = el("div", { class: "bn-choices", role: "radiogroup" });
+        opciones.forEach(([v, titulo, texto]) => {
+            const r = el("input", { type: "radio", name: nombre, value: v });
+            r.checked = v === valor;
+            caja.append(el("label", { class: "bn-choice" }, r, el("span", {}, el("b", { text: titulo }), el("small", { class: "bn-note bn-block", text: texto }))));
+        });
+        Object.defineProperty(caja, "value", { get: () => { const x = caja.querySelector("input:checked"); return x ? x.value : valor; } });
+        return caja;
+    }
+
+    const horaCorta = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
     function campo(etiqueta, input, nota) {
         return el("label", { class: "bn-field" }, el("span", { class: "bn-label", text: etiqueta }), input, nota ? el("small", { class: "bn-note", text: nota }) : null);
@@ -1107,6 +1127,147 @@
         await cargar();
     }
 
+    /* ================= Pantalla para proyectar (#bp/<hash>) ================= */
+
+    /** Duración de cada paso de la rifa: el cantador y la pantalla usan la misma para terminar a la vez. */
+    const msRifa = (i, pasos) => 70 + Math.pow(i / pasos, 3) * 380;
+
+    /** Un canal por link: la pantalla abierta en otra ventana del mismo equipo recibe las bolas y la rifa. */
+    const canalesPantalla = {};
+    function canalPantalla(hash) {
+        if (canalesPantalla[hash]) return canalesPantalla[hash];
+        let canal = null;
+        try {
+            canal = new BroadcastChannel(`bn_pantalla_${hash}`);
+        } catch (e) {
+            canal = null;
+        }
+        const api = {
+            estado: null,
+            emitir(m) {
+                if (m.t === "estado") api.estado = m;
+                try {
+                    if (canal) canal.postMessage(m);
+                } catch (e) {
+                    /* la pantalla es opcional */
+                }
+            }
+        };
+        if (canal) canal.onmessage = (ev) => { if (ev.data && ev.data.t === "hola" && api.estado) canal.postMessage(api.estado); };
+        canalesPantalla[hash] = api;
+        return api;
+    }
+
+    function estadoDeRonda(nombreBingo, r) {
+        return r
+            ? { t: "estado", bingo: nombreBingo, ronda: r.nombre, tipo: TIPOS_RONDA[r.tipo] || "", bolas: r.bolas.slice() }
+            : { t: "estado", bingo: nombreBingo, ronda: "", tipo: "", bolas: [] };
+    }
+
+    async function initPantalla(hash) {
+        cargando("Abriendo la pantalla…");
+        let g;
+        try {
+            g = await llamar({ action: "game_get", hash });
+        } catch (e) {
+            return pantallaError(e.message);
+        }
+        document.title = `${g.config.nombre || "Bingo"} · pantalla`;
+        const activa = (g.rondas || []).find((r) => r.estado === "En juego") || null;
+        let estado = estadoDeRonda(g.config.nombre, activa);
+        let rifa = null;
+        let girando = 0;
+
+        const raiz = el("div", { class: "bn-screen" });
+        const capa = el("div", { class: "bn-screen-rifa", hidden: true });
+        const completa = el("button", { class: "bn-btn bn-btn--sm bn-screen-fs", text: "Pantalla completa" });
+        completa.addEventListener("click", () => {
+            const d = document.documentElement;
+            if (document.fullscreenElement) document.exitFullscreen();
+            else if (d.requestFullscreen) d.requestFullscreen().catch(() => {});
+        });
+        document.addEventListener("fullscreenchange", () => { completa.hidden = !!document.fullscreenElement; });
+
+        function pintar() {
+            const bolas = estado.bolas || [];
+            const cantadas = new Set(bolas);
+            const ultima = bolas[bolas.length - 1];
+            poner(raiz,
+                el("header", { class: "bn-screen-head" },
+                    el("b", { text: estado.bingo || "Bingo" }),
+                    el("span", { text: estado.ronda ? `${estado.ronda}${estado.tipo ? " · " + estado.tipo : ""}` : "Esperando la próxima ronda" }),
+                    el("span", { class: "bn-screen-count", text: `${bolas.length} de 75` })),
+                el("div", { class: "bn-screen-main" },
+                    el("div", { class: "bn-screen-last" },
+                        ultima ? bolaEl(ultima, true) : el("span", { class: "bn-ball bn-ball--big bn-ball--empty" }, el("b", { text: "–" })),
+                        el("div", { class: "bn-screen-prev" }, bolas.slice(-7, -1).reverse().map((n) => bolaEl(n)))),
+                    el("div", { class: "bn-board bn-screen-board" }, C.LETRAS.map((letra, c) =>
+                        el("div", { class: "bn-board-row" }, el("b", { class: `bn-board-letter bn-ball--${letra.toLowerCase()}`, text: letra }),
+                            Array.from({ length: 15 }, (_, i) => {
+                                const n = c * 15 + i + 1;
+                                return el("span", { class: `${cantadas.has(n) ? "on" : ""}${n === ultima ? " last" : ""}`, text: n });
+                            }))))),
+                capa, completa);
+        }
+
+        function mostrarRifa(m) {
+            const vuelta = ++girando;
+            rifa = m;
+            const chips = m.lista.map((s) => el("span", { class: "bn-rifa-chip", text: s }));
+            const final = el("div", { class: "bn-screen-win", hidden: true });
+            poner(capa, el("p", { class: "bn-eyebrow", text: "Rifa" }), el("h2", { text: m.titulo }), el("div", { class: "bn-rifa-chips" }, chips), final);
+            capa.hidden = false;
+            let i = 0;
+            const paso = () => {
+                if (vuelta !== girando) return;
+                chips.forEach((c, k) => c.classList.toggle("is-on", k === i % chips.length));
+                if (i >= m.pasos) {
+                    chips[m.elegido].classList.add("is-win");
+                    poner(final, el("small", { text: "Gana la serie" }), el("b", { text: m.lista[m.elegido] }));
+                    final.hidden = false;
+                    return;
+                }
+                i++;
+                setTimeout(paso, msRifa(i, m.pasos));
+            };
+            paso();
+        }
+
+        function cerrarRifa() {
+            girando++;
+            rifa = null;
+            capa.hidden = true;
+        }
+
+        let canal = null;
+        try {
+            canal = new BroadcastChannel(`bn_pantalla_${hash}`);
+        } catch (e) {
+            canal = null;
+        }
+        if (canal) {
+            canal.onmessage = (ev) => {
+                const m = ev.data || {};
+                if (m.t === "estado") {
+                    const nueva = (m.bolas || []).length !== (estado.bolas || []).length || m.ronda !== estado.ronda;
+                    estado = m;
+                    if (rifa && nueva) cerrarRifa();
+                    pintar();
+                    if (rifa) capa.hidden = false;
+                } else if (m.t === "rifa") {
+                    mostrarRifa(m);
+                } else if (m.t === "rifa_cerrar") {
+                    cerrarRifa();
+                }
+            };
+            canal.postMessage({ t: "hola" });
+        }
+        document.body.classList.add("bn-screen-body");
+        poner(app, raiz);
+        pintar();
+        if (!canal) showMessage("Este navegador no puede conectar la pantalla con el link del cantador.", "error", 8000);
+    }
+
     /* ================= Panel del organizador / cantador ================= */
 
     async function initPanel(hash, rol) {
@@ -1182,8 +1343,10 @@
 
         async function recargar() {
             S.data = await llamar({ action: "resolve_admin", hash });
+            S.cargado = new Date();
             pintarCabecera();
         }
+        S.cargado = new Date();
 
         function faltaConfigurar() {
             const c = S.data.config;
@@ -1222,7 +1385,15 @@
                 );
             }));
 
+            const refrescar = el("button", { class: "bn-btn bn-btn--sm", text: "↻ Actualizar" });
+            refrescar.addEventListener("click", () => conBoton(refrescar, async () => {
+                await recargar();
+                ir("resumen");
+                showMessage("Resumen actualizado.", "success");
+            }, "Actualizando…"));
             agregar(root,
+                el("div", { class: "bn-toolbar bn-toolbar--end bn-refresh" },
+                    el("small", { class: "bn-note", text: `Datos de las ${horaCorta(S.cargado)}` }), refrescar),
                 faltaConfigurar() ? el("div", { class: "bn-banner" }, el("p", { text: "Completa los datos del bingo (fecha, combos de precio y SINPE) para empezar a vender." }), el("button", { class: "bn-btn bn-btn--primary", onclick: () => ir("ajustes"), text: "Completar datos" })) : null,
                 el("div", { class: "bn-tiles" },
                     tile(r.cartones_vendidos.toLocaleString("es-CR"), "cartones vendidos", `de ${r.cartones_habilitados.toLocaleString("es-CR")} habilitados · máximo 10 000`),
@@ -1689,7 +1860,7 @@
                         campo("¿Qué va en la casilla del centro?", centroSel, "Con número en el centro, la N lleva 5 números y ninguna casilla está marcada de entrada. Cámbialo antes de imprimir o vender."),
                         centroBox
                     ),
-                    el("div", { class: "bn-design-preview" }, preview, el("small", { class: "bn-note", text: "Vista previa: serie 00001 con 5 números marcados." }))
+                    el("div", { class: "bn-design-preview" }, preview, el("small", { class: "bn-note", text: `Vista previa: serie ${C.serieTexto(1)} con 5 números marcados.` }))
                 ),
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Imprimir cartones" }),
@@ -1813,6 +1984,17 @@
             const seed = J.seed;
             const gridDe = (s) => C.carton(seed, s, centroNumero(J.config));
             let enCurso = false;
+            const pantalla = canalPantalla(hash);
+            const estadoPantalla = (r) => estadoDeRonda(J.config.nombre, r);
+            /** Abre la pantalla para proyectar en otra ventana: solo las bolas cantadas y, al rifar, la rifa. */
+            const botonPantalla = () => el("button", {
+                class: "bn-btn bn-btn--sm", title: "Abre una ventana para proyectar las bolas cantadas y la rifa",
+                onclick: () => {
+                    const w = window.open(links.pantalla(hash), `bn_pantalla_${J.config.public_id || "bingo"}`, "popup,width=1280,height=760");
+                    if (!w) showMessage("El navegador bloqueó la ventana. Permite las ventanas emergentes de este sitio.", "error", 8000);
+                },
+                text: "⧉ Abrir pantalla"
+            });
 
             function rondaActiva() {
                 return J.rondas.find((r) => r.estado === "En juego") || null;
@@ -1922,11 +2104,12 @@
             }
 
             function vistaRondas() {
+                pantalla.emitir(estadoPantalla(null));
                 const pendientes = J.rondas.filter((r) => r.estado === "Pendiente");
                 const terminadas = J.rondas.filter((r) => r.estado === "Terminada");
                 return el("div", { class: "bn-stack" },
                     el("section", { class: "bn-card" },
-                        el("div", { class: "bn-card-head" }, el("h2", { text: "Rondas" }), el("button", { class: "bn-btn bn-btn--primary", onclick: () => editorRonda(null), text: "+ Nueva ronda" })),
+                        el("div", { class: "bn-card-head" }, el("h2", { text: "Rondas" }), el("div", { class: "bn-btnrow" }, botonPantalla(), el("button", { class: "bn-btn bn-btn--primary", onclick: () => editorRonda(null), text: "+ Nueva ronda" }))),
                         pendientes.length ? el("ul", { class: "bn-rounds" }, pendientes.map((r, i) => {
                             const abrir = el("button", { class: "bn-btn bn-btn--sm bn-btn--primary", text: "Empezar" });
                             abrir.addEventListener("click", async () => {
@@ -1971,32 +2154,46 @@
             function vistaRonda(r) {
                 const cantadas = new Set(r.bolas);
                 const ultimaBola = r.bolas[r.bolas.length - 1];
-                const manual = input("bn-bola-manual", "", { type: "number", min: 1, max: 75, placeholder: "1–75", inputmode: "numeric" });
-                const sacar = el("button", { class: "bn-btn bn-btn--primary bn-btn--xl", text: "Sacar bola" });
-                const cantarManual = el("button", { class: "bn-btn", text: "Cantar" });
+                /* Ajustes → «Juego y BINGO»: con marcado automático el cantador ve los ganadores; si no, solo un aviso. */
+                const auto = J.config.marcado_auto === true;
+                const tombola = J.config.sorteo === "tombola";
+                const elim = r.tipo === "eliminacion";
                 const deshacer = el("button", { class: "bn-btn bn-btn--sm", text: "Deshacer la última" });
                 const cerrar = el("button", { class: "bn-btn bn-btn--danger", text: "Terminar ronda" });
-                const elim = r.tipo === "eliminacion";
+                const nombrePremio = (p) => `${r.tipo === "figuras" ? C.nombreFigura(p.figura, p.celdas) : TIPOS_RONDA[r.tipo]}${p.premio ? " (" + p.premio + ")" : ""}`;
 
                 async function cantar(bola, btn) {
                     const extra = elim ? { quedan: enPie([...r.bolas, bola]).length } : {};
                     const res = await accion(btn, { action: "game_cantar", bola, ...extra }, "Cantando…");
                     if (res) pintar();
                 }
-                sacar.addEventListener("click", () => {
-                    const libres = [];
-                    for (let n = 1; n <= 75; n++) if (!cantadas.has(n)) libres.push(n);
-                    if (!libres.length) return showMessage("Ya salieron las 75 bolas.", "info");
-                    const a = new Uint32Array(1);
-                    crypto.getRandomValues(a);
-                    cantar(libres[a[0] % libres.length], sacar);
-                });
-                cantarManual.addEventListener("click", () => {
-                    const n = Number(manual.value);
-                    if (!(n >= 1 && n <= 75)) return showMessage("Escribe una bola de 1 a 75.", "error");
-                    cantar(n, cantarManual);
-                });
-                manual.addEventListener("keydown", (e) => { if (e.key === "Enter") cantarManual.click(); });
+
+                /* Con tómbola solo se escribe el número que salió; con la app solo se usa su sorteo. */
+                let controles;
+                if (tombola) {
+                    const bolaIn = input("bn-bola-manual", "", { type: "number", min: 1, max: 75, placeholder: "Bola 1–75", inputmode: "numeric", "aria-label": "Número que salió de la tómbola" });
+                    const cantarBtn = el("button", { class: "bn-btn bn-btn--primary", text: "Cantar" });
+                    cantarBtn.addEventListener("click", () => {
+                        const n = Number(bolaIn.value);
+                        if (!(n >= 1 && n <= 75 && Number.isInteger(n))) return showMessage("Escribe la bola que salió, de 1 a 75.", "error");
+                        if (cantadas.has(n)) return showMessage(`La ${bolaTexto(n)} ya salió en esta ronda.`, "error");
+                        cantar(n, cantarBtn);
+                    });
+                    bolaIn.addEventListener("keydown", (e) => { if (e.key === "Enter") cantarBtn.click(); });
+                    controles = [el("small", { class: "bn-note", text: "Tómbola: escribe el número que salió." }), el("div", { class: "bn-toolbar" }, bolaIn, cantarBtn)];
+                    setTimeout(() => bolaIn.focus(), 50);
+                } else {
+                    const sacar = el("button", { class: "bn-btn bn-btn--primary bn-btn--xl", text: "Sacar bola" });
+                    sacar.addEventListener("click", () => {
+                        const libres = [];
+                        for (let n = 1; n <= 75; n++) if (!cantadas.has(n)) libres.push(n);
+                        if (!libres.length) return showMessage("Ya salieron las 75 bolas.", "info");
+                        const a = new Uint32Array(1);
+                        crypto.getRandomValues(a);
+                        cantar(libres[a[0] % libres.length], sacar);
+                    });
+                    controles = [sacar, el("small", { class: "bn-note", text: "La app elige cada bola al azar." })];
+                }
                 deshacer.addEventListener("click", async () => {
                     const extra = elim ? { quedan: enPie(r.bolas.slice(0, -1)).length } : {};
                     if (await accion(deshacer, { action: "game_deshacer", ...extra })) pintar();
@@ -2033,6 +2230,111 @@
                     return b;
                 }
 
+                /* ----- Rifa: los cartones que cantaron BINGO se guardan en este dispositivo hasta registrar al ganador ----- */
+                const claveRifa = `bn_rifa_${hash}_${r.ronda_id}`;
+                let rifa = {};
+                try {
+                    rifa = JSON.parse(localStorage.getItem(claveRifa) || "{}") || {};
+                } catch (e) {
+                    rifa = {};
+                }
+                const guardarRifa = () => {
+                    try {
+                        localStorage.setItem(claveRifa, JSON.stringify(rifa));
+                    } catch (e) {
+                        /* sin almacenamiento: la lista dura mientras la página siga abierta */
+                    }
+                };
+                const enRifa = (p) => (rifa[p.id] || []).filter((s) => !p.ganadores.some((g) => g.serie === s));
+                function alternarRifa(p, serie) {
+                    const lista = rifa[p.id] || [];
+                    rifa[p.id] = lista.includes(serie) ? lista.filter((s) => s !== serie) : [...lista, serie];
+                    guardarRifa();
+                    pintarApoyo();
+                }
+                function botonRifa(p, serie) {
+                    const b = el("button", { class: "bn-btn bn-btn--sm" });
+                    const ver = () => {
+                        const esta = enRifa(p).includes(serie);
+                        b.textContent = esta ? "✓ En la rifa (quitar)" : "Cantó BINGO: a la rifa";
+                        b.classList.toggle("bn-btn--ghost", esta);
+                    };
+                    b.addEventListener("click", () => { alternarRifa(p, serie); ver(); });
+                    ver();
+                    return b;
+                }
+
+                function abrirRifa(p, series) {
+                    const lista = [...new Set(series)].sort((a, z) => a - z);
+                    const chips = lista.map((s) => el("span", { class: "bn-rifa-chip", text: C.serieTexto(s) }));
+                    const resultado = el("div", { class: "bn-stack bn-rifa-res", "aria-live": "polite" });
+                    modal(`Rifa · ${nombrePremio(p)}`, el("div", { class: "bn-stack" },
+                        el("p", { class: "bn-note", text: `Participan ${lista.length} cartones. La app elige uno al azar; el resultado no se puede repetir.` }),
+                        el("div", { class: "bn-rifa-chips" }, chips),
+                        resultado
+                    ), (cerrarM) => {
+                        const girar = el("button", { class: "bn-btn bn-btn--primary", text: "Rifar" });
+                        girar.addEventListener("click", () => {
+                            girar.disabled = true;
+                            const a = new Uint32Array(1);
+                            crypto.getRandomValues(a);
+                            const elegido = a[0] % lista.length;
+                            const pasos = lista.length * 3 + elegido;
+                            pantalla.emitir({ t: "rifa", titulo: nombrePremio(p), lista: lista.map((x) => C.serieTexto(x)), elegido, pasos });
+                            let i = 0;
+                            const terminar = () => {
+                                const s = lista[elegido];
+                                chips[elegido].classList.add("is-win");
+                                const reg = el("button", { class: "bn-btn bn-btn--primary", text: `Registrar la serie ${C.serieTexto(s)}` });
+                                reg.addEventListener("click", async () => {
+                                    if (await accion(reg, { action: "game_ganador", serie: s, premio_id: p.id, dato: `rifa entre ${lista.map((x) => C.serieTexto(x)).join(", ")}` })) {
+                                        cerrarM();
+                                        showMessage(`Ganador registrado: serie ${C.serieTexto(s)}.`, "success");
+                                        pintar();
+                                    }
+                                });
+                                poner(resultado, el("p", { class: "bn-verdict ok", text: `Gana la serie ${C.serieTexto(s)}` }), el("div", { class: "bn-btnrow" }, reg));
+                                girar.hidden = true;
+                            };
+                            const paso = () => {
+                                chips.forEach((c, k) => c.classList.toggle("is-on", k === i % lista.length));
+                                if (i >= pasos) return terminar();
+                                i++;
+                                setTimeout(paso, msRifa(i, pasos));
+                            };
+                            paso();
+                        });
+                        return [el("button", { class: "bn-btn", onclick: () => { pantalla.emitir({ t: "rifa_cerrar" }); cerrarM(); }, text: "Cerrar" }), girar];
+                    });
+                }
+
+                /** Cartones de la rifa de un premio, con su botón para rifar (o registrar si es uno solo). */
+                function bloqueRifa(p, extras, quitables) {
+                    const propias = enRifa(p);
+                    const todas = [...new Set([...(extras || []), ...propias])].sort((a, z) => a - z);
+                    if (!todas.length) return null;
+                    return el("div", { class: "bn-rifa" },
+                        el("div", { class: "bn-rifa-chips" }, todas.map((s) => el("span", { class: "bn-rifa-chip" },
+                            C.serieTexto(s),
+                            quitables && propias.includes(s) ? el("button", { class: "bn-rifa-x", "aria-label": `Quitar la serie ${C.serieTexto(s)} de la rifa`, onclick: () => alternarRifa(p, s), text: "×" }) : null))),
+                        todas.length > 1
+                            ? el("button", { class: "bn-btn bn-btn--primary", onclick: () => abrirRifa(p, todas), text: `Rifar entre ${todas.length} cartones` })
+                            : botonGanador(p, todas[0], "", `Registrar la serie ${C.serieTexto(todas[0])}`)
+                    );
+                }
+
+                /** Bola con la que el cartón completó la figura (posición 1…n), o 0 si todavía no la completa. */
+                function completoCon(grid, p) {
+                    for (let k = 1; k <= r.bolas.length; k++) if (C.faltan(grid, r.bolas.slice(0, k), p.figura, p.celdas) === 0) return k;
+                    return 0;
+                }
+                function cuandoCompleto(k) {
+                    const atras = r.bolas.length - k;
+                    return atras === 0
+                        ? `Completó con la ${bolaTexto(r.bolas[k - 1])}, la última cantada.`
+                        : `Completó con la ${bolaTexto(r.bolas[k - 1])}, hace ${atras} ${atras === 1 ? "bola" : "bolas"}.`;
+                }
+
                 /* Verificar un cartón contra todos los premios de la ronda */
                 const serieIn = input("bn-verif-serie", "", { type: "number", min: 1, max: 10000, placeholder: "Serie del cartón" });
                 const verificar = el("button", { class: "bn-btn bn-btn--primary", text: "Verificar" });
@@ -2047,19 +2349,26 @@
                     let detalle;
                     if (r.tipo === "salado") {
                         const n = C.blancos(grid, r.bolas);
-                        detalle = [el("p", { class: "bn-verdict", text: `${n} ${n === 1 ? "espacio" : "espacios"} en blanco` }), botonGanador(r.premios[0], s, `${n} en blanco`)];
+                        detalle = [el("p", { class: "bn-verdict", text: `${n} ${n === 1 ? "espacio" : "espacios"} en blanco` }), el("div", { class: "bn-btnrow" }, botonRifa(r.premios[0], s), botonGanador(r.premios[0], s, `${n} en blanco`))];
                     } else if (elim) {
                         const x = C.eliminadoPor(grid, r.bolas);
                         sello = x ? "FUERA" : "";
-                        detalle = [el("p", { class: `bn-verdict ${x ? "no" : "ok"}`, text: x ? `Eliminado con la ${bolaTexto(x)}.` : "Sigue en pie." }), x ? null : botonGanador(r.premios[0], s, "último en pie")];
+                        const empate = x && x === ultimaBola && !enPie(r.bolas).length;
+                        detalle = [
+                            el("p", { class: `bn-verdict ${x ? "no" : "ok"}`, text: x ? `Eliminado con la ${bolaTexto(x)}${x === ultimaBola ? ", la última cantada" : ""}.` : "Sigue en pie." }),
+                            !x || empate ? el("div", { class: "bn-btnrow" }, botonRifa(r.premios[0], s), botonGanador(r.premios[0], s, x ? "empate" : "último en pie")) : null
+                        ];
                     } else {
                         detalle = el("ul", { class: "bn-checks" }, r.premios.map((p) => {
                             const gana = C.casillasGanadoras(grid, r.bolas, p.figura, p.celdas);
                             if (gana && !resaltar) resaltar = gana;
                             const f = C.faltan(grid, r.bolas, p.figura, p.celdas);
+                            const k = gana ? completoCon(grid, p) : 0;
                             return el("li", { class: gana ? "ok" : "" },
-                                el("span", { text: `${gana ? "✓ Cumple" : `Le faltan ${f}`} · ${C.nombreFigura(p.figura, p.celdas)}${p.premio ? " (" + p.premio + ")" : ""}` }),
-                                gana ? botonGanador(p, s) : null);
+                                el("div", {},
+                                    el("span", { text: `${gana ? "✓ Cumple" : `Le faltan ${f}`} · ${nombrePremio(p)}` }),
+                                    k ? el("small", { class: `bn-note bn-block${k === r.bolas.length ? " bn-ok-text" : ""}`, text: cuandoCompleto(k) }) : null),
+                                gana && !p.ganadores.length ? el("div", { class: "bn-btnrow" }, botonRifa(p, s), botonGanador(p, s)) : gana ? botonGanador(p, s) : null);
                         }));
                     }
                     const cv = el("canvas", { class: "bn-canvas bn-canvas--mini" });
@@ -2073,42 +2382,84 @@
                 verificar.addEventListener("click", hacerVerificacion);
                 serieIn.addEventListener("keydown", (e) => { if (e.key === "Enter") hacerVerificacion(); });
 
-                /* Apoyo en vivo: quién ya completó, el ranking del más salado o quién sigue en pie */
+                /* Apoyo en vivo. Automático: quién completó y la rifa. Manual: solo un aviso, sin decir qué cartón. */
                 const vendidos = J.vendidos || [];
-                let apoyo;
-                if (r.tipo === "salado") {
-                    const ranking = vendidos.map((s) => ({ s, n: C.blancos(gridDe(s), r.bolas) })).sort((a, z) => z.n - a.n || a.s - z.s).slice(0, 10);
-                    apoyo = el("section", { class: "bn-card" },
-                        el("h2", { text: "Ranking: más espacios en blanco" }),
-                        ranking.length ? el("ol", { class: "bn-rank" }, ranking.map((x) => el("li", {},
-                            el("span", { text: `Serie ${C.serieTexto(x.s)}` }), el("b", { text: `${x.n} en blanco` }), botonGanador(r.premios[0], x.s, `${x.n} en blanco`, "Ganador")))) : el("p", { class: "bn-note", text: "Todavía no hay cartones vendidos." }),
-                        el("p", { class: "bn-note", text: "Solo cuenta los cartones vendidos. Si hay empate, el premio se reparte o se desempata como acostumbren." })
-                    );
-                } else if (elim) {
-                    const vivos = enPie(r.bolas);
-                    const ultimosFuera = ultimaBola && !vivos.length ? enPie(r.bolas.slice(0, -1)) : [];
-                    apoyo = el("section", { class: "bn-card" },
-                        el("h2", { text: "Cartones en pie" }),
-                        el("p", { class: "bn-big-num", text: `${vivos.length} de ${vendidos.length}` }),
-                        vivos.length === 1 ? el("div", { class: "bn-banner bn-banner--ok" }, el("p", { text: `¡Queda un cartón: serie ${C.serieTexto(vivos[0])}!` }), botonGanador(r.premios[0], vivos[0], "último en pie")) : null,
-                        vivos.length > 1 && vivos.length <= 30 ? el("p", { class: "bn-mono bn-note", text: vivos.map((s) => C.serieTexto(s)).join("  ") }) : null,
-                        ultimosFuera.length ? el("div", { class: "bn-banner" },
-                            el("p", { text: `La ${bolaTexto(ultimaBola)} sacó a los ${ultimosFuera.length} que quedaban (${ultimosFuera.map((s) => C.serieTexto(s)).join(", ")}). Deshaz la bola y saca otra, o registra el empate.` }),
-                            el("div", { class: "bn-btnrow" }, ultimosFuera.slice(0, 10).map((s) => botonGanador(r.premios[0], s, "empate", `Ganador ${C.serieTexto(s)}`)))) : null
-                    );
-                } else {
-                    const pendientes = r.premios.filter((p) => !p.ganadores.length);
-                    const completos = pendientes.map((p) => ({ p, series: vendidos.filter((s) => C.faltan(gridDe(s), r.bolas, p.figura, p.celdas) === 0) }));
-                    apoyo = completos.some((x) => x.series.length) ? el("section", { class: "bn-card bn-card--alert" },
-                        el("h2", { text: "Cartones vendidos que ya completaron" }),
-                        completos.filter((x) => x.series.length).map((x) => el("div", { class: "bn-stack" },
-                            el("b", { text: `${C.nombreFigura(x.p.figura, x.p.celdas)}${x.p.premio ? " (" + x.p.premio + ")" : ""}` }),
-                            el("div", { class: "bn-btnrow" }, x.series.slice(0, 12).map((s) => botonGanador(x.p, s, "", `Serie ${C.serieTexto(s)}`))),
-                            x.series.length > 12 ? el("small", { class: "bn-note", text: `y ${x.series.length - 12} más` }) : null
-                        )),
-                        el("p", { class: "bn-note", text: "Espera a que la persona cante BINGO y verifica su cartón antes de registrarlo." })
-                    ) : null;
+                const apoyoCaja = el("div", { class: "bn-stack" });
+                const notaManual = "Verifica cada cartón que cante BINGO y agrégalo a la rifa. Si cantan varios, rifa entre ellos.";
+                function pintarApoyo() {
+                    let apoyo;
+                    if (r.tipo === "salado") {
+                        const todos = vendidos.map((s) => ({ s, n: C.blancos(gridDe(s), r.bolas) })).sort((a, z) => z.n - a.n || a.s - z.s);
+                        const tope = todos.length ? todos[0].n : 0;
+                        const empatados = todos.filter((x) => x.n === tope).map((x) => x.s);
+                        const p = r.premios[0];
+                        apoyo = auto
+                            ? el("section", { class: "bn-card" },
+                                el("h2", { text: "Ranking: espacios en blanco" }),
+                                todos.length ? el("ol", { class: "bn-rank" }, todos.slice(0, 10).map((x) => el("li", {},
+                                    el("span", { text: `Serie ${C.serieTexto(x.s)}` }), el("b", { text: `${x.n} en blanco` }), botonGanador(p, x.s, `${x.n} en blanco`, "Ganador")))) : el("p", { class: "bn-note", text: "Todavía no hay cartones vendidos." }),
+                                !p.ganadores.length && empatados.length > 1 ? el("div", { class: "bn-banner" }, el("p", { text: `${empatados.length} cartones empatan con ${tope} en blanco.` }), bloqueRifa(p, empatados.slice(0, 50), true)) : bloqueRifa(p, [], true),
+                                el("p", { class: "bn-note", text: "Solo cuenta los cartones vendidos." })
+                            )
+                            : el("section", { class: "bn-card" },
+                                el("h2", { text: "El cartón más salado" }),
+                                el("p", { text: todos.length ? `El tope ahora: ${tope} ${tope === 1 ? "espacio" : "espacios"} en blanco (${empatados.length} ${empatados.length === 1 ? "cartón" : "cartones"}).` : "Todavía no hay cartones vendidos." }),
+                                p.ganadores.length ? null : bloqueRifa(p, [], true),
+                                el("p", { class: "bn-note", text: "Cuando pares, pide que se reporten los cartones con ese número de espacios en blanco y verifícalos." })
+                            );
+                    } else if (elim) {
+                        const vivos = enPie(r.bolas);
+                        const ultimosFuera = ultimaBola && !vivos.length ? enPie(r.bolas.slice(0, -1)) : [];
+                        const p = r.premios[0];
+                        apoyo = el("section", { class: "bn-card" },
+                            el("h2", { text: "Cartones en pie" }),
+                            el("p", { class: "bn-big-num", text: `${vivos.length} de ${vendidos.length}` }),
+                            auto
+                                ? [
+                                    vivos.length === 1 ? el("div", { class: "bn-banner bn-banner--ok" }, el("p", { text: `¡Queda un cartón: serie ${C.serieTexto(vivos[0])}!` }), botonGanador(p, vivos[0], "último en pie")) : null,
+                                    vivos.length > 1 && vivos.length <= 30 ? el("p", { class: "bn-mono bn-note", text: vivos.map((s) => C.serieTexto(s)).join("  ") }) : null,
+                                    ultimosFuera.length ? el("div", { class: "bn-banner" },
+                                        el("p", { text: `La ${bolaTexto(ultimaBola)} sacó a los ${ultimosFuera.length} que quedaban. Deshaz la bola y saca otra, o rifa entre ellos.` }),
+                                        bloqueRifa(p, ultimosFuera.slice(0, 50), true)) : bloqueRifa(p, [], true)
+                                ]
+                                : [
+                                    vivos.length === 1 ? el("div", { class: "bn-banner bn-banner--ok" }, el("p", { text: "Queda un cartón en pie. Espera a que lo reporten y verifícalo." })) : null,
+                                    ultimosFuera.length ? el("div", { class: "bn-banner" }, el("p", { text: `La ${bolaTexto(ultimaBola)} sacó a los ${ultimosFuera.length} que quedaban. Deshaz la bola y saca otra, o verifica esos cartones y rifa entre ellos.` })) : null,
+                                    p.ganadores.length ? null : bloqueRifa(p, [], true)
+                                ]
+                        );
+                    } else {
+                        const pendientes = r.premios.filter((p) => !p.ganadores.length);
+                        const completos = pendientes.map((p) => ({ p, series: vendidos.filter((s) => C.faltan(gridDe(s), r.bolas, p.figura, p.celdas) === 0) }));
+                        if (auto) {
+                            const conAlgo = completos.filter((x) => x.series.length || enRifa(x.p).length);
+                            apoyo = conAlgo.length ? el("section", { class: "bn-card bn-card--alert" },
+                                el("h2", { text: "Cartones que ya tienen BINGO" }),
+                                conAlgo.map((x) => el("div", { class: "bn-stack bn-prize-alert" },
+                                    el("b", { text: nombrePremio(x.p) }),
+                                    x.series.length === 1 && !enRifa(x.p).length
+                                        ? el("div", { class: "bn-btnrow" }, botonGanador(x.p, x.series[0], "", `Registrar la serie ${C.serieTexto(x.series[0])}`))
+                                        : bloqueRifa(x.p, x.series.slice(0, 50), true),
+                                    x.series.length > 50 ? el("small", { class: "bn-note", text: `${x.series.length} cartones en total; la rifa toma los primeros 50.` }) : null
+                                )),
+                                el("p", { class: "bn-note", text: "Con varios cartones en el mismo premio, rifa entre ellos para definir quién gana." })
+                            ) : null;
+                        } else {
+                            apoyo = pendientes.length ? el("section", { class: `bn-card${completos.some((x) => x.series.length) ? " bn-card--alert" : ""}` },
+                                el("h2", { text: "Premios de la ronda" }),
+                                completos.map((x) => el("div", { class: "bn-stack bn-prize-alert" },
+                                    el("b", { text: nombrePremio(x.p) }),
+                                    el("p", { class: x.series.length ? "bn-ok-text" : "bn-note", text: x.series.length ? "¡Ya hay alguien con este premio!" : "Todavía nadie lo completa." }),
+                                    bloqueRifa(x.p, [], true)
+                                )),
+                                el("p", { class: "bn-note", text: notaManual })
+                            ) : null;
+                        }
+                    }
+                    poner(apoyoCaja, apoyo);
                 }
+                pintarApoyo();
+                pantalla.emitir(estadoPantalla(r));
 
                 const ganadoresRonda = r.premios.filter((p) => p.ganadores.length);
                 return el("div", { class: "bn-stack" },
@@ -2118,7 +2469,11 @@
                                 el("p", { class: "bn-eyebrow" }, el("span", { class: "bn-dot bn-dot--live" }), ` En juego · ${TIPOS_RONDA[r.tipo]}`),
                                 el("h2", { text: r.nombre }),
                                 el("p", { class: "bn-note", text: `${r.bolas.length} de 75 bolas${elim ? ` · en pie: ${enPie(r.bolas).length}` : ""}` })
-                            )
+                            ),
+                            el("div", { class: "bn-btnrow" },
+                                botonPantalla(),
+                                el("span", { class: "bn-chip", text: tombola ? "Tómbola" : "Bolas de la app" }),
+                                el("span", { class: "bn-chip", text: auto ? "Ganadores a la vista" : "Ganadores ocultos" }))
                         ),
                         el("div", { class: "bn-prizes" }, r.premios.map((p) => el("div", { class: `bn-prize-card${p.ganadores.length ? " is-won" : ""}` },
                             r.tipo === "figuras" ? patronEl(p.figura, p.celdas, { chico: true }) : null,
@@ -2126,13 +2481,13 @@
                         ))),
                         el("div", { class: "bn-caller-main" },
                             el("div", { class: "bn-caller-last" }, ultimaBola ? bolaEl(ultimaBola, true) : el("span", { class: "bn-ball bn-ball--big bn-ball--empty" }, el("b", { text: "–" })), el("div", { class: "bn-live-prev" }, r.bolas.slice(-6, -1).reverse().map((n) => bolaEl(n)))),
-                            el("div", { class: "bn-caller-actions" }, sacar, el("div", { class: "bn-toolbar" }, manual, cantarManual), deshacer)
+                            el("div", { class: "bn-caller-actions" }, controles, r.bolas.length ? deshacer : null)
                         ),
                         tablero
                     ),
-                    apoyo,
                     el("section", { class: "bn-card" },
                         el("h2", { text: "Verificar un cartón" }),
+                        el("p", { class: "bn-note", text: "Escribe la serie del cartón que cantó BINGO. Verás si cumple y con qué bola lo completó." }),
                         el("div", { class: "bn-toolbar" }, serieIn, verificar),
                         verifRes,
                         ganadoresRonda.length ? el("div", { class: "bn-stack" }, el("h3", { text: "Ganadores de esta ronda" }), el("ul", { class: "bn-list" }, ganadoresRonda.map((p) => p.ganadores.map((g) => {
@@ -2143,6 +2498,7 @@
                             return el("li", {}, `${r.tipo === "figuras" ? C.nombreFigura(p.figura, p.celdas) : TIPOS_RONDA[r.tipo]}: serie ${C.serieTexto(g.serie)} · ${g.nombre || "sin nombre"} · ${g.hora}, con ${g.bolas} bolas${g.dato ? " · " + g.dato : ""} `, quitar);
                         })))) : null
                     ),
+                    apoyoCaja,
                     el("div", { class: "bn-toolbar bn-toolbar--end" }, cerrar)
                 );
             }
@@ -2165,11 +2521,25 @@
                 sinpe_nombre: input("bn-cfg-sinpe-nombre", c.sinpe_nombre),
                 iban: input("bn-cfg-iban", c.iban, { placeholder: "CR00 0000 …" }),
                 lote: input("bn-cfg-lote", c.lote, { type: "number", min: 10, max: 1000 }),
-                marcado: select("bn-cfg-marcado", [
-                    ["manual", "Solo tocando la casilla (el jugador marca cada número)"],
-                    ["auto", "Automático disponible (el jugador elige)"]
-                ], c.marcado === "auto" ? "auto" : "manual")
+                marcado: opcionesGrandes("bn-cfg-marcado", [
+                    ["manual", "BINGO manual", "El jugador marca cada número tocando la casilla. El cantador no ve qué cartones ganaron: solo un aviso de que ya hay alguien con el premio. Revisa cada cartón que cante BINGO y rifa si son varios."],
+                    ["auto", "BINGO automático", "Los números cantados se marcan solos en el cartón del jugador (puede cambiar a marcar tocando). El cantador ve de inmediato qué cartones ganaron, listos para rifar si son varios."]
+                ], c.marcado === "auto" ? "auto" : "manual"),
+                sorteo: opcionesGrandes("bn-cfg-sorteo", [
+                    ["app", "Bolas de la app", "El cantador toca «Sacar bola» y la app elige cada número al azar. No se pueden escribir números."],
+                    ["tombola", "Tómbola física", "Las bolas salen de la tómbola y el cantador escribe cada número. La app no saca bolas."]
+                ], c.sorteo === "tombola" ? "tombola" : "app"),
+                digitos: select("bn-cfg-digitos", [["3", "3 dígitos (001)"], ["4", "4 dígitos (0001)"], ["5", "5 dígitos (00001)"]], ["3", "4"].includes(String(c.digitos)) ? String(c.digitos) : "5")
             };
+            const avisoDigitos = el("small", { class: "bn-note" });
+            const verDigitos = () => {
+                const d = Number(f.digitos.value);
+                const tope = Math.pow(10, d) - 1;
+                const hab = Number(c.cartones_habilitados) || 0;
+                avisoDigitos.textContent = `Así se ve: serie ${String(7).padStart(d, "0")}.${hab > tope ? ` Ojo: hay ${hab.toLocaleString("es-CR")} cartones habilitados; desde el ${(tope + 1).toLocaleString("es-CR")} se muestran con ${String(hab).length} dígitos.` : ""}`;
+            };
+            f.digitos.addEventListener("change", verDigitos);
+            verDigitos();
             const verFecha = () => { fechaVista.textContent = f.fecha.value ? `Se muestra así: ${fechaLarga(f.fecha.value, f.hora.value)}` : ""; };
             f.fecha.addEventListener("input", verFecha);
             f.hora.addEventListener("input", verFecha);
@@ -2273,7 +2643,7 @@
             /* ----- Mensajes: correo con vista tipo bandeja de entrada y WhatsApp con vista de chat ----- */
             const ejemplo = {
                 nombre: "María", bingo: c.nombre || "Bingo", fecha: fechaLarga(c.fecha, c.hora) || "15 de nov de 2026 a las 19:00", lugar: c.lugar || "Salón comunal",
-                cantidad: 3, monto: colones(precioLocal(S.data.precios, c.precio_unitario, 3)), cartones: "00012, 00013, 00014",
+                cantidad: 3, monto: colones(precioLocal(S.data.precios, c.precio_unitario, 3)), cartones: [12, 13, 14].map((x) => C.serieTexto(x)).join(", "),
                 link: `${baseUrl()}#bj/${S.data.bingo.public_id}.ejemplo`
             };
             const VARIABLES = [["nombre", "Nombre"], ["bingo", "Bingo"], ["fecha", "Fecha y hora"], ["lugar", "Lugar"], ["cantidad", "Cantidad"], ["monto", "Monto"], ["cartones", "Series"], ["link", "Link de cartones"]];
@@ -2309,6 +2679,13 @@
                 faltaConfigurar() ? el("div", { class: "bn-banner" }, el("p", { text: "Primera vez: completa nombre, fecha, SINPE y el combo de 1 cartón. Con eso ya puedes compartir el link de compra." })) : null,
                 el("section", { class: "bn-card" }, el("h2", { text: "Datos del bingo" }), el("div", { class: "bn-form-grid" },
                     campo("Nombre (sale en el cartón si no subes arte)", f.nombre), campo("Fecha", f.fecha), campo("Hora", f.hora), campo("Lugar", f.lugar), campo("Modalidad", f.modalidad), campo("WhatsApp del organizador", f.whatsapp), fechaVista)),
+                el("section", { class: "bn-card" },
+                    el("h2", { text: "Juego y BINGO" }),
+                    el("p", { class: "bn-note", text: "Define cómo marcan los jugadores, qué ve el cantador y de dónde salen las bolas." }),
+                    el("div", { class: "bn-stack" },
+                        el("div", {}, el("span", { class: "bn-label", text: "Marcado y ganadores" }), f.marcado),
+                        el("div", {}, el("span", { class: "bn-label", text: "Bolas" }), f.sorteo),
+                        el("div", { class: "bn-form-grid" }, campo("Dígitos de la serie", f.digitos), avisoDigitos))),
                 el("section", { class: "bn-card" }, el("h2", { text: "Pagos" }), el("div", { class: "bn-form-grid" },
                     campo("SINPE Móvil", f.sinpe_numero), campo("A nombre de", f.sinpe_nombre), campo("IBAN (opcional)", f.iban))),
                 el("section", { class: "bn-card" },
@@ -2321,11 +2698,6 @@
                     el("details", { class: "bn-details" }, el("summary", { text: "Ver la tabla automática" }), el("p", { class: "bn-note", text: "Las cantidades en rojo cuestan lo mismo o menos que la anterior. Pasa el cursor para ver cómo se arma cada total." }), tablaAuto),
                     campo("Tamaño del lote", f.lote, "Cuántos cartones se habilitan cada vez.")
                 ),
-                el("section", { class: "bn-card" },
-                    el("h2", { text: "Juego en línea" }),
-                    el("div", { class: "bn-form-grid" }, campo("Marcado de los cartones del jugador", f.marcado,
-                        "Solo tocando la casilla: el jugador marca cada número y no ve el menú de marcado. Automático disponible: los números cantados se marcan solos y el jugador puede cambiar a marcar tocando.")))
-                ,
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Mensaje de WhatsApp" }),
                     el("p", { class: "bn-note", text: "Se abre listo para enviar al comprador. Puedes usar emojis y *negrita*." }),
@@ -2698,6 +3070,7 @@
         if (ctx.mode === "hub") return initHub();
         if (ctx.mode === "admin") return initPanel(ctx.hash, "organizador");
         if (ctx.mode === "cantador") return initPanel(ctx.hash, "cantador");
+        if (ctx.mode === "pantalla") return initPantalla(ctx.hash);
         if (ctx.mode === "sector") return initSector(ctx.hash);
         if (ctx.mode === "compra") return initCompra(ctx.hash);
         if (ctx.mode === "jugador") return initJugador(ctx.hash);

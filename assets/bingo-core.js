@@ -113,8 +113,14 @@
         return out;
     }
 
+    /* Dígitos con que se muestra la serie (Ajustes del bingo): 3, 4 o 5. Nunca recorta una serie más larga. */
+    let DIGITOS = 5;
+    function setDigitos(n) {
+        DIGITOS = [3, 4, 5].includes(Number(n)) ? Number(n) : 5;
+    }
+
     function serieTexto(serie) {
-        return String(serie).padStart(5, "0");
+        return String(serie).padStart(DIGITOS, "0");
     }
 
     function letraDe(bola) {
@@ -493,6 +499,7 @@
         carton,
         codigo,
         serieTexto,
+        setDigitos,
         letraDe,
         marcadas,
         faltan,

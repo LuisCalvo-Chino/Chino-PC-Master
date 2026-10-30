@@ -421,3 +421,56 @@ details.bn-card summary { cursor: pointer; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
     .bn-spinner, .bn-dot--live { animation: none; }
 }
+
+/* ---------- Beta 3: opciones del juego, rifa, pantalla para proyectar ---------- */
+.bn-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 6px; }
+.bn-choice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--bn-line); border-radius: var(--bn-radius); background: var(--bn-surface-2); cursor: pointer; }
+.bn-choice input { margin-top: 3px; accent-color: var(--bn-accent); flex: none; }
+.bn-choice:has(input:checked) { border-color: var(--bn-accent); box-shadow: 0 0 0 1px var(--bn-accent) inset; }
+.bn-choice b { display: block; margin-bottom: 2px; }
+.bn-ok-text { color: var(--bn-ok); font-weight: 700; }
+.bn-prize-alert { padding: 10px 0; border-top: 1px solid var(--bn-line); }
+.bn-prize-alert:first-of-type { border-top: 0; }
+.bn-refresh { align-items: center; gap: 10px; margin-bottom: 12px; }
+.bn-rifa { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.bn-rifa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bn-rifa-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bn-line); background: #15171b; font: 700 0.95rem "Montserrat", monospace; font-variant-numeric: tabular-nums; transition: background 0.08s, color 0.08s; }
+.bn-rifa-chip.is-on { background: var(--bn-accent); color: var(--bn-accent-ink); border-color: var(--bn-accent); }
+.bn-rifa-chip.is-win { background: var(--bn-ok); color: #06210f; border-color: var(--bn-ok); transform: scale(1.12); }
+.bn-rifa-x { border: 0; background: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px; opacity: 0.7; }
+.bn-rifa-x:hover { opacity: 1; }
+
+body.bn-screen-body .bn-app { max-width: none; padding: 0; }
+.bn-screen { min-height: 100vh; display: flex; flex-direction: column; gap: 2vh; padding: 2.5vh 3vw; background: var(--bn-bg); position: relative; }
+.bn-screen-head { display: flex; flex-wrap: wrap; gap: 1vw 2.5vw; align-items: baseline; font-family: "Montserrat", sans-serif; }
+.bn-screen-head b { font-size: clamp(1.4rem, 3.2vw, 3rem); }
+.bn-screen-head span { font-size: clamp(1rem, 1.8vw, 1.7rem); color: var(--bn-muted); }
+.bn-screen-head .bn-screen-count { margin-left: auto; color: var(--bn-accent); font-weight: 700; }
+.bn-screen-main { flex: 1; display: grid; grid-template-columns: minmax(220px, 28vw) 1fr; gap: 3vw; align-items: center; }
+.bn-screen-last { display: flex; flex-direction: column; align-items: center; gap: 3vh; }
+.bn-screen-last > .bn-ball--big { width: min(24vw, 46vh); height: min(24vw, 46vh); }
+.bn-screen-last > .bn-ball--big small { font-size: min(3.4vw, 6vh); }
+.bn-screen-last > .bn-ball--big b { font-size: min(9.5vw, 18vh); }
+.bn-screen-prev { display: flex; flex-wrap: wrap; justify-content: center; gap: 1vw; }
+.bn-screen-prev .bn-ball { width: min(4.6vw, 8vh); height: min(4.6vw, 8vh); }
+.bn-screen-prev .bn-ball b { font-size: min(1.8vw, 3.2vh); }
+.bn-screen-board { gap: 0.8vh; overflow: visible; }
+.bn-screen-board .bn-board-row { grid-template-columns: 1.3fr repeat(15, 1fr); gap: 0.5vw; min-width: 0; }
+.bn-screen-board .bn-board-row span, .bn-screen-board .bn-board-letter { height: min(9vh, 4.2vw); font-size: min(2.2vw, 4.4vh); font-weight: 700; border-radius: 0.6vw; }
+.bn-screen-fs { position: absolute; right: 16px; bottom: 16px; opacity: 0.6; }
+.bn-screen-fs:hover { opacity: 1; }
+.bn-screen-rifa { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vh; padding: 4vw; background: var(--bn-bg); text-align: center; }
+.bn-screen-rifa h2 { font-size: clamp(1.6rem, 4vw, 3.6rem); }
+.bn-screen-rifa .bn-eyebrow { font-size: clamp(1rem, 1.8vw, 1.6rem); }
+.bn-screen-rifa .bn-rifa-chips { justify-content: center; gap: 1.2vw; max-width: 90vw; }
+.bn-screen-rifa .bn-rifa-chip { font-size: clamp(1.4rem, 3.4vw, 3.4rem); padding: 1vh 2vw; }
+.bn-screen-win { display: flex; flex-direction: column; align-items: center; gap: 1vh; animation: bn-pop 0.5s ease-out; }
+.bn-screen-win small { font-size: clamp(1.2rem, 2.4vw, 2.2rem); color: var(--bn-muted); }
+.bn-screen-win b { font: 800 clamp(4rem, 14vw, 13rem) / 1 "Montserrat", sans-serif; color: var(--bn-ok); font-variant-numeric: tabular-nums; }
+@keyframes bn-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (max-width: 760px) {
+    .bn-screen-main { grid-template-columns: 1fr; }
+    .bn-screen-last > .bn-ball--big { width: 40vw; height: 40vw; }
+    .bn-screen-board .bn-board-row span, .bn-screen-board .bn-board-letter { height: 5vw; font-size: 2.6vw; }
+}
+@media (prefers-reduced-motion: reduce) { .bn-screen-win { animation: none; } }

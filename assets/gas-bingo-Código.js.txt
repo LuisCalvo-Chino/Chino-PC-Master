@@ -19,7 +19,7 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 2;
+var API_VERSION_ = 3;
 var MAX_CARTONES_ = 10000;
 var LOTE_DEFAULT_ = 100;
 var MAX_POR_COMPRA_ = 1000;
@@ -54,7 +54,7 @@ var CONFIG_DEFAULTS_ = {
   sinpe_numero: "", sinpe_nombre: "", iban: "", precio_unitario: "",
   cartones_habilitados: String(LOTE_DEFAULT_), lote: String(LOTE_DEFAULT_),
   arte_file_id: "", letras_sistema: "true", setup_done: "false",
-  marcado: "manual", centro: "libre", centro_file_id: "",
+  marcado: "manual", sorteo: "app", digitos: "5", centro: "libre", centro_file_id: "",
   plantilla_whatsapp: "Hola *{{nombre}}* 🎉\nGracias por tu compra en *{{bingo}}* ({{fecha}}).\nTus cartones: {{cartones}}\n\n👇 Aquí juegas en línea y ves cada bola cantada:\n{{link}}",
   plantilla_email_asunto: "Tus cartones para {{bingo}}",
   plantilla_email: "<p>Hola {{nombre}}:</p><p>Gracias por tu compra en <b>{{bingo}}</b>, que se juega el {{fecha}}.</p><p>Tus {{cantidad}} cartones: <b>{{cartones}}</b>.</p><p>Aquí juegas en línea y ves cada bola cantada:</p><p><a href=\"{{link}}\" style=\"display:inline-block;padding:12px 22px;background:#0097a7;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold\">Ver mis cartones</a></p><p>Si compras más cartones con este mismo correo, aparecen en este mismo link.</p>",
@@ -520,7 +520,7 @@ function readConfig_(b) {
 
 var CONFIG_EDITABLES_ = ["nombre", "fecha", "hora", "lugar", "modalidad", "whatsapp", "sinpe_numero", "sinpe_nombre",
   "iban", "precio_unitario", "lote", "setup_done", "plantilla_whatsapp", "plantilla_email_asunto", "plantilla_email",
-  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "centro", "centro_file_id"];
+  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "sorteo", "digitos", "centro", "centro_file_id"];
 
 function updateConfig_(b, changes) {
   var sh = sheetDe_(b, "config");
@@ -533,6 +533,8 @@ function updateConfig_(b, changes) {
     if (k === "lote") v = String(Math.min(1000, Math.max(10, Number(v) || LOTE_DEFAULT_)));
     if (k === "plantilla_email" || k === "plantilla_email_asunto") v = sinEmojis_(v);
     if (k === "marcado") v = v === "auto" ? "auto" : "manual";
+    if (k === "sorteo") v = v === "tombola" ? "tombola" : "app";
+    if (k === "digitos") v = v === "3" || v === "4" ? v : "5";
     if (k === "centro") v = v === "numero" ? "numero" : "libre";
     if (byKey[k]) sh.getRange(byKey[k], 2).setValue(v);
     else { sh.appendRow([k, v]); byKey[k] = sh.getLastRow(); }
@@ -612,13 +614,22 @@ function sectorObj_(s) {
 
 function sectores_(b) { return readObjects_(sheetDe_(b, "sectores")).map(sectorObj_); }
 
+function digitos_(cfg) { return cfg.digitos === "3" || cfg.digitos === "4" ? cfg.digitos : "5"; }
+
+/** Serie con los dígitos elegidos en Ajustes (nunca recorta una serie más larga). */
+function serieTxt_(cfg, x) {
+  var t = String(x).trim();
+  while (t.length < Number(digitos_(cfg))) t = "0" + t;
+  return t;
+}
+
 /** Configuración visible para jugadores y compradores (sin datos de otras personas). */
 function publicConfig_(b, cfg) {
   return {
     nombre: cfg.nombre, fecha: cfg.fecha, hora: cfg.hora, lugar: cfg.lugar, modalidad: cfg.modalidad,
     whatsapp: cfg.whatsapp, public_id: b.public_id, seed: b.seed, arte_url: arteUrl_(cfg),
     letras_sistema: cfg.letras_sistema !== "false",
-    marcado_auto: cfg.marcado === "auto", centro_numero: cfg.centro === "numero",
+    marcado_auto: cfg.marcado === "auto", sorteo: cfg.sorteo === "tombola" ? "tombola" : "app", digitos: digitos_(cfg), centro_numero: cfg.centro === "numero",
     centro_url: cfg.centro !== "numero" && cfg.centro_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.centro_file_id : "",
     vivo_id: prop_("VIVO_SPREADSHEET_ID")
   };
@@ -1021,7 +1032,7 @@ function sendEmail_(b, id) {
   var vars = {
     nombre: e.nombre.split(" ")[0], bingo: cfg.nombre, fecha: fechaLarga_(cfg.fecha, cfg.hora), lugar: cfg.lugar,
     cantidad: e.cantidad, monto: "₡" + Number(e.monto || 0).toLocaleString("es-CR"),
-    cartones: e.cartones.split(",").map(function (x) { return ("0000" + x).slice(-5); }).join(", "), link: linkJugador_(cfg, e.token)
+    cartones: e.cartones.split(",").map(function (x) { return serieTxt_(cfg, x); }).join(", "), link: linkJugador_(cfg, e.token)
   };
   MailApp.sendEmail({
     to: e.correo, subject: sinEmojis_(render_(cfg.plantilla_email_asunto, vars)), htmlBody: sinEmojis_(render_(cfg.plantilla_email, vars)),

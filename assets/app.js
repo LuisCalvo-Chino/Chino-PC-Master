@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "57"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "58"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -42,10 +42,10 @@ document.addEventListener("DOMContentLoaded", () => {
         "privacidad"
     ]);
 
-    /** Links públicos del Bingo Digital: #b/ organizador, #bk/ cantador, #bv/ sector, #bc/ compra, #bj/ jugador, #bt/ cartón. */
-    const BINGO_ROUTE_RE = /^(b|bk|bv|bc|bj|bt)\/(.+)$/;
-    const BINGO_MODES = { b: "admin", bk: "cantador", bv: "sector", bc: "compra", bj: "jugador", bt: "carton" };
-    const BINGO_PREFIX = { admin: "b", cantador: "bk", sector: "bv", compra: "bc", jugador: "bj", carton: "bt" };
+    /** Links públicos del Bingo Digital: #b/ organizador, #bk/ cantador, #bp/ pantalla, #bv/ sector, #bc/ compra, #bj/ jugador, #bt/ cartón. */
+    const BINGO_ROUTE_RE = /^(b|bk|bp|bv|bc|bj|bt)\/(.+)$/;
+    const BINGO_MODES = { b: "admin", bk: "cantador", bp: "pantalla", bv: "sector", bc: "compra", bj: "jugador", bt: "carton" };
+    const BINGO_PREFIX = { admin: "b", cantador: "bk", pantalla: "bp", sector: "bv", compra: "bc", jugador: "bj", carton: "bt" };
 
     function applyFooterVisibility(pageName) {
         document.body.classList.toggle("cpm-no-footer", !FOOTER_PAGES.has(pageName));
