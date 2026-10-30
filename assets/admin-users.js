@@ -142,6 +142,7 @@
                         estado: String(estadoInput?.value || "Activa")
                     }
                 });
+                if (passwordInput) passwordInput.value = "";
                 const msg = result?.data?.message || result?.message || "Usuario actualizado.";
                 showMessage?.(msg, "success", 2800);
             } catch (error) {
@@ -171,8 +172,11 @@
                 usernameInput.classList.add("admin-users-input--readonly");
                 const emailInput = createCellInput("email", u.email || "", false);
                 emailInput.setAttribute("data-field", "email");
-                const passInput = createCellInput("password", u.password || "", false);
+                // Las contraseñas se guardan cifradas: aquí solo se escribe una nueva.
+                const passInput = createCellInput("password", "", false);
                 passInput.setAttribute("data-field", "password");
+                passInput.placeholder = "Sin cambios";
+                passInput.autocomplete = "new-password";
 
                 const passWrap = document.createElement("div");
                 passWrap.className = "admin-users-pass-wrap";
@@ -259,7 +263,6 @@
                     fechaRegistroKey: u.fechaRegistroKey || getDateFilterKey(u.fechaRegistroISO || u.fechaRegistro),
                     username: String(u.username || ""),
                     email: String(u.email || ""),
-                    password: String(u.password || ""),
                     esAdmin: normalizeBoolean(u.esAdmin),
                     permisoRifa: normalizeBoolean(u.permisoRifa),
                     permisoCert: normalizeBoolean(u.permisoCert),

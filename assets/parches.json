@@ -45,7 +45,8 @@
             "fecha": "2026-10-30T15:08:00-06:00",
             "producto": [
                 "bingo",
-                "sitio"
+                "sitio",
+                "admin"
             ],
             "titulo": "Dominio chinopcmaster.com, correo de soporte y Bingo Digital con rifas de consolación",
             "resumen": "Después de rifar un premio, la rifa sigue entre los demás cartones para los premios de consolación. En la página de Bingo Digital, el soporte premium para diseñar y organizar su evento. Además, los links del bingo ahora tienen su propia imagen: nombre, ícono y vista previa al compartir. El sitio estrena su dominio chinopcmaster.com y el correo soporte@chinopcmaster.com.",
@@ -94,6 +95,16 @@
                     "tipo": "nuevo",
                     "producto": "sitio",
                     "texto": "Puede enviar sus preguntas a soporte@chinopcmaster.com; el correo está en el pie de página, en Contacto."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "El formulario de Contacto llega directo a soporte@chinopcmaster.com; al responderle, la respuesta le llega a su correo."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "admin",
+                    "texto": "Cuentas con seguridad reforzada: las contraseñas se guardan cifradas, cada inicio de sesión recibe una llave temporal y, después de 5 intentos fallidos, el ingreso se pausa 15 minutos."
                 }
             ]
         },

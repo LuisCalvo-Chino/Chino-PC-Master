@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_STORAGE_KEY = "cpm_session";
     /** Debe coincidir con window.CPM_ASSET_V en index.html (cache-bust de HTML/JS parciales). */
     const ASSET_V = String(
-        (typeof window !== "undefined" && window.CPM_ASSET_V) || "61"
+        (typeof window !== "undefined" && window.CPM_ASSET_V) || "62"
     );
     const PUBLIC_PAGES = new Set([
         "home",
@@ -195,7 +195,9 @@ document.addEventListener("DOMContentLoaded", () => {
             email: String(source.email || source.correo || "").trim(),
             permisos,
             role,
-            isAdmin: normalizeBoolean(source.isAdmin ?? rawData?.isAdmin)
+            isAdmin: normalizeBoolean(source.isAdmin ?? rawData?.isAdmin),
+            // El servidor solo confía en este token para las acciones de admin.
+            token: String(source.token || rawData?.token || "").trim()
         };
     }
 
@@ -1083,7 +1085,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!el) {
                 el = document.createElement("script");
                 el.id = "admin-users-script";
-                el.src = "assets/admin-users.js?v=4";
+                el.src = "assets/admin-users.js?v=5";
                 el.onerror = () => {
                     console.error("Error cargando admin-users.js");
                     resolve();
@@ -1272,6 +1274,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnLoginOpen?.addEventListener("click", () => openAuthModal("login"));
     btnLogout.addEventListener("click", () => {
+        const token = getSession()?.token;
+        if (token) callBackend({ action: "logout", session: { token } }).catch(() => {});
         clearSession();
         updateNavigationBySession();
         showMessage("Sesion cerrada correctamente.", "success");
