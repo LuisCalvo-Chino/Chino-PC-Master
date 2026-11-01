@@ -8992,6 +8992,164 @@ body.cpm-no-footer .site-footer {
     text-align: center;
 }
 
+/* Guía paso a paso: captura señalada con números y su leyenda */
+.doc-toc {
+    margin: 26px 0 8px;
+    padding: 20px 22px;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 12px;
+    background: rgba(0, 71, 171, 0.14);
+}
+
+.doc-toc__title {
+    margin: 0 0 12px;
+    color: var(--text-heading);
+    font-size: 1.05rem;
+}
+
+.doc-toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px 22px;
+}
+
+.doc-toc a {
+    color: var(--neon-cyan);
+    text-decoration: none;
+    line-height: 1.5;
+}
+
+.doc-toc a:hover,
+.doc-toc a:focus-visible {
+    text-decoration: underline;
+}
+
+.doc-toc span {
+    display: inline-block;
+    min-width: 28px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.doc-back {
+    margin: 26px 0 0;
+    text-align: right;
+    font-size: 0.88rem;
+}
+
+.doc-back a {
+    color: var(--neon-cyan);
+    text-decoration: none;
+}
+
+.doc-back a:hover,
+.doc-back a:focus-visible {
+    text-decoration: underline;
+}
+
+.doc-guide {
+    display: grid;
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    gap: 14px 28px;
+    align-items: start;
+    margin: 22px 0 32px;
+}
+
+.doc-guide--wide {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.doc-guide .doc-figure {
+    margin: 0;
+}
+
+.doc-guide .doc-figure a {
+    display: block;
+}
+
+.doc-guide .doc-figure img {
+    cursor: zoom-in;
+}
+
+.doc-marks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: marca;
+    display: grid;
+    gap: 10px;
+}
+
+.doc-guide--wide .doc-marks {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px 24px;
+}
+
+.doc-marks li {
+    position: relative;
+    padding-left: 36px;
+    color: var(--text-body);
+    line-height: 1.55;
+    counter-increment: marca;
+}
+
+.doc-marks li::before {
+    content: counter(marca);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #ff7a00;
+    color: #111;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 25px;
+    text-align: center;
+}
+
+.doc-marks strong {
+    color: var(--text-heading);
+}
+
+.doc-tip {
+    margin: 16px 0 24px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--neon-cyan);
+    border-radius: 0 8px 8px 0;
+    background: rgba(0, 255, 255, 0.07);
+    color: var(--text-body);
+    line-height: 1.6;
+}
+
+.doc-tip--warn {
+    border-left-color: #ff7a00;
+    background: rgba(255, 122, 0, 0.09);
+}
+
+.doc-tip strong {
+    color: var(--text-heading);
+}
+
+@media (max-width: 720px) {
+    .doc-guide {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .doc-guide .doc-figure img {
+        max-width: 340px;
+        margin: 0 auto;
+    }
+
+    .doc-guide--wide .doc-figure img {
+        max-width: 100%;
+    }
+}
+
 .doc-figure-pair {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
