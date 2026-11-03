@@ -268,6 +268,10 @@ details.bn-card summary { cursor: pointer; font-weight: 700; }
 /* ===== Beta 2 ===== */
 .bn-sep { border: 0; border-top: 1px solid var(--bn-line); margin: 4px 0; width: 100%; }
 .bn-chip--out { color: var(--bn-danger); border-color: var(--bn-danger); }
+.bn-chip--presencial { color: var(--bn-warn); border-color: var(--bn-warn); margin-top: 4px; }
+.bn-chip--virtual { color: var(--bn-accent); border-color: var(--bn-accent); margin-top: 4px; }
+.bn-player-pdf { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 4px 0 12px; }
+.bn-player-pdf .bn-input { width: auto; }
 .bn-banner--ok { border-color: rgba(61, 220, 132, 0.6); background: rgba(61, 220, 132, 0.1); }
 .bn-card--alert { border-color: rgba(61, 220, 132, 0.6); }
 .bn-big-num { font: 700 2.2rem/1 "Montserrat", sans-serif; font-variant-numeric: tabular-nums; }

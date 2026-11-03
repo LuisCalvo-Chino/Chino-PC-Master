@@ -181,11 +181,22 @@
     const tieneEmojis = (t) => new RegExp(RE_EMOJI.source, "u").test(String(t || ""));
     const sinEmojis = (t) => String(t || "").replace(RE_EMOJI, "");
 
+    /** «Presencial (en el salón)» o «Virtual (en línea)»: va en el mensaje de cada compra. */
+    const modalidadTexto = (m) => (m === "Presencial" ? "Presencial (en el salón)" : "Virtual (en línea)");
+
+    /** Toda compra le dice al cliente su modalidad: si la plantilla no tiene {{modalidad}}, se agrega al final. */
+    function conModalidad(tpl, html) {
+        const t = String(tpl || "");
+        if (/\{\{modalidad\}\}/.test(t)) return t;
+        return t + (html ? "<p>Modalidad: <b>{{modalidad}}</b>.</p>" : "\n\nModalidad: *{{modalidad}}*");
+    }
+
     /** Variables de los mensajes para una compra. */
     function varsMensaje(cfg, e, link) {
         return {
             nombre: String(e.nombre || "").split(" ")[0], bingo: cfg.nombre, fecha: fechaLarga(cfg.fecha, cfg.hora), lugar: cfg.lugar || "",
-            cantidad: e.cantidad, monto: colones(e.monto), cartones: String(e.cartones || "").split(",").filter(Boolean).map((x) => C.serieTexto(x)).join(", "), link
+            cantidad: e.cantidad, monto: colones(e.monto), cartones: String(e.cartones || "").split(",").filter(Boolean).map((x) => C.serieTexto(x)).join(", "), link,
+            modalidad: modalidadTexto(e.modalidad)
         };
     }
 
@@ -481,7 +492,7 @@
         return fn;
     }
 
-    async function generarPdf({ seed, pub, cfg, desde, hasta, porHoja, imagenes, progreso }) {
+    async function generarPdf({ seed, pub, cfg, desde, hasta, series, porHoja, imagenes, progreso }) {
         await Promise.all([cargarScript(LIB_JSPDF), cargarScript(LIB_QR)]);
         await fuentesListas();
         const arte = await cargarImagen(imagenes && imagenes.dataUrl);
@@ -496,8 +507,9 @@
         chico.width = Math.round(C.GEOMETRIA.W * escala);
         chico.height = Math.round(C.GEOMETRIA.H * escala);
         const t = tituloCarton(cfg);
-        let i = 0;
-        for (let s = desde; s <= hasta; s++, i++) {
+        const lista = series || Array.from({ length: hasta - desde + 1 }, (_, k) => desde + k);
+        for (let i = 0; i < lista.length; i++) {
+            const s = lista[i];
             if (i > 0 && i % d.posiciones.length === 0) pdf.addPage("letter", d.orient);
             C.dibujarCarton(cv, {
                 seed, serie: s, arte, titulo: t.titulo, subtitulo: t.subtitulo, letras: cfg.letras_sistema !== false && cfg.letras_sistema !== "false",
@@ -507,7 +519,7 @@
             const p = d.posiciones[i % d.posiciones.length];
             pdf.addImage(chico.toDataURL("image/jpeg", 0.88), "JPEG", p.x, p.y, p.w, p.h, undefined, "FAST");
             if (progreso && i % 5 === 0) {
-                progreso(i + 1, hasta - desde + 1);
+                progreso(i + 1, lista.length);
                 await new Promise((r) => window.setTimeout(r, 0));
             }
         }
@@ -624,6 +636,27 @@
         const toggle = auto ? el("button", { class: "bn-btn bn-btn--ghost", onclick: () => { manual = !manual; guardar(); pintarTodo(); } }) : null;
         const cards = el("div", { class: "bn-player-cards" });
         const ganadores = el("section", { class: "bn-card bn-winners", hidden: true });
+
+        /* PDF con todos los cartones del jugador (hasta 100 por archivo), armado en su propio navegador. */
+        const porHojaPdf = select("bn-pdf-jugador-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"]], series.length === 1 ? "1" : "4");
+        const estadoPdf = el("small", { class: "bn-note" });
+        const botonPdf = el("button", { class: "bn-btn bn-btn--primary", text: series.length === 1 ? "Descargar mi cartón en PDF" : `Descargar mis ${series.length} cartones en PDF` });
+        botonPdf.addEventListener("click", () =>
+            conBoton(botonPdf, async () => {
+                const r = cfg.arte_url || cfg.centro_url ? await imagenes() : {};
+                const nombreArchivo = `cartones-${String(cfg.nombre || "bingo").toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "bingo"}`;
+                for (let k = 0; k < series.length; k += 100) {
+                    const parte = series.slice(k, k + 100);
+                    const blob = await generarPdf({
+                        seed, pub: cfg.public_id, cfg, series: parte, porHoja: Number(porHojaPdf.value), imagenes: r,
+                        progreso: (n, total) => { estadoPdf.textContent = `Preparando ${n} de ${total}…`; }
+                    });
+                    descargarBlob(blob, series.length > 100 ? `${nombreArchivo}-${k / 100 + 1}.pdf` : `${nombreArchivo}.pdf`);
+                }
+                estadoPdf.textContent = "Listo: revisa tus descargas.";
+            }, "Generando PDF…")
+        );
+        const panelPdf = el("div", { class: "bn-player-pdf" }, botonPdf, porHojaPdf, estadoPdf);
 
         function guardar() {
             try {
@@ -777,6 +810,7 @@
                     saludo ? el("p", { class: "bn-hello", text: saludo }) : null
                 ),
                 barra,
+                panelPdf,
                 el("div", { class: "bn-player-tools" }, toggle,
                     el("small", { class: "bn-note", text: auto ? "Cada número cantado se marca solo con una X roja. Si prefieres marcar tú, cambia a «tocando la casilla»." : "Toca cada número que se cante para marcarlo con una X roja." })),
                 cards,
@@ -843,7 +877,7 @@
             pintar();
         };
         function pintar() {
-            burbuja.innerHTML = `${whatsappHtml(render(area.value, ejemplo))}<span class="bn-wa-meta">${horaAhora()} <span class="bn-wa-checks">✓✓</span></span>`;
+            burbuja.innerHTML = `${whatsappHtml(render(conModalidad(area.value), ejemplo))}<span class="bn-wa-meta">${horaAhora()} <span class="bn-wa-checks">✓✓</span></span>`;
         }
         area.addEventListener("input", pintar);
         pintar();
@@ -890,7 +924,7 @@
         function pintar() {
             const a = render(asuntoIn.value, ejemplo);
             asuntoVista.textContent = a || "(sin asunto)";
-            marco.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:4px 2px;font:14px/1.55 Arial,Helvetica,sans-serif;color:#202124;background:#fff}a{color:#1a73e8}p{margin:0 0 12px}img{max-width:100%}</style></head><body>${render(html(), ejemplo)}</body></html>`;
+            marco.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:4px 2px;font:14px/1.55 Arial,Helvetica,sans-serif;color:#202124;background:#fff}a{color:#1a73e8}p{margin:0 0 12px}img{max-width:100%}</style></head><body>${render(conModalidad(html(), true), ejemplo)}</body></html>`;
             const conEmojis = tieneEmojis(asuntoIn.value) || tieneEmojis(html());
             aviso.hidden = !conEmojis;
             if (conEmojis) {
@@ -1445,11 +1479,14 @@
             const lista = el("div", { class: "bn-entries" });
             const buscador = input("bn-ventas-buscar", "", { type: "search", placeholder: "Buscar por nombre, teléfono o serie" });
             const subtabs = el("div", { class: "bn-tabs" });
-            const ESTADOS = [["Pendiente", "Pendientes"], ["Aprobada", "Por enviar"], ["Completada", "Historial"], ["Rechazada", "Rechazadas"]];
+            const ESTADOS = [["Pendiente", "Pendientes"], ["Aprobada", "Por enviar"], ["Completada", "Historial"], ["Rechazada", "Rechazadas"], ["Todas", "Todas"]];
+            const filtroModalidad = select("bn-ventas-modalidad", [["", "Toda modalidad"], ["Presencial", "Solo presenciales"], ["Virtual", "Solo virtuales"]], S.ventasModalidad || "");
+            filtroModalidad.addEventListener("change", () => { S.ventasModalidad = filtroModalidad.value; pintarTabs(); pintar(); });
+            const conModalidadElegida = (e) => !filtroModalidad.value || e.modalidad === filtroModalidad.value;
 
             function pintarTabs() {
                 poner(subtabs, ...ESTADOS.map(([k, label]) => {
-                    const n = (S.entradas || []).filter((e) => e.estado === k).length;
+                    const n = (S.entradas || []).filter((e) => (k === "Todas" || e.estado === k) && conModalidadElegida(e)).length;
                     return el("button", { class: `bn-tab${S.ventasTab === k ? " is-active" : ""}`, onclick: () => { S.ventasTab = k; pintarTabs(); pintar(); } }, label, el("span", { class: "bn-count", text: n }));
                 }));
             }
@@ -1480,7 +1517,7 @@
 
             function pintar() {
                 const q = buscador.value.trim().toLowerCase();
-                const items = (S.entradas || []).filter((e) => e.estado === S.ventasTab).filter((e) => {
+                const items = (S.entradas || []).filter((e) => (S.ventasTab === "Todas" || e.estado === S.ventasTab) && conModalidadElegida(e)).filter((e) => {
                     if (!q) return true;
                     return [e.nombre, e.telefono, e.correo, e.vendedor, e.cartones].join(" ").toLowerCase().includes(q) || e.cartones.split(",").includes(q.replace(/^0+/, ""));
                 });
@@ -1539,7 +1576,7 @@
                     );
                 }
                 if (e.estado === "Aprobada") {
-                    const wa = el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(cfg.plantilla_whatsapp, vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "WhatsApp" });
+                    const wa = el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(conModalidad(cfg.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "WhatsApp" });
                     wa.addEventListener("click", () => { if (!e.wa_enviado) act(null, { action: "mark_sent", entrada_id: e.entrada_id, canal: "wa" }); });
                     acciones.append(wa);
                     if (e.correo) {
@@ -1567,9 +1604,24 @@
                     volver.addEventListener("click", () => act(volver, { action: "return_entrada", entrada_id: e.entrada_id }));
                     acciones.append(volver);
                 }
+                if (e.estado !== "Rechazada") {
+                    const otra = e.modalidad === "Presencial" ? "Virtual" : "Presencial";
+                    const cambiar = el("button", { class: "bn-btn bn-btn--sm", text: `Pasar a ${otra.toLowerCase()}` });
+                    cambiar.addEventListener("click", async () => {
+                        const enviado = e.email_enviado || e.wa_enviado;
+                        const ok = await confirmar(`Pasar a ${otra.toLowerCase()}`,
+                            `La compra #${e.entrada_id} de ${e.nombre} queda como ${otra}. Los cartones y el link no cambian; el cambio queda anotado en la nota.${enviado ? " Después vuelve a enviarle el mensaje para que vea la modalidad correcta." : ""}`,
+                            `Pasar a ${otra.toLowerCase()}`);
+                        if (!ok) return;
+                        const r = await act(cambiar, { action: "cambiar_modalidad", entrada_id: e.entrada_id, modalidad: otra }, "Cambiando…");
+                        if (r) showMessage(`Compra #${e.entrada_id}: ahora es ${otra}.${enviado ? " Reenvíale el mensaje." : ""}`, "success");
+                    });
+                    acciones.append(cambiar);
+                }
                 return el("article", { class: "bn-entry" },
                     el("header", {},
-                        el("div", {}, el("b", { text: e.nombre }), el("small", { class: "bn-note bn-block", text: `#${e.entrada_id} · ${fechaHoraTexto(e.fecha)} · ${e.modalidad}` })),
+                        el("div", {}, el("b", { text: e.nombre }), el("small", { class: "bn-note bn-block", text: `#${e.entrada_id} · ${fechaHoraTexto(e.fecha)}${S.ventasTab === "Todas" ? " · " + e.estado : ""}` }),
+                            el("span", { class: `bn-chip bn-chip--${e.modalidad === "Presencial" ? "presencial" : "virtual"}`, text: e.modalidad || "Virtual" })),
                         el("div", { class: "bn-entry-amount" }, el("b", { text: colones(e.monto) }), el("small", { text: `${e.cantidad} ${e.cantidad === 1 ? "cartón" : "cartones"}` }))
                     ),
                     el("dl", { class: "bn-dl" },
@@ -1594,7 +1646,7 @@
             }));
             const recargarBtn = el("button", { class: "bn-btn", onclick: cargar, text: "Recargar" });
             buscador.addEventListener("input", pintar);
-            agregar(root, el("div", { class: "bn-toolbar" }, buscador, recargarBtn, presencial), subtabs, lista);
+            agregar(root, el("div", { class: "bn-toolbar" }, buscador, filtroModalidad, recargarBtn, presencial), subtabs, lista);
             await cargar();
         }
 
@@ -2779,9 +2831,9 @@
             const ejemplo = {
                 nombre: "María", bingo: c.nombre || "Bingo", fecha: fechaLarga(c.fecha, c.hora) || "15 de nov de 2026 a las 19:00", lugar: c.lugar || "Salón comunal",
                 cantidad: 3, monto: colones(precioLocal(S.data.precios, c.precio_unitario, 3)), cartones: [12, 13, 14].map((x) => C.serieTexto(x)).join(", "),
-                link: `${baseUrl()}#bj/${S.data.bingo.public_id}.ejemplo`
+                link: `${baseUrl()}#bj/${S.data.bingo.public_id}.ejemplo`, modalidad: modalidadTexto("Virtual")
             };
-            const VARIABLES = [["nombre", "Nombre"], ["bingo", "Bingo"], ["fecha", "Fecha y hora"], ["lugar", "Lugar"], ["cantidad", "Cantidad"], ["monto", "Monto"], ["cartones", "Series"], ["link", "Link de cartones"]];
+            const VARIABLES = [["nombre", "Nombre"], ["bingo", "Bingo"], ["fecha", "Fecha y hora"], ["lugar", "Lugar"], ["cantidad", "Cantidad"], ["monto", "Monto"], ["cartones", "Series"], ["modalidad", "Modalidad"], ["link", "Link de cartones"]];
             const correo = editorCorreo(c.plantilla_email_asunto, c.plantilla_email, ejemplo, VARIABLES, c.nombre || "Bingo");
             const whatsapp = editorWhatsApp(c.plantilla_whatsapp, ejemplo, VARIABLES, c.nombre || "Bingo");
 
@@ -3019,7 +3071,7 @@
             poner(lista, ...D.entradas.map((e) => {
                 const linkJ = e.token ? links.jugador(e.token) : "";
                 const vars = varsMensaje(cfg, e, linkJ);
-                const wa = e.telefono && linkJ ? el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(D.plantilla_whatsapp, vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "Enviar por WhatsApp" }) : null;
+                const wa = e.telefono && linkJ ? el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(conModalidad(D.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "Enviar por WhatsApp" }) : null;
                 if (wa) wa.addEventListener("click", () => { if (!e.wa_enviado) llamar({ action: "sector_mark_sent", hash, entrada_id: e.entrada_id, canal: "wa" }).then(() => { e.wa_enviado = true; pintar(); }).catch(() => {}); });
                 const ver = e.tiene_comprobante ? el("button", { class: "bn-btn bn-btn--sm", text: "Ver comprobante" }) : null;
                 if (ver) ver.addEventListener("click", () => conBoton(ver, async () => verComprobante(await llamar({ action: "sector_comprobante", hash, entrada_id: e.entrada_id }, { timeoutMs: 60000 }), e), "Abriendo…"));

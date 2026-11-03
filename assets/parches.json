@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-03T15:01:00-06:00",
+    "actualizado": "2026-11-03T16:45:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -42,10 +42,10 @@
     "parches": [
         {
             "id": "2026-11-03-bingo-reiniciar",
-            "fecha": "2026-11-03T15:01:00-06:00",
+            "fecha": "2026-11-03T16:45:00-06:00",
             "producto": "bingo",
-            "titulo": "Bingo Digital: reiniciar y borrar rondas ya jugadas",
-            "resumen": "Las rondas de prueba ya no quedan para siempre: el organizador puede reiniciarlas, borrarlas o dejar todo el juego como nuevo.",
+            "titulo": "Bingo Digital: rondas de prueba, modalidad de cada compra y cartones en PDF",
+            "resumen": "El organizador puede reiniciar o borrar las rondas de prueba, ver todas las compras y corregir su modalidad. Cada mensaje de compra dice si es presencial o virtual, y el jugador descarga todos sus cartones en un PDF.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -62,6 +62,22 @@
                 {
                     "tipo": "nota",
                     "texto": "Estas acciones piden confirmar y solo están en el enlace del organizador; el enlace del cantador no puede borrar ni reiniciar lo ya jugado."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Ventas tiene la lista «Todas», con cada compra y su estado, y un filtro para ver solo las presenciales o solo las virtuales."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cada compra tiene «Pasar a presencial» o «Pasar a virtual», para corregir la modalidad si el cliente eligió la que no quería. El cambio queda anotado en la nota de la compra, con la fecha y la hora."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Los mensajes de compra por WhatsApp y por correo dicen la modalidad: «Presencial (en el salón)» o «Virtual (en línea)». Si su mensaje no tiene la variable {{modalidad}}, la línea se agrega al final."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "El jugador descarga todos sus cartones en un PDF desde su enlace, con 1, 2 o 4 cartones por hoja carta."
                 }
             ]
         },
