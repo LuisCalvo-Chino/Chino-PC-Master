@@ -19,7 +19,7 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 3;
+var API_VERSION_ = 4;
 var MAX_CARTONES_ = 10000;
 var LOTE_DEFAULT_ = 100;
 var MAX_POR_COMPRA_ = 1000;
@@ -110,6 +110,8 @@ function doPost(e) {
       if (action === "game_get") return ok_(gameGet_(bg));
       if (action === "game_save_ronda") return ok_(conLock_(function () { return gameSaveRonda_(bg, data); }));
       if (action === "game_delete_ronda") return ok_(conLock_(function () { return gameDeleteRonda_(bg, data); }));
+      if (action === "game_reiniciar_ronda") return ok_(conLock_(function () { return gameReiniciarRonda_(bg, data); }));
+      if (action === "game_reiniciar_todo") return ok_(conLock_(function () { return gameReiniciarTodo_(bg); }));
       if (action === "game_abrir") return ok_(conLock_(function () { return gameAbrir_(bg, data); }));
       if (action === "game_cantar") return ok_(conLock_(function () { return gameCantar_(bg, data); }));
       if (action === "game_deshacer") return ok_(conLock_(function () { return gameDeshacer_(bg, data); }));
@@ -1304,9 +1306,46 @@ function gameSaveRonda_(b, data) {
 function gameDeleteRonda_(b, data) {
   var r = rondas_(b).filter(function (x) { return x.ronda_id === Number(data.ronda_id); })[0];
   if (!r) throw new Error("Ronda no encontrada.");
-  if (r.estado !== "Pendiente") throw new Error("Solo se borran rondas que no han empezado.");
+  if (r.estado === "En juego") throw new Error("Termina la ronda en juego antes de borrarla.");
+  if (r.estado === "Terminada") soloOrganizador_(b);
   sheetDe_(b, "rondas").deleteRow(r._row);
-  return { rondas: rondas_(b).map(limpiaRonda_) };
+  /* Una ronda terminada sale también de los ganadores que ven los jugadores. */
+  var vivo = r.estado === "Terminada" ? publicarVivo_(b, rondaEnJuego_(b)) : undefined;
+  return { rondas: rondas_(b).map(limpiaRonda_), vivo: vivo };
+}
+
+/** Borrar o reiniciar lo ya jugado lo decide el organizador, no el link del cantador. */
+function soloOrganizador_(b) {
+  if (b._rol !== "organizador") throw new Error("Solo el organizador puede borrar o reiniciar rondas ya jugadas.");
+}
+
+/** Deja la ronda como nueva: sin bolas ni ganadores, lista para empezar. Conserva nombre, tipo y premios. */
+function vaciarRonda_(r) {
+  r.estado = "Pendiente";
+  r.bolas = [];
+  r.extra = {};
+  r.inicio = "";
+  r.fin = "";
+  r.premios.forEach(function (p) { p.ganadores = []; });
+}
+
+function gameReiniciarRonda_(b, data) {
+  soloOrganizador_(b);
+  var r = rondas_(b).filter(function (x) { return x.ronda_id === Number(data.ronda_id); })[0];
+  if (!r) throw new Error("Ronda no encontrada.");
+  vaciarRonda_(r);
+  guardarRonda_(b, r);
+  return { rondas: rondas_(b).map(limpiaRonda_), vivo: publicarVivo_(b, rondaEnJuego_(b)) };
+}
+
+/** Todas las rondas vuelven a pendiente, sin bolas ni ganadores (por ejemplo, después de las pruebas). */
+function gameReiniciarTodo_(b) {
+  soloOrganizador_(b);
+  rondas_(b).forEach(function (r) {
+    vaciarRonda_(r);
+    guardarRonda_(b, r);
+  });
+  return { rondas: rondas_(b).map(limpiaRonda_), vivo: publicarVivo_(b, null) };
 }
 
 /** Cambia el orden de una ronda (dir = -1 sube, 1 baja). */

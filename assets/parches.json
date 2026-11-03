@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-01T15:20:00-06:00",
+    "actualizado": "2026-11-03T15:01:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -40,6 +40,31 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-03-bingo-reiniciar",
+            "fecha": "2026-11-03T15:01:00-06:00",
+            "producto": "bingo",
+            "titulo": "Bingo Digital: reiniciar y borrar rondas ya jugadas",
+            "resumen": "Las rondas de prueba ya no quedan para siempre: el organizador puede reiniciarlas, borrarlas o dejar todo el juego como nuevo.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cada ronda terminada tiene «Reiniciar»: vuelve a «Pendiente», sin bolas ni ganadores, y conserva su nombre, figuras y premios."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cada ronda terminada también se puede «Borrar», con sus bolas y ganadores. Los jugadores dejan de verla en la lista de ganadores."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "«Reiniciar todas las rondas», al final de la pestaña Juego, deja el juego completo como nuevo después de las pruebas. Las ventas y los cartones no se tocan."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Estas acciones piden confirmar y solo están en el enlace del organizador; el enlace del cantador no puede borrar ni reiniciar lo ya jugado."
+                }
+            ]
+        },
         {
             "id": "2026-11-01-bingo-guia",
             "fecha": "2026-11-01T15:20:00-06:00",

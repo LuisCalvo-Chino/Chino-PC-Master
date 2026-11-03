@@ -2159,10 +2159,65 @@
                             el("div", { class: "bn-round-info" }, el("b", { text: r.nombre }), el("small", { class: "bn-note bn-block", text: `${TIPOS_RONDA[r.tipo]} · ${r.bolas.length} bolas` })),
                             el("ul", { class: "bn-list bn-note" }, r.premios.map((p) => el("li", {},
                                 `${r.tipo === "figuras" ? C.nombreFigura(p.figura, p.celdas) : TIPOS_RONDA[r.tipo]}${p.premio ? " (" + p.premio + ")" : ""}: `,
-                                p.ganadores.length ? p.ganadores.map((g) => `serie ${C.serieTexto(g.serie)} ${g.nombre || ""}${esConsuelo(g.dato) ? " (consolación)" : ""}`).join(" · ") : "sin ganador")))
+                                p.ganadores.length ? p.ganadores.map((g) => `serie ${C.serieTexto(g.serie)} ${g.nombre || ""}${esConsuelo(g.dato) ? " (consolación)" : ""}`).join(" · ") : "sin ganador"))),
+                            rol === "organizador" ? el("div", { class: "bn-btnrow" }, botonReiniciar(r), botonBorrarJugada(r)) : null
                         )))
+                    ) : null,
+                    rol === "organizador" && J.rondas.some((r) => r.estado !== "Pendiente" || r.bolas.length) ? el("section", { class: "bn-card" },
+                        el("h2", { text: "Reiniciar el juego" }),
+                        el("p", { class: "bn-note", text: "Para borrar las pruebas: todas las rondas vuelven a «Pendiente», sin bolas ni ganadores. Se conservan sus nombres, figuras y premios." }),
+                        el("div", { class: "bn-btnrow" }, botonReiniciarTodo())
                     ) : null
                 );
+            }
+
+            /* ----- Borrar o reiniciar lo ya jugado (solo el organizador; el servidor también lo exige) ----- */
+            const olvidarRifa = (r) => {
+                try {
+                    localStorage.removeItem(`bn_rifa_${hash}_${r.ronda_id}`);
+                } catch (e) {
+                    /* sin almacenamiento */
+                }
+            };
+
+            function botonReiniciar(r) {
+                const b = el("button", { class: "bn-btn bn-btn--sm", text: "Reiniciar" });
+                b.addEventListener("click", async () => {
+                    if (!(await confirmar("Reiniciar ronda", `«${r.nombre}» vuelve a «Pendiente»: se borran sus ${r.bolas.length} bolas y sus ganadores. Se conservan el nombre, las figuras y los premios.`, "Reiniciar", true))) return;
+                    if (await accion(b, { action: "game_reiniciar_ronda", ronda_id: r.ronda_id }, "Reiniciando…")) {
+                        olvidarRifa(r);
+                        showMessage(`«${r.nombre}» quedó lista para jugarse de nuevo.`, "success");
+                        pintar();
+                    }
+                });
+                return b;
+            }
+
+            function botonBorrarJugada(r) {
+                const b = el("button", { class: "bn-btn bn-btn--sm bn-btn--danger", text: "Borrar" });
+                b.addEventListener("click", async () => {
+                    if (!(await confirmar("Borrar ronda", `Se borra «${r.nombre}» con sus bolas y sus ganadores. Los jugadores dejan de verla en la lista de ganadores. No se puede deshacer.`, "Borrar", true))) return;
+                    if (await accion(b, { action: "game_delete_ronda", ronda_id: r.ronda_id }, "Borrando…")) {
+                        olvidarRifa(r);
+                        showMessage(`Ronda «${r.nombre}» borrada.`, "success");
+                        pintar();
+                    }
+                });
+                return b;
+            }
+
+            function botonReiniciarTodo() {
+                const b = el("button", { class: "bn-btn bn-btn--danger", text: "Reiniciar todas las rondas" });
+                b.addEventListener("click", async () => {
+                    const jugadas = J.rondas.filter((r) => r.estado !== "Pendiente" || r.bolas.length);
+                    if (!(await confirmar("Reiniciar el juego", `${jugadas.length} ${jugadas.length === 1 ? "ronda vuelve" : "rondas vuelven"} a «Pendiente»: se borran todas las bolas y todos los ganadores registrados. Las rondas, sus figuras y sus premios se conservan. No se puede deshacer.`, "Reiniciar todo", true))) return;
+                    if (await accion(b, { action: "game_reiniciar_todo" }, "Reiniciando…")) {
+                        J.rondas.forEach(olvidarRifa);
+                        showMessage("Juego reiniciado: todas las rondas están listas para empezar.", "success");
+                        pintar();
+                    }
+                });
+                return b;
             }
 
             function vistaRonda(r) {
