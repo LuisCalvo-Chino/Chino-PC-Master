@@ -241,9 +241,30 @@
         });
     }
 
-    async function fuentesListas() {
+    /** Hoja de Google Fonts con las tipografías de los diseños; se agrega una sola vez, cuando se dibuja el primer cartón. */
+    let hojaFuentes = null;
+    function cargarHojaFuentes() {
+        if (!hojaFuentes) {
+            hojaFuentes = new Promise((res) => {
+                const link = el("link", { rel: "stylesheet", href: C.FUENTES_URL });
+                link.onload = () => res();
+                link.onerror = () => res();
+                document.head.appendChild(link);
+                window.setTimeout(res, 6000);
+            });
+        }
+        return hojaFuentes;
+    }
+
+    /** Espera las tipografías que usa el diseño (sin diseño, la letra de siempre). */
+    async function fuentesListas(diseno, hayArte) {
         try {
-            await document.fonts.load("700 92px Montserrat");
+            await cargarHojaFuentes();
+            const lista = ["700 92px Montserrat", ...C.fuentesDiseno(diseno, hayArte)];
+            await Promise.race([
+                Promise.all(lista.map((f) => document.fonts.load(f).catch(() => null))),
+                new Promise((r) => window.setTimeout(r, 5000))
+            ]);
         } catch (e) {
             /* se usa la letra de respaldo */
         }
@@ -366,8 +387,45 @@
     function tituloCarton(cfg) {
         return {
             titulo: cfg.nombre || "BINGO",
-            subtitulo: cuando(cfg)
+            subtitulo: cuando(cfg),
+            diseno: cfg.diseno || ""
         };
+    }
+
+    /** Diseño guardado (texto JSON) → objeto editable. */
+    function leerDiseno(v) {
+        if (v && typeof v === "object") return JSON.parse(JSON.stringify(v));
+        try {
+            const o = v ? JSON.parse(String(v)) : {};
+            return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    /** Solo el texto escrito y si se muestra (lo que se conserva al cambiar de diseño). */
+    function textosDe(o) {
+        const r = {};
+        if (o && typeof o.texto === "string" && o.texto.trim()) r.texto = o.texto;
+        if (o && typeof o.mostrar === "boolean") r.mostrar = o.mostrar;
+        return r;
+    }
+
+    /** Quita valores vacíos antes de guardar. */
+    function limpiarDiseno(d) {
+        const r = {};
+        Object.entries(d || {}).forEach(([k, v]) => {
+            if (v && typeof v === "object") {
+                const x = {};
+                Object.entries(v).forEach(([kk, vv]) => {
+                    if (vv === "" || vv === null || vv === undefined) return;
+                    x[kk] = typeof vv === "string" && kk === "texto" ? vv.trim() : vv;
+                    if (x[kk] === "") delete x[kk];
+                });
+                if (Object.keys(x).length) r[k] = x;
+            } else if (v !== "" && v !== null && v !== undefined) r[k] = v;
+        });
+        return r;
     }
 
     /* ================= Estado en vivo ================= */
@@ -494,8 +552,8 @@
 
     async function generarPdf({ seed, pub, cfg, desde, hasta, series, porHoja, imagenes, progreso }) {
         await Promise.all([cargarScript(LIB_JSPDF), cargarScript(LIB_QR)]);
-        await fuentesListas();
         const arte = await cargarImagen(imagenes && imagenes.dataUrl);
+        await fuentesListas(cfg.diseno, Boolean(arte));
         const conCentro = centroNumero(cfg);
         const centroImg = conCentro ? null : await cargarImagen(imagenes && imagenes.centroDataUrl);
         const { jsPDF } = window.jspdf;
@@ -512,7 +570,7 @@
             const s = lista[i];
             if (i > 0 && i % d.posiciones.length === 0) pdf.addPage("letter", d.orient);
             C.dibujarCarton(cv, {
-                seed, serie: s, arte, titulo: t.titulo, subtitulo: t.subtitulo, letras: cfg.letras_sistema !== false && cfg.letras_sistema !== "false",
+                seed, serie: s, arte, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras: cfg.letras_sistema !== false && cfg.letras_sistema !== "false",
                 centroNumero: conCentro, centroImg, qrTexto: links.carton(pub, seed, s)
             });
             chico.getContext("2d").drawImage(cv, 0, 0, chico.width, chico.height);
@@ -529,7 +587,7 @@
     function panelImprimir({ seed, pub, cfg, min, max, obtenerArte, sugerido }) {
         const desde = input("bn-pdf-desde", sugerido ? sugerido[0] : min, { type: "number", min, max });
         const hasta = input("bn-pdf-hasta", sugerido ? sugerido[1] : Math.min(max, min + 99), { type: "number", min, max });
-        const porHoja = select("bn-pdf-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"], ["6", "6 por hoja"]], "4");
+        const porHoja = select("bn-pdf-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"], ["6", "6 por hoja"]], "2");
         const estado = el("p", { class: "bn-note", text: "Hasta 100 cartones por archivo; un rango mayor se descarga en varios PDF." });
         const btn = el("button", { class: "bn-btn bn-btn--primary", text: "Descargar PDF" });
         btn.addEventListener("click", () =>
@@ -638,7 +696,7 @@
         const ganadores = el("section", { class: "bn-card bn-winners", hidden: true });
 
         /* PDF con todos los cartones del jugador (hasta 100 por archivo), armado en su propio navegador. */
-        const porHojaPdf = select("bn-pdf-jugador-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"]], series.length === 1 ? "1" : "4");
+        const porHojaPdf = select("bn-pdf-jugador-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"]], "1");
         const estadoPdf = el("small", { class: "bn-note" });
         const botonPdf = el("button", { class: "bn-btn bn-btn--primary", text: series.length === 1 ? "Descargar mi cartón en PDF" : `Descargar mis ${series.length} cartones en PDF` });
         botonPdf.addEventListener("click", () =>
@@ -656,7 +714,10 @@
                 estadoPdf.textContent = "Listo: revisa tus descargas.";
             }, "Generando PDF…")
         );
-        const panelPdf = el("div", { class: "bn-player-pdf" }, botonPdf, porHojaPdf, estadoPdf);
+        const panelPdf = el("section", { class: "bn-card bn-player-pdf-card" },
+            el("h3", { text: series.length === 1 ? "Tu cartón en PDF" : "Tus cartones en PDF" }),
+            el("p", { class: "bn-note", text: "Para guardarlos o imprimirlos. Elige cuántos cartones van en cada hoja carta." }),
+            el("div", { class: "bn-player-pdf" }, porHojaPdf, botonPdf, estadoPdf));
 
         function guardar() {
             try {
@@ -711,7 +772,8 @@
                     const img = await cargarImagen(r.dataUrl);
                     const cen = conCentro ? null : await cargarImagen(r.centroDataUrl);
                     const tmp = document.createElement("canvas");
-                    C.dibujarCarton(tmp, { seed, serie, arte: img, titulo: t.titulo, subtitulo: t.subtitulo, letras, centroNumero: conCentro, centroImg: cen, qrTexto: links.carton(cfg.public_id, seed, serie) });
+                    await fuentesListas(t.diseno, Boolean(img));
+                    C.dibujarCarton(tmp, { seed, serie, arte: img, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras, centroNumero: conCentro, centroImg: cen, qrTexto: links.carton(cfg.public_id, seed, serie) });
                     descargarBlob(await canvasABlob(tmp, "image/jpeg", 0.92), `carton-${C.serieTexto(serie)}.jpg`);
                 }, "Preparando…")
             );
@@ -739,7 +801,7 @@
             const l = lienzos.find((x) => x.serie === serie);
             if (!l) return;
             const est = estadoCarton(serie);
-            C.dibujarCarton(l.cv, { seed, serie, arte, titulo: t.titulo, subtitulo: t.subtitulo, letras, centroNumero: conCentro, centroImg, marcas: marcasDe(serie), sello: est && est.sello });
+            C.dibujarCarton(l.cv, { seed, serie, arte, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras, centroNumero: conCentro, centroImg, marcas: marcasDe(serie), sello: est && est.sello });
             l.chip.hidden = !est;
             if (est) {
                 l.chip.textContent = est.texto;
@@ -810,17 +872,17 @@
                     saludo ? el("p", { class: "bn-hello", text: saludo }) : null
                 ),
                 barra,
-                panelPdf,
                 el("div", { class: "bn-player-tools" }, toggle,
                     el("small", { class: "bn-note", text: auto ? "Cada número cantado se marca solo con una X roja. Si prefieres marcar tú, cambia a «tocando la casilla»." : "Toca cada número que se cante para marcarlo con una X roja." })),
                 cards,
-                ganadores
+                ganadores,
+                panelPdf
             )
         );
 
         (async () => {
-            await fuentesListas();
             [arte, centroImg] = await Promise.all([cargarImagen(cfg.arte_url), conCentro ? null : cargarImagen(cfg.centro_url)]);
+            await fuentesListas(t.diseno, Boolean(arte));
             vivoCtrl.iniciar(vivo);
         })();
     }
@@ -1607,14 +1669,27 @@
                 if (e.estado !== "Rechazada") {
                     const otra = e.modalidad === "Presencial" ? "Virtual" : "Presencial";
                     const cambiar = el("button", { class: "bn-btn bn-btn--sm", text: `Pasar a ${otra.toLowerCase()}` });
-                    cambiar.addEventListener("click", async () => {
+                    cambiar.addEventListener("click", () => {
                         const enviado = e.email_enviado || e.wa_enviado;
-                        const ok = await confirmar(`Pasar a ${otra.toLowerCase()}`,
-                            `La compra #${e.entrada_id} de ${e.nombre} queda como ${otra}. Los cartones y el link no cambian; el cambio queda anotado en la nota.${enviado ? " Después vuelve a enviarle el mensaje para que vea la modalidad correcta." : ""}`,
-                            `Pasar a ${otra.toLowerCase()}`);
-                        if (!ok) return;
-                        const r = await act(cambiar, { action: "cambiar_modalidad", entrada_id: e.entrada_id, modalidad: otra }, "Cambiando…");
-                        if (r) showMessage(`Compra #${e.entrada_id}: ahora es ${otra}.${enviado ? " Reenvíale el mensaje." : ""}`, "success");
+                        const conLote = cfg.modalidad === "Mixta" && String(cfg.lote_presencial || "").trim() && e.cartones;
+                        const chk = conLote ? el("input", { type: "checkbox" }) : null;
+                        if (chk) chk.checked = true;
+                        modal(`Pasar a ${otra.toLowerCase()}`, el("div", {},
+                            el("p", { text: `La compra #${e.entrada_id} de ${e.nombre} queda como ${otra}. El link no cambia y el cambio queda anotado en la nota de la compra.` }),
+                            chk ? el("label", { class: "bn-check" }, chk, el("span", { text: otra === "Presencial"
+                                ? "Cambiar sus cartones por cartones libres del lote presencial (los que ya se imprimieron)."
+                                : "Cambiar sus cartones por cartones de fuera del lote presencial. Los suyos vuelven a quedar libres en el lote." })) : null,
+                            enviado ? el("p", { class: "bn-note", text: "Después vuelva a enviarle el mensaje para que vea la modalidad correcta." }) : null
+                        ), (cerrar) => {
+                            const ok = el("button", { class: "bn-btn bn-btn--primary", text: `Pasar a ${otra.toLowerCase()}` });
+                            ok.addEventListener("click", async () => {
+                                const r = await act(ok, { action: "cambiar_modalidad", entrada_id: e.entrada_id, modalidad: otra, reasignar: chk ? chk.checked : false }, "Cambiando…");
+                                if (!r) return;
+                                cerrar();
+                                showMessage(`Compra #${e.entrada_id}: ahora es ${otra}.${r.reasignados ? ` Cartones nuevos: ${r.entrada.cartones.split(",").map((x) => C.serieTexto(x)).join(", ")}.` : ""}${enviado || r.reasignados ? " Reenvíele el mensaje." : ""}`, "success");
+                            });
+                            return [el("button", { class: "bn-btn", onclick: cerrar, text: "Cancelar" }), ok];
+                        });
                     });
                     acciones.append(cambiar);
                 }
@@ -1662,23 +1737,289 @@
             const centroUrl = () => (cfg.centro !== "numero" && cfg.centro_file_id ? `https://lh3.googleusercontent.com/d/${cfg.centro_file_id}` : "");
             let arteActual;
             let centroActual;
+            /** Diseño en edición (se guarda con «Guardar diseño»). */
+            let borrador = leerDiseno(cfg.diseno);
+            let sinGuardar = false;
 
             /** Vuelve a dibujar la serie 00001; un argumento undefined usa lo que está guardado. */
             async function pintarPreview(arteImg, centroImg) {
                 if (arteImg !== undefined) arteActual = arteImg;
                 if (centroImg !== undefined) centroActual = centroImg;
-                await fuentesListas();
                 await cargarScript(LIB_QR).catch(() => {});
                 if (arteActual === undefined) arteActual = await cargarImagen(S.data.arte_url);
                 if (centroActual === undefined) centroActual = await cargarImagen(centroUrl());
+                await fuentesListas(borrador, Boolean(arteActual));
                 const conCentro = centroNumero(cfg);
                 const t = tituloCarton(cfg);
                 const grid = C.carton(seed, 1, conCentro);
                 const ejemplo = [grid[0][0], grid[1][1], grid[3][3], grid[4][4], grid[0][4]];
                 C.dibujarCarton(preview, {
-                    seed, serie: 1, arte: arteActual, titulo: t.titulo, subtitulo: t.subtitulo, letras: cfg.letras_sistema !== "false",
+                    seed, serie: 1, arte: arteActual, titulo: t.titulo, subtitulo: t.subtitulo, diseno: borrador, letras: cfg.letras_sistema !== "false",
                     centroNumero: conCentro, centroImg: conCentro ? null : centroActual, marcas: C.marcadas(grid, ejemplo), qrTexto: links.carton(pub, seed, 1)
                 });
+            }
+
+            /* ---- Diseños listos y editor de textos, colores y tipografía ---- */
+            const temaActual = () => C.resolverDiseno(borrador, Boolean(S.data.arte_url)).tema;
+            const galeria = el("div", { class: "bn-temas", role: "radiogroup", "aria-label": "Diseños listos" });
+            const estadoDiseno = el("small", { class: "bn-note", "aria-live": "polite" });
+            const guardarDiseno = el("button", { class: "bn-btn bn-btn--primary", text: "Guardar diseño" });
+            const editor = el("div", { class: "bn-editor" });
+            const bloqueLetras = el("div");
+
+            function marcarCambio() {
+                sinGuardar = true;
+                estadoDiseno.textContent = "Cambios sin guardar: los cartones usan el diseño guardado hasta que toques «Guardar diseño».";
+                guardarDiseno.disabled = false;
+            }
+
+            let repintar = 0;
+            function previewPronto() {
+                window.clearTimeout(repintar);
+                repintar = window.setTimeout(() => pintarPreview(), 120);
+            }
+
+            function pintarGaleria() {
+                const hayArte = Boolean(S.data.arte_url);
+                const actual = temaActual();
+                const opciones = [...C.ORDEN_TEMAS.map((id) => [id, C.TEMAS[id].nombre, C.TEMAS[id].detalle]), ...(hayArte ? [["arte", "Mi arte", "La imagen que subiste"]] : [])];
+                poner(galeria, ...opciones.map(([id, nombre, detalle]) => {
+                    const mini = el("canvas", { class: "bn-tema-mini", width: 150, height: 210, "aria-hidden": "true" });
+                    const b = el("button", { type: "button", class: `bn-tema${id === actual ? " is-on" : ""}`, role: "radio", "aria-checked": id === actual ? "true" : "false", title: detalle },
+                        mini, el("b", { text: nombre }), el("small", { text: detalle }));
+                    b.addEventListener("click", () => {
+                        /* Al cambiar de diseño se conservan los textos escritos; colores y letras vuelven a los del diseño. */
+                        borrador = { tema: id, titulo: textosDe(borrador.titulo), subtitulo: textosDe(borrador.subtitulo) };
+                        marcarCambio();
+                        pintarGaleria();
+                        pintarEditor();
+                        pintarPreview();
+                    });
+                    miniatura(mini, id);
+                    return b;
+                }));
+            }
+
+            async function miniatura(canvas, tema) {
+                const grande = document.createElement("canvas");
+                const t = tituloCarton(cfg);
+                const d = { tema, titulo: textosDe(borrador.titulo), subtitulo: textosDe(borrador.subtitulo) };
+                const arte = tema === "arte" ? arteActual || (await cargarImagen(S.data.arte_url)) : null;
+                await fuentesListas(d, Boolean(arte));
+                C.dibujarCarton(grande, { seed, serie: 1, arte, titulo: t.titulo, subtitulo: t.subtitulo, diseno: d, letras: cfg.letras_sistema !== "false", centroNumero: centroNumero(cfg) });
+                canvas.getContext("2d").drawImage(grande, 0, 0, canvas.width, canvas.height);
+            }
+
+            /** Un renglón del editor: texto, tipografía, color, tamaño… según la parte del cartón. */
+            function filaEditor(clave, etiqueta, partes, porDefecto) {
+                const R = C.resolverDiseno(borrador, Boolean(S.data.arte_url))[clave];
+                const actual = () => {
+                    borrador[clave] = borrador[clave] && typeof borrador[clave] === "object" ? borrador[clave] : {};
+                    return borrador[clave];
+                };
+                const cambiar = (k, v) => {
+                    actual()[k] = v;
+                    marcarCambio();
+                    previewPronto();
+                };
+                const id = `bn-dis-${clave}`;
+                const controles = [];
+                if (partes.includes("texto")) {
+                    const tx = input(`${id}-texto`, R.texto, { placeholder: porDefecto, maxlength: 80 });
+                    tx.addEventListener("input", () => cambiar("texto", tx.value));
+                    const ver = el("input", { type: "checkbox", id: `${id}-ver` });
+                    ver.checked = R.mostrar;
+                    ver.addEventListener("change", () => cambiar("mostrar", ver.checked));
+                    controles.push(el("label", { class: "bn-field bn-editor-texto" }, el("span", { class: "bn-label", text: "Texto" }), tx,
+                        el("small", { class: "bn-note", text: porDefecto ? `Vacío: «${porDefecto}».` : "" })));
+                    controles.push(el("label", { class: "bn-check bn-editor-ver" }, ver, el("span", { text: "Mostrar" })));
+                }
+                if (partes.includes("fuente")) {
+                    const fs = select(`${id}-fuente`, Object.entries(C.FUENTES).map(([k, f]) => [k, f.n]), R.fuente);
+                    fs.addEventListener("change", () => cambiar("fuente", fs.value));
+                    controles.push(campo("Tipografía", fs));
+                }
+                [["color", "Color"], ["fondo", "Fondo"], ["borde", "Borde"]].forEach(([k, nombre]) => {
+                    if (!partes.includes(k)) return;
+                    const c = el("input", { type: "color", class: "bn-color", id: `${id}-${k}`, value: R[k] });
+                    c.addEventListener("input", () => cambiar(k, c.value));
+                    controles.push(campo(nombre, c));
+                });
+                if (partes.includes("tam")) {
+                    const val = el("output", { text: `${Math.round(R.tam * 100)} %` });
+                    const r = el("input", { type: "range", class: "bn-range", id: `${id}-tam`, min: 50, max: clave === "titulo" || clave === "subtitulo" ? 160 : 130, step: 5, value: Math.round(R.tam * 100) });
+                    r.addEventListener("input", () => {
+                        val.textContent = `${r.value} %`;
+                        cambiar("tam", Number(r.value) / 100);
+                    });
+                    controles.push(el("label", { class: "bn-field" }, el("span", { class: "bn-label" }, "Tamaño ", val), r));
+                }
+                return el("fieldset", { class: "bn-editor-fila" }, el("legend", { text: etiqueta }), el("div", { class: "bn-editor-controles" }, controles));
+            }
+
+            function pintarEditor() {
+                const restablecer = el("button", { type: "button", class: "bn-btn bn-btn--sm", text: "Volver a los colores y letras del diseño" });
+                restablecer.addEventListener("click", () => {
+                    borrador = { tema: borrador.tema, titulo: textosDe(borrador.titulo), subtitulo: textosDe(borrador.subtitulo) };
+                    marcarCambio();
+                    pintarEditor();
+                    pintarPreview();
+                });
+                poner(editor,
+                    filaEditor("titulo", "Título", ["texto", "fuente", "color", "tam"], cfg.nombre || "BINGO"),
+                    filaEditor("subtitulo", "Subtítulo", ["texto", "fuente", "color", "tam"], cuando(cfg)),
+                    filaEditor("letras", "Letras B I N G O", ["fuente", "color", "tam"]),
+                    filaEditor("numeros", "Números", ["fuente", "color", "tam"]),
+                    filaEditor("casillas", "Casillas", ["fondo", "borde"]),
+                    filaEditor("pie", "Serie y código", ["fuente", "color"]),
+                    el("div", { class: "bn-btnrow" }, restablecer)
+                );
+                const tema = temaActual();
+                bloqueLetras.hidden = tema !== "arte" && tema !== "sencillo";
+            }
+
+            guardarDiseno.disabled = true;
+            guardarDiseno.addEventListener("click", () => conBoton(guardarDiseno, async () => {
+                const res = await llamar({ action: "update_config", hash, config: { diseno: JSON.stringify(limpiarDiseno(borrador)) } });
+                /* Un Apps Script sin la versión de diseños ignora el campo: se avisa en vez de decir «guardado». */
+                if (!res || !res.config || res.config.diseno === undefined) throw new Error("El servidor del bingo no guardó el diseño: falta publicar la versión nueva del Apps Script.");
+                S.data.config = res.config;
+                Object.assign(cfg, res.config);
+                sinGuardar = false;
+                estadoDiseno.textContent = "Diseño guardado: los cartones, el PDF y los links de los jugadores ya lo usan.";
+                showMessage("Diseño del cartón guardado.", "success");
+            }, "Guardando…").then(() => { guardarDiseno.disabled = !sinGuardar; }));
+
+            /**
+             * Lote de cartones presenciales (solo bingos mixtos). Al principio no hay lote: se descarga el PDF de los
+             * presenciales ya vendidos más los cartones que se imprimen para vender en el evento, y en ese momento
+             * se aparta el lote. Desde ahí cada compra presencial toma un cartón libre del lote, y cada virtual, uno de fuera.
+             */
+            function panelPresenciales() {
+                const caja = el("div", { class: "bn-lote" });
+                const porHoja = select("bn-lote-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"], ["6", "6 por hoja"]], "2");
+                const estado = el("p", { class: "bn-note", "aria-live": "polite" });
+                let info = null;
+                const seriesDe = (lista) => lista.map((x) => (typeof x === "number" ? x : x.serie));
+                const rango = (lista) => {
+                    const v = seriesDe(lista);
+                    return v.length ? `${C.serieTexto(v[0])} a ${C.serieTexto(v[v.length - 1])}` : "";
+                };
+
+                async function pdfDe(lista, base) {
+                    const series = seriesDe(lista);
+                    if (!series.length) return;
+                    const imgs = await imagenes();
+                    for (let k = 0; k < series.length; k += 100) {
+                        const parte = series.slice(k, k + 100);
+                        const blob = await generarPdf({
+                            seed, pub, cfg, series: parte, porHoja: Number(porHoja.value), imagenes: imgs,
+                            progreso: (n, total) => { estado.textContent = `${base}: ${n} de ${total}…`; }
+                        });
+                        descargarBlob(blob, series.length > 100 ? `${base}-${k / 100 + 1}.pdf` : `${base}.pdf`);
+                    }
+                    estado.textContent = "Listo: revise sus descargas.";
+                }
+
+                function csvVendidos() {
+                    const filas = [["Serie", "Comprador", "Compra", "Modalidad"], ...info.vendidos.map((x) => [C.serieTexto(x.serie), x.comprador, `#${x.entrada_id}`, x.modalidad])];
+                    const txt = "﻿" + filas.map((f) => f.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+                    descargarBlob(new Blob([txt], { type: "text/csv;charset=utf-8" }), "presenciales-vendidos.csv");
+                }
+
+                const boton = (texto, fn, clase) => {
+                    const b = el("button", { class: `bn-btn${clase ? " " + clase : ""}`, text: texto });
+                    b.addEventListener("click", () => conBoton(b, fn, "Generando…"));
+                    return b;
+                };
+
+                function pintar() {
+                    if (!info.activo) {
+                        const n = info.vendidos.length;
+                        const extra = input("bn-lote-extra", "50", { type: "number", min: 0, max: 5000 });
+                        const apartar = el("button", { class: "bn-btn bn-btn--primary", text: "Descargar PDF y apartar el lote" });
+                        apartar.addEventListener("click", async () => {
+                            const x = Math.max(0, Math.floor(Number(extra.value) || 0));
+                            if (!n && !x) return showMessage("Indique cuántos cartones imprimir para vender en el evento.", "error");
+                            const ok = await confirmar("Apartar el lote presencial",
+                                `Se descargan ${n} ${n === 1 ? "cartón vendido" : "cartones vendidos"} como presenciales y ${x} ${x === 1 ? "cartón" : "cartones"} para vender en el evento. Desde ese momento, cada compra presencial toma un cartón libre de este lote, y cada compra virtual, uno de fuera del lote.`,
+                                "Apartar y descargar");
+                            if (!ok) return;
+                            await conBoton(apartar, async () => {
+                                const r = await llamar({ action: "lote_presencial_crear", hash, extra: x }, { timeoutMs: 90000 });
+                                info = r.info;
+                                cfg.lote_presencial = "activo";
+                                pintar();
+                                await pdfDe(info.vendidos, "presenciales-vendidos");
+                                await pdfDe(r.nuevos, "presenciales-para-vender");
+                                showMessage("Lote presencial apartado.", "success");
+                            }, "Apartando…");
+                        });
+                        poner(caja,
+                            el("p", {}, n
+                                ? `Hay ${n} ${n === 1 ? "cartón vendido" : "cartones vendidos"} como presenciales (${rango(info.vendidos)}).`
+                                : "Todavía no hay cartones vendidos como presenciales."),
+                            el("p", { class: "bn-note", text: "Indique cuántos cartones adicionales imprimir para vender en el evento. Al descargar, la app aparta ese lote: las siguientes compras presenciales toman sus cartones de ahí y las virtuales, de fuera. Los bloques de los sectores no se incluyen, porque cada sector imprime el suyo." }),
+                            el("div", { class: "bn-form-grid" },
+                                campo("Cartones adicionales para el evento", extra),
+                                campo("Cartones por hoja carta", porHoja),
+                                el("div", { class: "bn-field bn-field--end" }, apartar)),
+                            estado);
+                        return;
+                    }
+                    const agregarN = input("bn-lote-agregar", "20", { type: "number", min: 1, max: 5000 });
+                    const agregar = el("button", { class: "bn-btn", text: "Agregar al lote y descargar" });
+                    agregar.addEventListener("click", () => conBoton(agregar, async () => {
+                        const r = await llamar({ action: "lote_presencial_agregar", hash, cantidad: Number(agregarN.value) || 0 }, { timeoutMs: 90000 });
+                        info = r.info;
+                        pintar();
+                        await pdfDe(r.nuevos, "presenciales-agregados");
+                        showMessage(`Se agregaron ${r.nuevos.length} cartones al lote.`, "success");
+                    }, "Agregando…"));
+                    const quitar = el("button", { class: "bn-btn bn-btn--danger", text: "Quitar el lote" });
+                    quitar.addEventListener("click", async () => {
+                        if (!(await confirmar("Quitar el lote presencial", "Las compras presenciales y virtuales vuelven a tomar cualquier cartón libre. Los cartones ya vendidos no cambian.", "Quitar el lote", true))) return;
+                        await conBoton(quitar, async () => {
+                            info = (await llamar({ action: "lote_presencial_desactivar", hash })).info;
+                            cfg.lote_presencial = "";
+                            pintar();
+                        });
+                    });
+                    poner(caja,
+                        el("div", { class: "bn-tiles" },
+                            tile(String(info.lote.length), "cartones en el lote", rango(info.lote)),
+                            tile(String(info.vendidos.length), "vendidos"),
+                            tile(String(info.libres.length), "libres para vender")),
+                        el("p", { class: "bn-note", text: `Lote apartado el ${fechaHoraTexto(info.fecha)}. Cada compra presencial toma un cartón libre del lote; cada compra virtual, uno de fuera del lote.` }),
+                        info.fuera.length ? el("p", { class: "bn-banner", text: `${info.fuera.length} ${info.fuera.length === 1 ? "cartón presencial quedó" : "cartones presenciales quedaron"} fuera del lote, por ejemplo si se aprobaron con series elegidas. Imprímalos con «Presenciales fuera del lote», o en Ventas pase la compra a virtual y de vuelta a presencial para cambiarlos por cartones del lote.` }) : null,
+                        el("div", { class: "bn-form-grid" }, campo("Cartones por hoja carta", porHoja)),
+                        el("div", { class: "bn-btnrow" },
+                            boton("PDF de vendidos", () => pdfDe(info.vendidos, "presenciales-vendidos")),
+                            boton("PDF de libres", () => pdfDe(info.libres, "presenciales-para-vender")),
+                            boton("PDF de todo el lote", () => pdfDe(info.lote, "lote-presencial")),
+                            info.fuera.length ? boton("Presenciales fuera del lote", () => pdfDe(info.fuera, "presenciales-fuera-del-lote")) : null,
+                            info.vendidos.length ? el("button", { class: "bn-btn", onclick: csvVendidos, text: "Lista de vendidos (CSV)" }) : null),
+                        el("hr", { class: "bn-sep" }),
+                        el("div", { class: "bn-form-grid" },
+                            campo("Cartones a agregar al lote", agregarN, "Se descargan solo los cartones nuevos."),
+                            el("div", { class: "bn-field bn-field--end" }, agregar)),
+                        el("div", { class: "bn-btnrow" }, quitar),
+                        estado);
+                }
+
+                (async () => {
+                    poner(caja, el("p", { class: "bn-note", text: "Cargando cartones presenciales…" }));
+                    try {
+                        info = await llamar({ action: "lote_presencial_info", hash });
+                        pintar();
+                    } catch (e) {
+                        poner(caja, el("p", { class: "bn-empty bn-empty--error", text: e.message }));
+                    }
+                })();
+                return el("section", { class: "bn-card" },
+                    el("h2", { text: "Cartones presenciales" }),
+                    el("p", { class: "bn-note", text: "Imprima aparte lo presencial: los cartones ya vendidos en presencial y un lote para vender el día del evento. Lo virtual queda por aparte, sin cruzarse." }),
+                    caja);
             }
 
             async function descargarTemplate(transparente, pdf) {
@@ -1715,6 +2056,8 @@
                 cv.height = C.GEOMETRIA.H;
                 cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
                 const normal = await cargarImagen(cv.toDataURL("image/jpeg", 0.9));
+                const previo = borrador.tema;
+                borrador.tema = "arte";
                 await pintarPreview(normal);
                 estadoArte.textContent = "Así se verá con números reales. Si te gusta, súbelo.";
                 const subir = el("button", { class: "bn-btn bn-btn--primary", text: "Usar este arte" });
@@ -1723,10 +2066,19 @@
                     S.data.arte_url = d.arte_url;
                     S.data.config.arte_file_id = d.arte_file_id;
                     imagenes.limpiar();
-                    estadoArte.textContent = "Arte guardado en la carpeta del bingo.";
+                    /* El arte subido pasa a ser el diseño del cartón. */
+                    const res = await llamar({ action: "update_config", hash, config: { diseno: JSON.stringify(limpiarDiseno({ ...borrador, tema: "arte" })) } });
+                    S.data.config = res.config;
+                    Object.assign(cfg, res.config);
+                    borrador.tema = "arte";
+                    estadoArte.textContent = "Arte guardado en la carpeta del bingo y elegido como diseño del cartón.";
                     subir.remove();
+                    pintarGaleria();
+                    pintarEditor();
                     showMessage("Arte del cartón guardado.", "success");
                 }, "Subiendo…"));
+                /* Si no se sube, la vista previa vuelve al diseño elegido al cambiar de diseño. */
+                if (previo !== "arte" && !S.data.arte_url) estadoArte.textContent += " Mientras no lo subas, el diseño guardado no cambia.";
                 estadoArte.after(subir);
             });
 
@@ -1748,6 +2100,9 @@
                 S.data.arte_url = "";
                 S.data.config.arte_file_id = "";
                 imagenes.limpiar();
+                quitarArte.hidden = true;
+                pintarGaleria();
+                pintarEditor();
                 pintarPreview(null);
             }));
 
@@ -1879,8 +2234,10 @@
                 const venta = (v.vendidos || []).find((x) => x.serie === s);
                 const cv = el("canvas", { class: "bn-canvas bn-canvas--mini" });
                 const t = tituloCarton(cfg);
+                const arteS = await cargarImagen(S.data.arte_url);
+                await fuentesListas(t.diseno, Boolean(arteS));
                 C.dibujarCarton(cv, {
-                    seed, serie: s, arte: await cargarImagen(S.data.arte_url), titulo: t.titulo, subtitulo: t.subtitulo, letras: cfg.letras_sistema !== "false",
+                    seed, serie: s, arte: arteS, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras: cfg.letras_sistema !== "false",
                     centroNumero: conCentro, centroImg: conCentro ? null : await cargarImagen(centroUrl()), qrTexto: links.carton(pub, seed, s)
                 });
                 poner(resultado, cv, el("div", { class: "bn-stack" },
@@ -1900,20 +2257,31 @@
                 el("section", { class: "bn-card bn-design" },
                     el("div", { class: "bn-design-text" },
                         el("h2", { text: "Diseño del cartón" }),
-                        el("ol", { class: "bn-steps" },
-                            el("li", {}, "Descarga el template. Marca dónde van el título, la palabra BINGO, las 25 casillas, la serie, el QR y el código."),
-                            el("li", {}, "Diseña tu arte encima con la herramienta que quieras (Canva, Photoshop…). Deja libre el espacio de las casillas: el sistema las pinta de blanco."),
-                            el("li", {}, "Exporta en 1200 × 1680 px (10 × 14 cm) y súbelo aquí.")
-                        ),
-                        el("div", { class: "bn-btnrow" },
-                            el("button", { class: "bn-btn", onclick: () => descargarTemplate(false), text: "Template PNG" }),
-                            el("button", { class: "bn-btn", onclick: () => descargarTemplate(true), text: "PNG transparente" }),
-                            el("button", { class: "bn-btn", onclick: () => descargarTemplate(false, true), text: "Template PDF" })
-                        ),
-                        campo("Subir arte del cartón", archivo, "PNG, JPG o WEBP en la proporción del template."),
-                        estadoArte,
-                        el("label", { class: "bn-check" }, letrasChk, el("span", { text: "Dibujar las letras B I N G O del sistema (desmárcalo si tu arte ya las trae)" })),
-                        S.data.arte_url ? el("div", { class: "bn-btnrow" }, quitarArte) : null,
+                        el("p", { class: "bn-note", text: "Elige un diseño listo con un toque, o sube tu propio arte. Después ajusta títulos, colores y tipografías a tu gusto y toca «Guardar diseño»." }),
+                        el("h3", { text: "Diseños listos" }),
+                        galeria,
+                        bloqueLetras,
+                        el("details", { class: "bn-details bn-editor-box" },
+                            el("summary", { text: "Textos, colores y tipografía" }),
+                            el("p", { class: "bn-note", text: "Cambia cualquier parte del cartón. Lo que dejes igual toma los colores y letras del diseño elegido." }),
+                            editor),
+                        el("div", { class: "bn-btnrow bn-guardar-diseno" }, guardarDiseno, estadoDiseno),
+                        el("hr", { class: "bn-sep" }),
+                        el("details", { class: "bn-details", open: temaActual() === "arte" },
+                            el("summary", { text: "Usar mi propio arte (imagen)" }),
+                            el("ol", { class: "bn-steps" },
+                                el("li", {}, "Descarga el template. Marca dónde van el título, la palabra BINGO, las 25 casillas, la serie, el QR y el código."),
+                                el("li", {}, "Diseña tu arte encima con la herramienta que quieras (Canva, Photoshop…). Deja libre el espacio de las casillas: el sistema las pinta encima."),
+                                el("li", {}, "Exporta en 1200 × 1680 px (10 × 14 cm) y súbelo aquí. Queda como diseño «Mi arte».")
+                            ),
+                            el("div", { class: "bn-btnrow" },
+                                el("button", { class: "bn-btn", onclick: () => descargarTemplate(false), text: "Template PNG" }),
+                                el("button", { class: "bn-btn", onclick: () => descargarTemplate(true), text: "PNG transparente" }),
+                                el("button", { class: "bn-btn", onclick: () => descargarTemplate(false, true), text: "Template PDF" })
+                            ),
+                            campo("Subir arte del cartón", archivo, "PNG, JPG o WEBP en la proporción del template."),
+                            estadoArte,
+                            S.data.arte_url ? el("div", { class: "bn-btnrow" }, quitarArte) : null),
                         el("hr", { class: "bn-sep" }),
                         el("h3", { text: "Centro del cartón" }),
                         campo("¿Qué va en la casilla del centro?", centroSel, "Con número en el centro, la N lleva 5 números y ninguna casilla está marcada de entrada. Cámbialo antes de imprimir o vender."),
@@ -1926,12 +2294,16 @@
                     el("p", { class: "bn-note", text: "El PDF se arma en este navegador; no se sube nada. Cada cartón lleva su QR al link en línea." }),
                     panelImprimir({ seed, pub, cfg, min: 1, max: 10000, obtenerArte: imagenes })
                 ),
+                cfg.modalidad === "Mixta" ? panelPresenciales() : null,
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Buscar un cartón" }),
                     el("div", { class: "bn-toolbar" }, buscar, btnBuscar),
                     resultado
                 )
             );
+            bloqueLetras.append(el("label", { class: "bn-check" }, letrasChk, el("span", { text: "Dibujar las letras B I N G O del sistema (desmárcalo si tu arte ya las trae)" })));
+            pintarEditor();
+            pintarGaleria();
             pintarPreview();
         }
 
@@ -2559,8 +2931,8 @@
                         }));
                     }
                     const cv = el("canvas", { class: "bn-canvas bn-canvas--mini" });
-                    await fuentesListas();
-                    C.dibujarCarton(cv, { seed, serie: s, arte: null, titulo: J.config.nombre, letras: true, centroNumero: centroNumero(J.config), marcas: C.marcadas(grid, r.bolas), resaltar, sello });
+                    await fuentesListas(J.config.diseno);
+                    C.dibujarCarton(cv, { seed, serie: s, arte: null, titulo: J.config.nombre, diseno: J.config.diseno, letras: true, centroNumero: centroNumero(J.config), marcas: C.marcadas(grid, r.bolas), resaltar, sello });
                     poner(verifRes, cv, el("div", { class: "bn-stack" },
                         detalle,
                         el("p", { text: info ? (info.vendido ? `Vendido a ${info.comprador}.` : "Atención: este cartón no aparece como vendido.") : "" })

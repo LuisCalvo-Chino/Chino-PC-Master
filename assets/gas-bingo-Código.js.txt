@@ -19,7 +19,7 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 5;
+var API_VERSION_ = 6;
 var MAX_CARTONES_ = 10000;
 var LOTE_DEFAULT_ = 100;
 var MAX_POR_COMPRA_ = 1000;
@@ -143,6 +143,10 @@ function doPost(e) {
     if (action === "mark_sent") return ok_(conLock_(function () { return markSent_(b, data, null); }));
     if (action === "send_email") return ok_(conLock_(function () { return sendEmail_(b, data.entrada_id); }));
     if (action === "cambiar_modalidad") return ok_(conLock_(function () { return cambiarModalidad_(b, data); }));
+    if (action === "lote_presencial_info") return ok_(lotePresencialInfo_(b));
+    if (action === "lote_presencial_crear") return ok_(conLock_(function () { return lotePresencialCrear_(b, data); }));
+    if (action === "lote_presencial_agregar") return ok_(conLock_(function () { return lotePresencialAgregar_(b, data); }));
+    if (action === "lote_presencial_desactivar") return ok_(conLock_(function () { return lotePresencialDesactivar_(b); }));
     if (action === "vender_presencial") return ok_(conLock_(function () { return venderPresencial_(b, data, null); }));
     if (action === "ampliar_lote") return ok_(conLock_(function () { return ampliarLote_(b, data.cantidad); }));
     if (action === "list_cartones") return ok_(listCartones_(b));
@@ -533,7 +537,17 @@ function readConfig_(b) {
 
 var CONFIG_EDITABLES_ = ["nombre", "fecha", "hora", "lugar", "modalidad", "whatsapp", "sinpe_numero", "sinpe_nombre",
   "iban", "precio_unitario", "lote", "setup_done", "plantilla_whatsapp", "plantilla_email_asunto", "plantilla_email",
-  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "sorteo", "digitos", "centro", "centro_file_id"];
+  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "sorteo", "digitos", "centro", "centro_file_id", "diseno"];
+
+/** Diseño del cartón (JSON del organizador): solo se guarda si es un objeto válido y de tamaño razonable. */
+function disenoValido_(v) {
+  if (!v) return "";
+  if (v.length > 6000) throw new Error("El diseño del cartón es demasiado largo.");
+  var o;
+  try { o = JSON.parse(v); } catch (e) { throw new Error("El diseño del cartón no es válido."); }
+  if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("El diseño del cartón no es válido.");
+  return JSON.stringify(o);
+}
 
 function updateConfig_(b, changes) {
   var sh = sheetDe_(b, "config");
@@ -549,6 +563,7 @@ function updateConfig_(b, changes) {
     if (k === "sorteo") v = v === "tombola" ? "tombola" : "app";
     if (k === "digitos") v = v === "3" || v === "4" ? v : "5";
     if (k === "centro") v = v === "numero" ? "numero" : "libre";
+    if (k === "diseno") v = disenoValido_(v);
     if (byKey[k]) sh.getRange(byKey[k], 2).setValue(v);
     else { sh.appendRow([k, v]); byKey[k] = sh.getLastRow(); }
   });
@@ -641,7 +656,7 @@ function publicConfig_(b, cfg) {
   return {
     nombre: cfg.nombre, fecha: cfg.fecha, hora: cfg.hora, lugar: cfg.lugar, modalidad: cfg.modalidad,
     whatsapp: cfg.whatsapp, public_id: b.public_id, seed: b.seed, arte_url: arteUrl_(cfg),
-    letras_sistema: cfg.letras_sistema !== "false",
+    letras_sistema: cfg.letras_sistema !== "false", diseno: cfg.diseno || "",
     marcado_auto: cfg.marcado === "auto", sorteo: cfg.sorteo === "tombola" ? "tombola" : "app", digitos: digitos_(cfg), centro_numero: cfg.centro === "numero",
     centro_url: cfg.centro !== "numero" && cfg.centro_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.centro_file_id : "",
     vivo_id: prop_("VIVO_SPREADSHEET_ID")
@@ -668,12 +683,27 @@ function ampliarLote_(b, cantidad) {
   return { cartones_habilitados: nuevo };
 }
 
-/** Busca cartones libres del fondo general (fuera de los rangos de sectores); amplía el lote si hace falta. */
-function tomarLibres_(b, cantidad, sector) {
+/**
+ * Busca cartones libres del fondo general (fuera de los rangos de sectores); amplía el lote si hace falta.
+ * Con el lote presencial activo (bingo mixto): una compra presencial toma los libres del lote y una virtual,
+ * los de fuera del lote. El bloque de un sector no cambia.
+ */
+function tomarLibres_(b, cantidad, sector, modalidad) {
   var cfg = readConfig_(b);
   var habil = Number(cfg.cartones_habilitados) || LOTE_DEFAULT_;
   var usados = {};
   cartonesVendidos_(b).forEach(function (c) { usados[c.serie] = 1; });
+  var lote = sector ? null : loteActivo_(cfg);
+  var enLote = {};
+  if (lote) lote.forEach(function (n) { enLote[n] = 1; });
+  if (lote && modalidad === "Presencial") {
+    var libresLote = lote.filter(function (n) { return !usados[n]; });
+    if (libresLote.length < cantidad) {
+      throw new Error("El lote de cartones presenciales tiene " + libresLote.length + " cartones libres y esta compra requiere " + cantidad +
+        ". En Cartones → Cartones presenciales, agregue cartones al lote.");
+    }
+    return libresLote.slice(0, cantidad);
+  }
   var rangos = sector ? [] : sectores_(b).filter(function (s) { return s.desde && s.hasta; });
   function enSector(n) {
     for (var i = 0; i < rangos.length; i++) if (n >= rangos[i].desde && n <= rangos[i].hasta) return true;
@@ -687,7 +717,7 @@ function tomarLibres_(b, cantidad, sector) {
       habil = Math.min(MAX_CARTONES_, habil + (Number(cfg.lote) || LOTE_DEFAULT_));
       if (n > habil) break;
     }
-    if (!usados[n] && !enSector(n)) out.push(n);
+    if (!usados[n] && !enSector(n) && !enLote[n]) out.push(n);
   }
   if (out.length < cantidad) {
     throw new Error(sector
@@ -696,6 +726,112 @@ function tomarLibres_(b, cantidad, sector) {
   }
   if (!sector && habil !== (Number(cfg.cartones_habilitados) || LOTE_DEFAULT_)) setConfigValue_(b, "cartones_habilitados", habil);
   return out;
+}
+
+/* ---------- Lote de cartones presenciales (solo bingos mixtos) ---------- */
+
+/** «S 1-50,73,80-82» → [1..50, 73, 80, 81, 82]. La «S» evita que la hoja lo lea como fecha. */
+function loteSeries_(txt) {
+  var out = [];
+  String(txt || "").replace(/[^\d,\-]/g, "").split(",").forEach(function (p) {
+    var m = p.match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) return;
+    var a = Number(m[1]), z = m[2] ? Number(m[2]) : a;
+    for (var n = a; n <= z && n <= MAX_CARTONES_; n++) out.push(n);
+  });
+  return out;
+}
+
+function loteTexto_(series) {
+  var lista = series.slice().sort(function (a, z) { return a - z; }).filter(function (n, i, arr) { return i === 0 || n !== arr[i - 1]; });
+  var partes = [];
+  for (var i = 0; i < lista.length; i++) {
+    var a = lista[i], z = a;
+    while (i + 1 < lista.length && lista[i + 1] === z + 1) z = lista[++i];
+    partes.push(a === z ? String(a) : a + "-" + z);
+  }
+  return partes.length ? "S " + partes.join(",") : "";
+}
+
+/** Series del lote presencial, o null si el bingo no es mixto o el lote no está activo. */
+function loteActivo_(cfg) {
+  if (cfg.modalidad !== "Mixta" || !String(cfg.lote_presencial || "").trim()) return null;
+  var l = loteSeries_(cfg.lote_presencial);
+  return l.length ? l : null;
+}
+
+/**
+ * Estado del lote. Sin lote: los cartones vendidos como presenciales (fuera de los bloques de sectores,
+ * que cada sector imprime aparte). Con lote: vendidos y libres del lote, y las compras presenciales
+ * que quedaron con cartones fuera del lote.
+ */
+function lotePresencialInfo_(b) {
+  var cfg = readConfig_(b);
+  var lote = loteActivo_(cfg);
+  var enLote = {};
+  if (lote) lote.forEach(function (n) { enLote[n] = 1; });
+  var bloques = sectores_(b).filter(function (s) { return s.desde && s.hasta; });
+  function enBloque(n) {
+    for (var i = 0; i < bloques.length; i++) if (n >= bloques[i].desde && n <= bloques[i].hasta) return true;
+    return false;
+  }
+  var ent = {};
+  entradas_(b).forEach(function (e) { ent[e.entrada_id] = e; });
+  var vendidos = [], fuera = [], usados = {};
+  cartonesVendidos_(b).forEach(function (c) {
+    usados[c.serie] = 1;
+    var e = ent[c.entrada_id];
+    var fila = { serie: c.serie, comprador: e ? e.nombre : c.comprador, entrada_id: c.entrada_id, modalidad: e ? e.modalidad : "" };
+    var presencial = e && e.modalidad === "Presencial";
+    if (lote) {
+      if (enLote[c.serie]) vendidos.push(fila);
+      else if (presencial && !enBloque(c.serie)) fuera.push(fila);
+    } else if (presencial && !enBloque(c.serie)) {
+      vendidos.push(fila);
+    }
+  });
+  var orden = function (a, z) { return a.serie - z.serie; };
+  return {
+    modalidad: cfg.modalidad, activo: Boolean(lote), fecha: lote ? String(cfg.lote_presencial_fecha || "") : "",
+    lote: lote || [], vendidos: vendidos.sort(orden), fuera: fuera.sort(orden),
+    libres: (lote || []).filter(function (n) { return !usados[n]; })
+  };
+}
+
+/** Aparta el lote: los presenciales ya vendidos más «extra» cartones libres para vender en el evento. */
+function lotePresencialCrear_(b, data) {
+  var cfg = readConfig_(b);
+  if (cfg.modalidad !== "Mixta") throw new Error("El lote presencial es solo para bingos en modalidad «Presencial y virtual».");
+  if (loteActivo_(cfg)) throw new Error("El lote presencial ya está apartado.");
+  var extra = Math.floor(Number(data.extra) || 0);
+  if (extra < 0 || extra > 5000) throw new Error("Los cartones adicionales van de 0 a 5000.");
+  var info = lotePresencialInfo_(b);
+  var vendidos = info.vendidos.map(function (x) { return x.serie; });
+  var nuevos = extra ? tomarLibres_(b, extra, null, "Virtual") : [];
+  var lote = vendidos.concat(nuevos);
+  if (!lote.length) throw new Error("Todavía no hay cartones presenciales vendidos: indique cuántos cartones apartar para vender en el evento.");
+  setConfigValue_(b, "lote_presencial", loteTexto_(lote));
+  setConfigValue_(b, "lote_presencial_fecha", ahora_());
+  return { info: lotePresencialInfo_(b), nuevos: nuevos };
+}
+
+/** Suma cartones libres (de fuera del lote) al lote presencial. */
+function lotePresencialAgregar_(b, data) {
+  var cfg = readConfig_(b);
+  var lote = loteActivo_(cfg);
+  if (!lote) throw new Error("Primero aparte el lote presencial.");
+  var cantidad = Math.floor(Number(data.cantidad) || 0);
+  if (cantidad < 1 || cantidad > 5000) throw new Error("Indique de 1 a 5000 cartones.");
+  var nuevos = tomarLibres_(b, cantidad, null, "Virtual");
+  setConfigValue_(b, "lote_presencial", loteTexto_(lote.concat(nuevos)));
+  return { info: lotePresencialInfo_(b), nuevos: nuevos };
+}
+
+/** Quita el lote: todas las compras vuelven a tomar cartones del fondo general. Los cartones vendidos no cambian. */
+function lotePresencialDesactivar_(b) {
+  setConfigValue_(b, "lote_presencial", "");
+  setConfigValue_(b, "lote_presencial_fecha", "");
+  return { info: lotePresencialInfo_(b) };
 }
 
 function listCartones_(b) {
@@ -983,7 +1119,7 @@ function approveEntrada_(b, data) {
     if (series.length !== e.cantidad) throw new Error("Indica exactamente " + e.cantidad + " cartones.");
     validarLibres_(b, series, null);
   } else {
-    series = tomarLibres_(b, e.cantidad, sector && sector.desde && sector.hasta ? sector : null);
+    series = tomarLibres_(b, e.cantidad, sector && sector.desde && sector.hasta ? sector : null, e.modalidad);
   }
   asignarCartones_(b, series, e, e.sector_id);
   e.cartones = series.join(",");
@@ -1072,14 +1208,32 @@ function cambiarModalidad_(b, data) {
   if (e.modalidad === nueva) throw new Error("La compra ya es " + nueva + ".");
   var antes = e.modalidad || "sin modalidad";
   e.modalidad = nueva;
-  var marca = "Modalidad cambiada de " + antes + " a " + nueva + " (" + ahora_().slice(0, 16) + ")";
+  var marca = "Modalidad cambiada de " + antes + " a " + nueva;
+  /* Con el lote presencial activo, los cartones pueden pasar al grupo de la nueva modalidad (mismo link). */
+  var lote = loteActivo_(readConfig_(b));
+  var reasignados = false;
+  var actuales = String(e.cartones || "").split(",").map(Number).filter(Boolean);
+  if (data.reasignar && lote && actuales.length && (e.estado === "Aprobada" || e.estado === "Completada")) {
+    var enLote = {};
+    lote.forEach(function (n) { enLote[n] = 1; });
+    var desubicados = actuales.some(function (n) { return nueva === "Presencial" ? !enLote[n] : enLote[n]; });
+    if (desubicados) {
+      var nuevas = tomarLibres_(b, actuales.length, null, nueva);
+      liberarCartones_(b, e.entrada_id);
+      asignarCartones_(b, nuevas, e, e.sector_id);
+      e.cartones = nuevas.join(",");
+      reasignados = true;
+      marca += "; cartones " + actuales.join(", ") + " cambiados por " + nuevas.join(", ");
+    }
+  }
+  marca += " (" + ahora_().slice(0, 16) + ")";
   e.nota = e.nota ? e.nota + " · " + marca : marca;
   e.email_enviado = false;
   e.wa_enviado = false;
   guardarEntrada_(b, e);
   delete e._row;
   delete e.comprobante_id;
-  return { entrada: e };
+  return { entrada: e, reasignados: reasignados };
 }
 
 /**
@@ -1105,7 +1259,7 @@ function venderPresencial_(b, data, sector, encargado) {
   } else {
     var cantidad = Math.floor(Number(data.cantidad) || 0);
     if (cantidad < 1 || cantidad > MAX_POR_COMPRA_) throw new Error("Indica las series entregadas o la cantidad de cartones (1 a " + MAX_POR_COMPRA_ + ").");
-    series = tomarLibres_(b, cantidad, conBloque);
+    series = tomarLibres_(b, cantidad, conBloque, data.modalidad === "Virtual" ? "Virtual" : "Presencial");
   }
   if (!series.length) throw new Error("Indica las series de los cartones vendidos.");
   var comprobanteId = "";

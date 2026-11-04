@@ -239,6 +239,1001 @@
             ctx.font = `${peso} ${s}px ${familia}`;
         }
         ctx.fillText(texto, x, y);
+        return s;
+    }
+
+    /* ---------- Diseños prediseñados: tipografías ---------- */
+
+    /** Tipografías que se pueden elegir para cada texto del cartón (todas de Google Fonts). */
+    const FUENTES = {
+        montserrat: { n: "Montserrat", css: "'Montserrat', Arial, sans-serif", w: 700 },
+        poppins: { n: "Poppins", css: "'Poppins', Arial, sans-serif", w: 700 },
+        roboto: { n: "Roboto", css: "'Roboto', Arial, sans-serif", w: 700 },
+        inter: { n: "Inter", css: "'Inter', Arial, sans-serif", w: 700 },
+        lato: { n: "Lato", css: "'Lato', Arial, sans-serif", w: 700 },
+        nunito: { n: "Nunito", css: "'Nunito', Arial, sans-serif", w: 700 },
+        raleway: { n: "Raleway", css: "'Raleway', Arial, sans-serif", w: 700 },
+        oswald: { n: "Oswald", css: "'Oswald', Arial, sans-serif", w: 700 },
+        anton: { n: "Anton", css: "'Anton', Impact, sans-serif", w: 400 },
+        bebas: { n: "Bebas Neue", css: "'Bebas Neue', Impact, sans-serif", w: 400 },
+        bungee: { n: "Bungee", css: "'Bungee', Impact, sans-serif", w: 400 },
+        luckiest: { n: "Luckiest Guy", css: "'Luckiest Guy', Impact, sans-serif", w: 400 },
+        righteous: { n: "Righteous", css: "'Righteous', Arial, sans-serif", w: 400 },
+        fredoka: { n: "Fredoka", css: "'Fredoka', Arial, sans-serif", w: 700 },
+        orbitron: { n: "Orbitron", css: "'Orbitron', Arial, sans-serif", w: 700 },
+        robotomono: { n: "Roboto Mono", css: "'Roboto Mono', monospace", w: 700 },
+        merriweather: { n: "Merriweather", css: "'Merriweather', Georgia, serif", w: 700 },
+        playfair: { n: "Playfair Display", css: "'Playfair Display', Georgia, serif", w: 700 },
+        cinzel: { n: "Cinzel", css: "'Cinzel', Georgia, serif", w: 700 },
+        lobster: { n: "Lobster", css: "'Lobster', cursive", w: 400 },
+        pacifico: { n: "Pacifico", css: "'Pacifico', cursive", w: 400 },
+        dancing: { n: "Dancing Script", css: "'Dancing Script', cursive", w: 700 },
+        navidad: { n: "Mountains of Christmas", css: "'Mountains of Christmas', cursive", w: 700 },
+        creepster: { n: "Creepster", css: "'Creepster', cursive", w: 400 }
+    };
+
+    /** Hoja de Google Fonts con todas las tipografías de FUENTES (la app la agrega solo cuando hace falta). */
+    const FUENTES_URL = "https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Bungee&family=Cinzel:wght@400;700" +
+        "&family=Creepster&family=Dancing+Script:wght@400;700&family=Fredoka:wght@400;700&family=Inter:wght@400;700&family=Lato:wght@400;700" +
+        "&family=Lobster&family=Luckiest+Guy&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Mountains+of+Christmas:wght@400;700" +
+        "&family=Nunito:wght@400;700&family=Orbitron:wght@700&family=Oswald:wght@400;700&family=Pacifico&family=Playfair+Display:wght@400;700" +
+        "&family=Poppins:wght@400;700&family=Raleway:wght@400;700&family=Righteous&family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap";
+
+    const fuente = (id) => FUENTES[id] || FUENTES.montserrat;
+
+    /* ---------- Diseños prediseñados: piezas de dibujo ---------- */
+
+    function degradado(ctx, x0, y0, x1, y1, colores) {
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        colores.forEach((c, i) => g.addColorStop(i / (colores.length - 1), c));
+        return g;
+    }
+
+    function fondoLiso(ctx, colores) {
+        ctx.fillStyle = degradado(ctx, 0, 0, 0, G.H, colores);
+        ctx.fillRect(0, 0, G.W, G.H);
+    }
+
+    function circulo(ctx, x, y, r, relleno, borde, grosor) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (relleno) {
+            ctx.fillStyle = relleno;
+            ctx.fill();
+        }
+        if (borde) {
+            ctx.strokeStyle = borde;
+            ctx.lineWidth = grosor || 3;
+            ctx.stroke();
+        }
+    }
+
+    function estrella(ctx, x, y, r1, r2, puntas, relleno) {
+        ctx.beginPath();
+        for (let i = 0; i < puntas * 2; i++) {
+            const r = i % 2 ? r2 : r1;
+            const a = -Math.PI / 2 + (i * Math.PI) / puntas;
+            ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fillStyle = relleno;
+        ctx.fill();
+    }
+
+    /** Esfera con brillo (perlas, burbujas, esferas navideñas). */
+    function esfera(ctx, x, y, r, claro, oscuro) {
+        const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+        g.addColorStop(0, "#ffffff");
+        g.addColorStop(0.25, claro);
+        g.addColorStop(1, oscuro);
+        circulo(ctx, x, y, r, g);
+    }
+
+    function copo(ctx, x, y, r, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, r / 7);
+        ctx.lineCap = "round";
+        for (let i = 0; i < 6; i++) {
+            ctx.rotate(Math.PI / 3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -r);
+            ctx.moveTo(0, -r * 0.55);
+            ctx.lineTo(-r * 0.25, -r * 0.8);
+            ctx.moveTo(0, -r * 0.55);
+            ctx.lineTo(r * 0.25, -r * 0.8);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    /** Puntos de azar fijos (la decoración sale igual en todos los cartones). */
+    function azarFijo(n) {
+        const r = mulberry32(n);
+        return (a, b) => a + r() * (b - a);
+    }
+
+    /** Lugares libres de casillas y textos: orillas a los lados de la cuadrícula y esquinas. */
+    const LADOS = { izq: 62, der: G.W - 62 };
+
+    function caminoHuevo(ctx, x, y, w, h) {
+        const rx = w / 2;
+        const y0 = y - h / 2 + h * 0.58;
+        ctx.beginPath();
+        ctx.ellipse(x, y0, rx, h * 0.58, 0, Math.PI, Math.PI * 2);
+        ctx.ellipse(x, y0, rx, h * 0.42, 0, 0, Math.PI);
+        ctx.closePath();
+    }
+
+    const PASTELES = [["#ffb3c7", "#ff6f9a"], ["#b5e3ff", "#4fb0ea"], ["#c9f2c0", "#5cbf55"], ["#ffe59e", "#f2b705"], ["#dcc6ff", "#9a6be0"]];
+
+    function huevo(ctx, x, y, w, h, k, angulo) {
+        const [base, linea] = PASTELES[k % PASTELES.length];
+        ctx.save();
+        ctx.translate(x, y);
+        if (angulo) ctx.rotate(angulo);
+        caminoHuevo(ctx, 0, 0, w, h);
+        ctx.fillStyle = base;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        ctx.strokeStyle = linea;
+        ctx.fillStyle = "#ffffff";
+        ctx.lineWidth = Math.max(3, w / 14);
+        const tipo = k % 3;
+        if (tipo === 0) {
+            /* zigzag al centro y bandas */
+            ctx.beginPath();
+            const paso = w / 6;
+            for (let i = 0; i <= 6; i++) ctx.lineTo(-w / 2 + i * paso, (i % 2 ? -1 : 1) * h * 0.06);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-w, -h * 0.22);
+            ctx.lineTo(w, -h * 0.22);
+            ctx.moveTo(-w, h * 0.24);
+            ctx.lineTo(w, h * 0.24);
+            ctx.stroke();
+        } else if (tipo === 1) {
+            /* lunares */
+            for (let f = -2; f <= 2; f++) {
+                for (let c = -2; c <= 2; c++) circulo(ctx, c * w * 0.26 + (f % 2 ? w * 0.13 : 0), f * h * 0.2, w * 0.07, "#ffffff");
+            }
+        } else {
+            /* rayas onduladas */
+            for (let f = -2; f <= 2; f++) {
+                ctx.beginPath();
+                for (let i = 0; i <= 12; i++) ctx.lineTo(-w / 2 + (i * w) / 12, f * h * 0.18 + Math.sin(i) * h * 0.025);
+                ctx.strokeStyle = f % 2 ? "#ffffff" : linea;
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+        caminoHuevo(ctx, 0, 0, w, h);
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        /* brillo */
+        ctx.beginPath();
+        ctx.ellipse(-w * 0.18, -h * 0.2, w * 0.08, h * 0.14, -0.4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function conejo(ctx, x, y, s, espejo) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(espejo ? -s : s, s);
+        const blanco = "#ffffff";
+        const rosa = "#ffc2d6";
+        const linea = "#d9c7ea";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = linea;
+        /* orejas */
+        [[-22, -0.18], [22, 0.22]].forEach(([dx, a]) => {
+            ctx.save();
+            ctx.translate(dx, -70);
+            ctx.rotate(a);
+            ctx.beginPath();
+            ctx.ellipse(0, -40, 19, 52, 0, 0, Math.PI * 2);
+            ctx.fillStyle = blanco;
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(0, -38, 9, 38, 0, 0, Math.PI * 2);
+            ctx.fillStyle = rosa;
+            ctx.fill();
+            ctx.restore();
+        });
+        /* cabeza */
+        ctx.beginPath();
+        ctx.ellipse(0, -30, 56, 50, 0, 0, Math.PI * 2);
+        ctx.fillStyle = blanco;
+        ctx.fill();
+        ctx.stroke();
+        /* cara */
+        circulo(ctx, -20, -38, 7, "#3b2a5a");
+        circulo(ctx, 20, -38, 7, "#3b2a5a");
+        circulo(ctx, -18, -41, 2.4, "#ffffff");
+        circulo(ctx, 22, -41, 2.4, "#ffffff");
+        circulo(ctx, -34, -18, 10, "rgba(255,150,190,0.45)");
+        circulo(ctx, 34, -18, 10, "rgba(255,150,190,0.45)");
+        ctx.beginPath();
+        ctx.moveTo(-7, -24);
+        ctx.lineTo(7, -24);
+        ctx.lineTo(0, -16);
+        ctx.closePath();
+        ctx.fillStyle = "#ff8fb1";
+        ctx.fill();
+        ctx.strokeStyle = "#b9a3cf";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -16);
+        ctx.quadraticCurveTo(-8, -6, -14, -12);
+        ctx.moveTo(0, -16);
+        ctx.quadraticCurveTo(8, -6, 14, -12);
+        [-1, 1].forEach((l) => {
+            ctx.moveTo(l * 18, -20);
+            ctx.lineTo(l * 50, -26);
+            ctx.moveTo(l * 18, -16);
+            ctx.lineTo(l * 50, -12);
+        });
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function calabaza(ctx, x, y, w, h, cara) {
+        ctx.save();
+        ctx.translate(x, y);
+        /* tallo */
+        ctx.fillStyle = "#4f7a28";
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.05, -h * 0.4);
+        ctx.quadraticCurveTo(-w * 0.02, -h * 0.62, w * 0.12, -h * 0.66);
+        ctx.lineTo(w * 0.1, -h * 0.58);
+        ctx.quadraticCurveTo(w * 0.05, -h * 0.52, w * 0.07, -h * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        /* gajos */
+        const gajos = [[-0.3, 0.24], [0.3, 0.24], [-0.16, 0.3], [0.16, 0.3], [0, 0.3]];
+        gajos.forEach(([dx, rx]) => {
+            ctx.beginPath();
+            ctx.ellipse(dx * w, 0, rx * w, h * 0.45, 0, 0, Math.PI * 2);
+            const g = ctx.createRadialGradient(dx * w - w * 0.05, -h * 0.15, 4, dx * w, 0, h * 0.5);
+            g.addColorStop(0, "#ffad42");
+            g.addColorStop(1, "#e2620c");
+            ctx.fillStyle = g;
+            ctx.fill();
+            ctx.strokeStyle = "#b44a06";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        if (cara) {
+            ctx.fillStyle = "#ffd54a";
+            ctx.shadowColor = "#ffcc33";
+            ctx.shadowBlur = 12;
+            [-1, 1].forEach((l) => {
+                ctx.beginPath();
+                ctx.moveTo(l * w * 0.08, -h * 0.02);
+                ctx.lineTo(l * w * 0.3, -h * 0.02);
+                ctx.lineTo(l * w * 0.19, -h * 0.2);
+                ctx.closePath();
+                ctx.fill();
+            });
+            ctx.beginPath();
+            const pasos = 7;
+            ctx.moveTo(-w * 0.3, h * 0.1);
+            for (let i = 1; i <= pasos; i++) ctx.lineTo(-w * 0.3 + (i * w * 0.6) / pasos, h * 0.1 + (i % 2 ? h * 0.07 : 0));
+            ctx.quadraticCurveTo(0, h * 0.34, -w * 0.3, h * 0.1);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function murcielago(ctx, x, y, s, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(s, s);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.quadraticCurveTo(10, -14, 22, -10);
+        ctx.quadraticCurveTo(34, -12, 44, -4);
+        ctx.quadraticCurveTo(36, -2, 34, 6);
+        ctx.quadraticCurveTo(28, 0, 22, 6);
+        ctx.quadraticCurveTo(16, 0, 10, 6);
+        ctx.quadraticCurveTo(6, 2, 0, 10);
+        ctx.quadraticCurveTo(-6, 2, -10, 6);
+        ctx.quadraticCurveTo(-16, 0, -22, 6);
+        ctx.quadraticCurveTo(-28, 0, -34, 6);
+        ctx.quadraticCurveTo(-36, -2, -44, -4);
+        ctx.quadraticCurveTo(-34, -12, -22, -10);
+        ctx.quadraticCurveTo(-10, -14, 0, -6);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-6, -2);
+        ctx.lineTo(-7, -14);
+        ctx.lineTo(-2, -9);
+        ctx.lineTo(2, -9);
+        ctx.lineTo(7, -14);
+        ctx.lineTo(6, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function telarana(ctx, x, y, r, dirX, dirY, color) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        const rayos = 6;
+        const angulo = (i) => (Math.PI / 2) * (i / (rayos - 1));
+        const punto = (i, rr) => [x + dirX * Math.cos(angulo(i)) * rr, y + dirY * Math.sin(angulo(i)) * rr];
+        for (let i = 0; i < rayos; i++) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(...punto(i, r));
+            ctx.stroke();
+        }
+        for (let k = 1; k <= 5; k++) {
+            const rr = (r * k) / 5.2;
+            ctx.beginPath();
+            ctx.moveTo(...punto(0, rr));
+            for (let i = 1; i < rayos; i++) {
+                const [ax, ay] = punto(i - 0.5, rr * 0.84);
+                ctx.quadraticCurveTo(ax, ay, ...punto(i, rr));
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function arbolNavidad(ctx, x, y, w, h) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = "#6b3e1f";
+        ctx.fillRect(-w * 0.08, h * 0.38, w * 0.16, h * 0.14);
+        const pisos = [[-0.5, -0.08, 0.5], [-0.24, 0.16, 0.42], [0.02, 0.4, 0.5]];
+        pisos.forEach(([arriba, abajo, ancho], i) => {
+            ctx.beginPath();
+            ctx.moveTo(0, arriba * h);
+            ctx.lineTo(ancho * w, abajo * h);
+            ctx.lineTo(-ancho * w, abajo * h);
+            ctx.closePath();
+            ctx.fillStyle = i % 2 ? "#2f9e55" : "#3cb563";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.85)";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-ancho * w + 4, abajo * h - 2);
+            ctx.lineTo(ancho * w - 4, abajo * h - 2);
+            ctx.stroke();
+        });
+        [["#ff4d4d", -0.18, 0.08], ["#ffd23f", 0.16, 0.02], ["#4dc3ff", 0.05, 0.3], ["#ff4d4d", -0.3, 0.34], ["#ffffff", 0.3, 0.32], ["#ffd23f", -0.08, -0.16]].forEach(([c, dx, dy]) =>
+            circulo(ctx, dx * w, dy * h, w * 0.055, c));
+        estrella(ctx, 0, -h * 0.52, w * 0.16, w * 0.07, 5, "#ffd23f");
+        ctx.restore();
+    }
+
+    function esferaColgante(ctx, x, largo, r, claro, oscuro) {
+        ctx.strokeStyle = "rgba(255,230,160,0.8)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, largo - r);
+        ctx.stroke();
+        ctx.fillStyle = "#d4af37";
+        ctx.fillRect(x - r * 0.3, largo - r - r * 0.32, r * 0.6, r * 0.36);
+        esfera(ctx, x, largo, r, claro, oscuro);
+    }
+
+    function ancla(ctx, x, y, s, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(s, s);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.arc(0, -46, 9, 0, Math.PI * 2);
+        ctx.moveTo(0, -37);
+        ctx.lineTo(0, 44);
+        ctx.moveTo(-22, -24);
+        ctx.lineTo(22, -24);
+        ctx.moveTo(-40, 12);
+        ctx.quadraticCurveTo(-34, 46, 0, 46);
+        ctx.quadraticCurveTo(34, 46, 40, 12);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-48, 20);
+        ctx.lineTo(-40, 6);
+        ctx.lineTo(-30, 20);
+        ctx.moveTo(48, 20);
+        ctx.lineTo(40, 6);
+        ctx.lineTo(30, 20);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function timon(ctx, x, y, r, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.strokeStyle = color;
+        ctx.lineCap = "round";
+        ctx.lineWidth = r * 0.1;
+        for (let i = 0; i < 8; i++) {
+            const a = (i * Math.PI) / 4;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2);
+            ctx.lineTo(Math.cos(a) * r * 1.22, Math.sin(a) * r * 1.22);
+            ctx.stroke();
+            circulo(ctx, Math.cos(a) * r * 1.26, Math.sin(a) * r * 1.26, r * 0.1, color);
+        }
+        circulo(ctx, 0, 0, r * 0.82, null, color, r * 0.14);
+        circulo(ctx, 0, 0, r * 0.22, color);
+        ctx.restore();
+    }
+
+    function concha(ctx, x, y, r, espejo) {
+        ctx.save();
+        ctx.translate(x, y);
+        if (espejo) ctx.scale(-1, 1);
+        const n = 7;
+        const puntas = [];
+        for (let i = 0; i <= n; i++) {
+            const a = Math.PI + (i / n) * Math.PI;
+            puntas.push([Math.cos(a) * r, Math.sin(a) * r * 0.9]);
+        }
+        ctx.beginPath();
+        ctx.moveTo(0, r * 0.3);
+        ctx.lineTo(...puntas[0]);
+        for (let i = 1; i <= n; i++) {
+            const [ax, ay] = puntas[i - 1];
+            const [bx, by] = puntas[i];
+            const mx = (ax + bx) / 2;
+            const my = (ay + by) / 2;
+            ctx.quadraticCurveTo(mx * 1.12, my * 1.12, bx, by);
+        }
+        ctx.closePath();
+        ctx.fillStyle = degradado(ctx, 0, -r, 0, r * 0.3, ["#fff1ea", "#f7c9b6"]);
+        ctx.fill();
+        ctx.strokeStyle = "#d99a85";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        for (let i = 1; i < n; i++) {
+            ctx.moveTo(0, r * 0.3);
+            ctx.lineTo(puntas[i][0] * 0.92, puntas[i][1] * 0.92);
+        }
+        ctx.stroke();
+        ctx.fillStyle = "#f3b9a3";
+        ctx.fillRect(-r * 0.18, r * 0.22, r * 0.36, r * 0.18);
+        esfera(ctx, 0, r * 0.22, r * 0.24, "#f6f3ff", "#b9c4d6");
+        ctx.restore();
+    }
+
+    /** Collar de perlas que cuelga entre dos puntos (catenaria aproximada). */
+    function collarPerlas(ctx, x0, y0, x1, y1, caida, r) {
+        const largo = Math.hypot(x1 - x0, y1 - y0);
+        const n = Math.max(2, Math.round(largo / (r * 2.3)));
+        for (let i = 0; i <= n; i++) {
+            const t = i / n;
+            const x = x0 + (x1 - x0) * t;
+            const y = y0 + (y1 - y0) * t + Math.sin(Math.PI * t) * caida;
+            esfera(ctx, x, y, r, "#fbf8ff", "#aeb9cc");
+        }
+    }
+
+    function circuito(ctx, x0, y0, dir, largo, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.lineJoin = "round";
+        const x1 = x0 + dir * 30;
+        const x2 = x1 + dir * 26;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y0);
+        ctx.lineTo(x2, y0 + 26);
+        ctx.lineTo(x2, y0 + 26 + largo);
+        ctx.stroke();
+        circulo(ctx, x2, y0 + 26 + largo + 8, 8, null, color, 4);
+        circulo(ctx, x0, y0, 5, color);
+    }
+
+    function esquinaHud(ctx, x, y, dx, dy, largo, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.lineCap = "square";
+        ctx.beginPath();
+        ctx.moveTo(x, y + dy * largo);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + dx * largo, y);
+        ctx.stroke();
+    }
+
+    function abanicoDeco(ctx, x, y, dx, dy, r, color) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        for (let k = 1; k <= 3; k++) {
+            ctx.beginPath();
+            ctx.arc(x, y, (r * k) / 3, dx > 0 ? (dy > 0 ? 0 : -Math.PI / 2) : dy > 0 ? Math.PI / 2 : Math.PI, dx > 0 ? (dy > 0 ? Math.PI / 2 : 0) : dy > 0 ? Math.PI : Math.PI * 1.5);
+            ctx.stroke();
+        }
+        for (let i = 0; i <= 6; i++) {
+            const a = (i / 6) * (Math.PI / 2);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + dx * Math.cos(a) * r, y + dy * Math.sin(a) * r);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    const oro = (ctx, y0, y1) => degradado(ctx, 0, y0, 0, y1, ["#8a6417", "#f7e08a", "#d4a73a", "#fff3c2", "#9c7420"]);
+
+    /* ---------- Diseños prediseñados ---------- */
+
+    /**
+     * Cada diseño trae su fondo y su estilo de textos y casillas. El organizador puede cambiar cualquier texto,
+     * color o tipografía encima del diseño. «sencillo» es el cartón blanco de siempre y «arte» usa la imagen subida.
+     */
+    const ESTILO_BASE = {
+        titulo: { fuente: "montserrat", color: TINTA, tam: 1 },
+        subtitulo: { fuente: "montserrat", color: TINTA, tam: 1 },
+        letras: { fuente: "montserrat", color: TINTA, tam: 1 },
+        numeros: { fuente: "montserrat", color: TINTA, tam: 1 },
+        casillas: { fondo: "#ffffff", borde: TINTA },
+        pie: { fuente: "montserrat", color: TINTA }
+    };
+
+    const TEMAS = {
+        sencillo: {
+            nombre: "Sencillo",
+            detalle: "Blanco con borde",
+            fondo(ctx) {
+                ctx.strokeStyle = TINTA;
+                ctx.lineWidth = 6;
+                ctx.strokeRect(24, 24, G.W - 48, G.H - 48);
+            }
+        },
+        clasico: {
+            nombre: "Clásico",
+            detalle: "Rojo con BINGO en blanco",
+            estilo: {
+                titulo: { fuente: "anton", color: "#ffffff", tam: 1.3 },
+                subtitulo: { fuente: "montserrat", color: "#ffe1e1" },
+                letras: { fuente: "anton", color: "#ffffff" },
+                numeros: { fuente: "montserrat", color: "#16182a" },
+                casillas: { fondo: "#ffffff", borde: "#8c0b17" },
+                pie: { fuente: "montserrat", color: "#16182a" }
+            },
+            sombra: { color: "rgba(0,0,0,0.3)", blur: 6, dy: 4 },
+            fondo(ctx) {
+                fondoLiso(ctx, ["#e3242f", "#c8102e", "#a10c1e"]);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 10;
+                ctx.strokeRect(26, 26, G.W - 52, G.H - 52);
+                ctx.lineWidth = 3;
+                ctx.strokeRect(46, 46, G.W - 92, G.H - 92);
+                /* focos de marquesina alrededor */
+                const paso = 56;
+                for (let x = 60; x <= G.W - 60; x += paso) {
+                    circulo(ctx, x, 36, 6, "#fff6c9");
+                    circulo(ctx, x, G.H - 36, 6, "#fff6c9");
+                }
+                for (let y = 92; y <= G.H - 92; y += paso) {
+                    circulo(ctx, 36, y, 6, "#fff6c9");
+                    circulo(ctx, G.W - 36, y, 6, "#fff6c9");
+                }
+                /* franja oscura detrás de las letras */
+                const l = G.letras;
+                ctx.fillStyle = "rgba(0,0,0,0.18)";
+                ctx.fillRect(l.x, l.y, l.w, l.h);
+            }
+        },
+        chinopc: {
+            nombre: "ChinoPCMaster",
+            detalle: "Negro y cian, estilo tecnológico",
+            estilo: {
+                titulo: { fuente: "orbitron", color: "#00e5ff", tam: 1.3 },
+                subtitulo: { fuente: "inter", color: "#cfd8e3" },
+                letras: { fuente: "orbitron", color: "#ffffff" },
+                numeros: { fuente: "orbitron", color: "#0b0f17" },
+                casillas: { fondo: "#f2fdff", borde: "#00a9bd" },
+                pie: { fuente: "orbitron", color: "#0b0f17" }
+            },
+            sombra: { color: "rgba(0,229,255,0.75)", blur: 22, dy: 0 },
+            margenTitulo: 70,
+            fondo(ctx) {
+                fondoLiso(ctx, ["#0d1118", "#101722", "#0a0d13"]);
+                ctx.strokeStyle = "rgba(0,229,255,0.06)";
+                ctx.lineWidth = 1;
+                for (let x = 0; x <= G.W; x += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, G.H);
+                    ctx.stroke();
+                }
+                for (let y = 0; y <= G.H; y += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(G.W, y);
+                    ctx.stroke();
+                }
+                ctx.save();
+                ctx.shadowColor = "#00e5ff";
+                ctx.shadowBlur = 14;
+                const az = azarFijo(2024);
+                for (let y = 540; y < 1400; y += 150) {
+                    circuito(ctx, 10, y + az(0, 30), 1, az(40, 80), "rgba(0,229,255,0.75)");
+                    circuito(ctx, G.W - 10, y + 70 + az(0, 30), -1, az(40, 80), "rgba(0,229,255,0.75)");
+                }
+                const c = "#00e5ff";
+                esquinaHud(ctx, 34, 34, 1, 1, 90, c);
+                esquinaHud(ctx, G.W - 34, 34, -1, 1, 90, c);
+                esquinaHud(ctx, 34, G.H - 34, 1, -1, 90, c);
+                esquinaHud(ctx, G.W - 34, G.H - 34, -1, -1, 90, c);
+                ctx.restore();
+                /* línea bajo el título */
+                ctx.fillStyle = degradado(ctx, 200, 0, G.W - 200, 0, ["rgba(0,229,255,0)", "#00e5ff", "rgba(0,229,255,0)"]);
+                ctx.fillRect(200, 372, G.W - 400, 4);
+            },
+            letraFondo(ctx, cx, cy) {
+                ctx.save();
+                ctx.strokeStyle = "#00e5ff";
+                ctx.fillStyle = "rgba(0,229,255,0.12)";
+                ctx.lineWidth = 4;
+                ctx.shadowColor = "#00e5ff";
+                ctx.shadowBlur = 12;
+                const w = 150;
+                const h = 96;
+                ctx.beginPath();
+                ctx.moveTo(cx - w / 2 + 18, cy - h / 2);
+                ctx.lineTo(cx + w / 2, cy - h / 2);
+                ctx.lineTo(cx + w / 2, cy + h / 2 - 18);
+                ctx.lineTo(cx + w / 2 - 18, cy + h / 2);
+                ctx.lineTo(cx - w / 2, cy + h / 2);
+                ctx.lineTo(cx - w / 2, cy - h / 2 + 18);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        },
+        ocean: {
+            nombre: "Ocean",
+            detalle: "Turquesa con perlas, ancla y timón",
+            estilo: {
+                titulo: { fuente: "righteous", color: "#ffffff", tam: 1.3 },
+                subtitulo: { fuente: "nunito", color: "#e3fbff" },
+                letras: { fuente: "righteous", color: "#ffffff" },
+                numeros: { fuente: "nunito", color: "#063848" },
+                casillas: { fondo: "#ffffff", borde: "#0a6e8a" },
+                pie: { fuente: "nunito", color: "#063848" }
+            },
+            sombra: { color: "rgba(0,40,60,0.35)", blur: 8, dy: 4 },
+            margenTitulo: 170,
+            fondo(ctx) {
+                fondoLiso(ctx, ["#2fd3d0", "#13b0bd", "#0b86a0", "#095c79"]);
+                /* rayos de luz */
+                ctx.save();
+                ctx.globalAlpha = 0.1;
+                ctx.fillStyle = "#ffffff";
+                [[180, 300], [520, 260], [880, 320]].forEach(([x, w]) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x + w * 0.4, 0);
+                    ctx.lineTo(x + w * 1.4, G.H);
+                    ctx.lineTo(x + w * 0.6, G.H);
+                    ctx.closePath();
+                    ctx.fill();
+                });
+                ctx.restore();
+                /* burbujas */
+                const az = azarFijo(77);
+                for (let i = 0; i < 26; i++) {
+                    const lado = i % 2 ? LADOS.izq : LADOS.der;
+                    circulo(ctx, lado + az(-40, 40), az(520, 1460), az(5, 16), "rgba(255,255,255,0.12)", "rgba(255,255,255,0.55)", 2);
+                }
+                /* perlas: collar arriba y hilos a los lados */
+                collarPerlas(ctx, 20, 26, G.W - 20, 26, 46, 11);
+                collarPerlas(ctx, LADOS.izq, 520, LADOS.izq + 6, 1440, 0, 9);
+                collarPerlas(ctx, LADOS.der, 520, LADOS.der - 6, 1440, 0, 9);
+                concha(ctx, 120, 230, 78);
+                concha(ctx, G.W - 120, 230, 78, true);
+                ancla(ctx, 62, 1570, 0.95, "rgba(255,255,255,0.9)");
+                timon(ctx, G.W - 64, 1568, 40, "rgba(255,255,255,0.9)");
+                /* olas al pie */
+                ctx.fillStyle = "rgba(255,255,255,0.18)";
+                ctx.beginPath();
+                ctx.moveTo(0, G.H);
+                for (let x = 0; x <= G.W; x += 20) ctx.lineTo(x, G.H - 28 + Math.sin(x / 40) * 8);
+                ctx.lineTo(G.W, G.H);
+                ctx.closePath();
+                ctx.fill();
+            },
+            letraFondo(ctx, cx, cy) {
+                circulo(ctx, cx, cy, 52, "rgba(6,56,72,0.35)", "rgba(255,255,255,0.85)", 4);
+            }
+        },
+        gold: {
+            nombre: "Gold",
+            detalle: "Negro elegante con dorado",
+            estilo: {
+                titulo: { fuente: "cinzel", color: "#e6c463", tam: 1.3 },
+                subtitulo: { fuente: "cinzel", color: "#e9dcae" },
+                letras: { fuente: "cinzel", color: "#e6c463" },
+                numeros: { fuente: "cinzel", color: "#2b2210" },
+                casillas: { fondo: "#fffaf0", borde: "#b8902f" },
+                pie: { fuente: "cinzel", color: "#2b2210" }
+            },
+            oro: true,
+            sombra: { color: "rgba(0,0,0,0.6)", blur: 8, dy: 3 },
+            margenTitulo: 110,
+            fondo(ctx) {
+                const g = ctx.createRadialGradient(G.W / 2, G.H * 0.35, 80, G.W / 2, G.H / 2, G.H * 0.75);
+                g.addColorStop(0, "#2a2216");
+                g.addColorStop(1, "#0b0906");
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, G.W, G.H);
+                /* rayos art déco detrás del título */
+                ctx.save();
+                ctx.globalAlpha = 0.09;
+                ctx.fillStyle = "#e6c463";
+                for (let i = 0; i < 18; i++) {
+                    const a = Math.PI + (i / 17) * Math.PI;
+                    ctx.beginPath();
+                    ctx.moveTo(G.W / 2, 400);
+                    ctx.lineTo(G.W / 2 + Math.cos(a - 0.03) * 900, 400 + Math.sin(a - 0.03) * 900);
+                    ctx.lineTo(G.W / 2 + Math.cos(a + 0.03) * 900, 400 + Math.sin(a + 0.03) * 900);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+                ctx.strokeStyle = oro(ctx, 0, G.H);
+                ctx.lineWidth = 12;
+                ctx.strokeRect(28, 28, G.W - 56, G.H - 56);
+                ctx.lineWidth = 3;
+                ctx.strokeRect(50, 50, G.W - 100, G.H - 100);
+                const c = "#d4a73a";
+                abanicoDeco(ctx, 50, 50, 1, 1, 90, c);
+                abanicoDeco(ctx, G.W - 50, 50, -1, 1, 90, c);
+                abanicoDeco(ctx, 50, G.H - 50, 1, -1, 90, c);
+                abanicoDeco(ctx, G.W - 50, G.H - 50, -1, -1, 90, c);
+                /* rombos y filetes */
+                ctx.fillStyle = oro(ctx, 360, 390);
+                [[G.W / 2, 376]].forEach(([x, y]) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - 12);
+                    ctx.lineTo(x + 12, y);
+                    ctx.lineTo(x, y + 12);
+                    ctx.lineTo(x - 12, y);
+                    ctx.closePath();
+                    ctx.fill();
+                });
+                ctx.fillRect(250, 374, 320, 3);
+                ctx.fillRect(G.W - 570, 374, 320, 3);
+                const cz = G.casillas;
+                ctx.strokeStyle = oro(ctx, cz.y, cz.y + cz.celda * 5);
+                ctx.lineWidth = 6;
+                ctx.strokeRect(cz.x - 12, cz.y - 12, cz.celda * 5 + 24, cz.celda * 5 + 24);
+            }
+        },
+        navidad: {
+            nombre: "Navidad",
+            detalle: "Árboles, esferas y nieve",
+            estilo: {
+                titulo: { fuente: "navidad", color: "#ffffff", tam: 1.3 },
+                subtitulo: { fuente: "montserrat", color: "#ffe9a8" },
+                letras: { fuente: "navidad", color: "#ffffff" },
+                numeros: { fuente: "montserrat", color: "#0f3d26" },
+                casillas: { fondo: "#ffffff", borde: "#b3121f" },
+                pie: { fuente: "montserrat", color: "#0f3d26" }
+            },
+            sombra: { color: "rgba(0,0,0,0.4)", blur: 8, dy: 4 },
+            margenTitulo: 190,
+            fondo(ctx) {
+                fondoLiso(ctx, ["#14603b", "#0f4d30", "#0a3a24"]);
+                /* borde de bastón de caramelo */
+                ctx.lineWidth = 16;
+                ctx.strokeStyle = "#ffffff";
+                ctx.strokeRect(16, 16, G.W - 32, G.H - 32);
+                ctx.setLineDash([28, 28]);
+                ctx.strokeStyle = "#d61f2c";
+                ctx.strokeRect(16, 16, G.W - 32, G.H - 32);
+                ctx.setLineDash([]);
+                const az = azarFijo(1225);
+                for (let i = 0; i < 40; i++) {
+                    const x = i < 14 ? az(40, G.W - 40) : i % 2 ? az(30, 110) : az(G.W - 110, G.W - 30);
+                    const y = i < 14 ? az(40, 380) : az(520, 1640);
+                    copo(ctx, x, y, az(7, 16), "rgba(255,255,255,0.55)");
+                }
+                [[70, 150, 30, "#ff6b6b", "#a1101c"], [150, 230, 26, "#ffe27a", "#c48a00"], [G.W - 150, 230, 26, "#8fd3ff", "#1d6fb8"], [G.W - 70, 150, 30, "#ff6b6b", "#a1101c"]].forEach(
+                    ([x, largo, r, a, b]) => esferaColgante(ctx, x, largo, r, a, b));
+                arbolNavidad(ctx, LADOS.izq, 700, 104, 170);
+                arbolNavidad(ctx, LADOS.der, 960, 104, 170);
+                arbolNavidad(ctx, LADOS.izq, 1220, 104, 170);
+                /* nieve al pie */
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.moveTo(0, G.H);
+                ctx.lineTo(0, G.H - 40);
+                for (let x = 0; x <= G.W; x += 60) ctx.quadraticCurveTo(x + 30, G.H - 58, x + 60, G.H - 40);
+                ctx.lineTo(G.W, G.H);
+                ctx.closePath();
+                ctx.fill();
+            },
+            letraFondo(ctx, cx, cy, i) {
+                const colores = [["#ff6b6b", "#a1101c"], ["#6fc3ff", "#1b5aa6"], ["#ff6b6b", "#a1101c"], ["#6fc3ff", "#1b5aa6"], ["#ff6b6b", "#a1101c"]][i];
+                ctx.fillStyle = "#d4af37";
+                ctx.fillRect(cx - 13, cy - 64, 26, 14);
+                esfera(ctx, cx, cy, 54, colores[0], colores[1]);
+            }
+        },
+        halloween: {
+            nombre: "Halloween",
+            detalle: "Calabazas, murciélagos y luna",
+            estilo: {
+                titulo: { fuente: "creepster", color: "#ff7a1a", tam: 1.3 },
+                subtitulo: { fuente: "montserrat", color: "#e8d6ff" },
+                letras: { fuente: "creepster", color: "#2b0d00" },
+                numeros: { fuente: "montserrat", color: "#1c0b2e" },
+                casillas: { fondo: "#fff6ea", borde: "#ff7a1a" },
+                pie: { fuente: "montserrat", color: "#1c0b2e" }
+            },
+            sombra: { color: "rgba(0,0,0,0.7)", blur: 10, dy: 4 },
+            margenTitulo: 200,
+            fondo(ctx) {
+                fondoLiso(ctx, ["#2b0f4a", "#1f0b35", "#120720"]);
+                /* luna */
+                ctx.save();
+                ctx.shadowColor = "#ffcf6b";
+                ctx.shadowBlur = 60;
+                circulo(ctx, G.W - 130, 150, 82, "#ffd98a");
+                ctx.restore();
+                circulo(ctx, G.W - 150, 130, 14, "rgba(200,150,60,0.35)");
+                circulo(ctx, G.W - 105, 175, 10, "rgba(200,150,60,0.35)");
+                murcielago(ctx, G.W - 250, 90, 1.4, "#0a0410");
+                murcielago(ctx, G.W - 60, 290, 1, "#0a0410");
+                murcielago(ctx, 270, 70, 1.1, "#0a0410");
+                telarana(ctx, 0, 0, 220, 1, 1, "rgba(255,255,255,0.4)");
+                ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(120, 60);
+                ctx.lineTo(120, 260);
+                ctx.stroke();
+                circulo(ctx, 120, 270, 13, "#0a0410");
+                const az = azarFijo(1031);
+                for (let i = 0; i < 18; i++) circulo(ctx, az(20, G.W - 20), az(20, 380), az(1.5, 3), "rgba(255,255,255,0.6)");
+                calabaza(ctx, LADOS.izq, 720, 104, 92, true);
+                calabaza(ctx, LADOS.der, 1000, 104, 92, true);
+                calabaza(ctx, LADOS.izq, 1280, 104, 92, true);
+                murcielago(ctx, LADOS.der, 640, 1, "#0a0410");
+                murcielago(ctx, LADOS.izq, 980, 0.9, "#0a0410");
+                murcielago(ctx, LADOS.der, 1320, 1, "#0a0410");
+                calabaza(ctx, 62, 1585, 100, 88, true);
+                calabaza(ctx, G.W - 62, 1585, 100, 88, true);
+            },
+            letraFondo(ctx, cx, cy) {
+                calabaza(ctx, cx, cy + 6, 150, 104, false);
+            }
+        },
+        pascua: {
+            nombre: "Pascua",
+            detalle: "Conejos y huevos de pascua",
+            estilo: {
+                titulo: { fuente: "fredoka", color: "#7a46b8", tam: 1.3 },
+                subtitulo: { fuente: "fredoka", color: "#5d74a3" },
+                letras: { fuente: "fredoka", color: "#4a2f73" },
+                numeros: { fuente: "fredoka", color: "#4a2f73" },
+                casillas: { fondo: "#ffffff", borde: "#b493e0" },
+                pie: { fuente: "fredoka", color: "#4a2f73" }
+            },
+            sombra: { color: "rgba(122,70,184,0.25)", blur: 6, dy: 3 },
+            margenTitulo: 200,
+            fondo(ctx) {
+                fondoLiso(ctx, ["#fdeeff", "#eaf5ff", "#eafff1"]);
+                const az = azarFijo(4040);
+                for (let i = 0; i < 70; i++) {
+                    const [c] = PASTELES[i % PASTELES.length];
+                    circulo(ctx, az(10, G.W - 10), az(10, G.H - 10), az(4, 10), c);
+                }
+                ctx.strokeStyle = "#d6c2f2";
+                ctx.lineWidth = 8;
+                ctx.setLineDash([2, 18]);
+                ctx.lineCap = "round";
+                ctx.strokeRect(24, 24, G.W - 48, G.H - 48);
+                ctx.setLineDash([]);
+                conejo(ctx, 125, 300, 1.35);
+                conejo(ctx, G.W - 125, 300, 1.35, true);
+                [620, 830, 1040, 1250].forEach((y, k) => {
+                    huevo(ctx, LADOS.izq, y, 74, 98, k, -0.15);
+                    huevo(ctx, LADOS.der, y + 100, 74, 98, k + 2, 0.15);
+                });
+                /* pasto con huevos al pie */
+                ctx.fillStyle = "#8fd694";
+                ctx.beginPath();
+                ctx.moveTo(0, G.H);
+                for (let x = 0; x <= G.W; x += 16) ctx.lineTo(x, G.H - (x % 32 ? 26 : 44));
+                ctx.lineTo(G.W, G.H);
+                ctx.closePath();
+                ctx.fill();
+                huevo(ctx, 50, 1600, 64, 84, 0, -0.3);
+                huevo(ctx, 92, 1620, 56, 72, 3, 0.25);
+                huevo(ctx, G.W - 50, 1600, 64, 84, 1, 0.3);
+                huevo(ctx, G.W - 92, 1620, 56, 72, 4, -0.25);
+            },
+            letraFondo(ctx, cx, cy, i) {
+                huevo(ctx, cx, cy, 96, 112, i + 1, 0);
+                caminoHuevo(ctx, cx, cy - 2, 62, 74);
+                ctx.fillStyle = "rgba(255,255,255,0.82)";
+                ctx.fill();
+            }
+        }
+    };
+
+    const ORDEN_TEMAS = ["sencillo", "clasico", "chinopc", "ocean", "gold", "navidad", "halloween", "pascua"];
+
+    const colorValido = (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
+
+    /**
+     * Diseño guardado (JSON o texto) → estilo completo listo para dibujar.
+     * d = { tema, titulo: { texto, mostrar, fuente, color, tam }, subtitulo: {…}, letras: { fuente, color, tam },
+     *       numeros: {…}, casillas: { fondo, borde }, pie: { fuente, color } }; lo vacío toma lo del diseño.
+     */
+    function resolverDiseno(entrada, hayArte) {
+        let d = entrada;
+        if (typeof d === "string") {
+            try {
+                d = d ? JSON.parse(d) : {};
+            } catch (e) {
+                d = {};
+            }
+        }
+        if (!d || typeof d !== "object") d = {};
+        let tema = d.tema;
+        if (tema !== "arte" && !TEMAS[tema]) tema = hayArte ? "arte" : "sencillo";
+        if (tema === "arte" && !hayArte) tema = "sencillo";
+        const def = TEMAS[tema] || {};
+        const base = def.estilo || ESTILO_BASE;
+        const r = { tema, def };
+        Object.keys(ESTILO_BASE).forEach((k) => {
+            const b = { ...ESTILO_BASE[k], ...(base[k] || {}) };
+            const o = d[k] && typeof d[k] === "object" ? d[k] : {};
+            const x = { ...b, defecto: { ...b } };
+            if (o.fuente && FUENTES[o.fuente]) x.fuente = o.fuente;
+            ["color", "fondo", "borde"].forEach((c) => {
+                if (colorValido(o[c])) x[c] = o[c];
+            });
+            if (o.tam !== undefined && Number(o.tam) > 0) x.tam = Math.min(1.6, Math.max(0.5, Number(o.tam)));
+            if (k === "titulo" || k === "subtitulo") {
+                x.texto = typeof o.texto === "string" ? o.texto.slice(0, 80) : "";
+                /* Con arte propio el título viene en la imagen: solo se escribe si el organizador lo pide. */
+                x.mostrar = o.mostrar === undefined ? tema !== "arte" : o.mostrar !== false;
+            }
+            r[k] = x;
+        });
+        return r;
+    }
+
+    /** Tipografías que usa un diseño, en el formato de document.fonts.load(). */
+    function fuentesDiseno(entrada, hayArte) {
+        const d = resolverDiseno(entrada, hayArte);
+        const set = new Set(["titulo", "subtitulo", "letras", "numeros", "pie"].map((k) => {
+            const f = fuente(d[k].fuente);
+            return `${f.w} 40px ${f.css.split(",")[0]}`;
+        }));
+        return [...set];
+    }
+
+    /** Relleno del texto: el dorado del diseño Gold es un degradado mientras el color sea el del diseño. */
+    function rellenoTexto(ctx, D, x, y, size) {
+        if (D.def.oro && x.color.toLowerCase() === x.defecto.color.toLowerCase()) return oro(ctx, y - size / 2, y + size / 2);
+        return x.color;
     }
 
     function dibujarX(ctx, r, grosor) {
@@ -292,69 +1287,107 @@
         canvas.height = G.H;
         const familia = opts.familia || "'Montserrat', Arial, sans-serif";
         const grid = carton(opts.seed, opts.serie, opts.centroNumero);
+        const D = resolverDiseno(opts.diseno, Boolean(opts.arte));
+        const conTema = D.tema !== "arte" && D.tema !== "sencillo";
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, G.W, G.H);
 
-        if (opts.arte) {
-            ctx.drawImage(opts.arte, 0, 0, G.W, G.H);
-        } else {
-            ctx.strokeStyle = TINTA;
-            ctx.lineWidth = 6;
-            ctx.strokeRect(24, 24, G.W - 48, G.H - 48);
-        }
+        ctx.save();
+        if (D.tema === "arte" && opts.arte) ctx.drawImage(opts.arte, 0, 0, G.W, G.H);
+        else if (D.tema === "arte") TEMAS.sencillo.fondo(ctx);
+        else D.def.fondo(ctx);
+        ctx.restore();
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = TINTA;
-        if (!opts.arte) {
-            const t = G.titulo;
-            textoAjustado(ctx, String(opts.titulo || "BINGO"), t.x + t.w / 2, t.y + t.h * 0.42, t.w - 40, 96, 900, familia);
-            if (opts.subtitulo) {
-                textoAjustado(ctx, String(opts.subtitulo), t.x + t.w / 2, t.y + t.h * 0.78, t.w - 40, 48, 600, familia);
+        const conSombra = (fn) => {
+            ctx.save();
+            const s = D.def.sombra;
+            if (s) {
+                ctx.shadowColor = s.color;
+                ctx.shadowBlur = s.blur;
+                ctx.shadowOffsetY = s.dy || 0;
             }
+            fn();
+            ctx.restore();
+        };
+        /** Escribe un texto con su tipografía, color y tamaño; se achica si no cabe a lo ancho. */
+        const escribir = (x, texto, cx, cy, maxW, size, peso) => {
+            const f = fuente(x.fuente);
+            const s0 = Math.round(size * (x.tam || 1));
+            ctx.font = `${peso || f.w} ${s0}px ${f.css}`;
+            ctx.fillStyle = rellenoTexto(ctx, D, x, cy, s0);
+            return textoAjustado(ctx, texto, cx, cy, maxW, s0, peso || f.w, f.css);
+        };
+
+        const t = G.titulo;
+        const margen = D.def.margenTitulo || 20;
+        const titulo = D.titulo.texto || String(opts.titulo || "BINGO");
+        const subtitulo = D.subtitulo.texto || String(opts.subtitulo || "");
+        const haySub = D.subtitulo.mostrar && subtitulo;
+        if (D.titulo.mostrar) {
+            conSombra(() => escribir(D.titulo, titulo, t.x + t.w / 2, t.y + t.h * (haySub ? 0.42 : 0.5), t.w - margen * 2, 96));
         }
-        if (opts.letras !== false) {
+        if (haySub) {
+            conSombra(() => escribir(D.subtitulo, subtitulo, t.x + t.w / 2, t.y + t.h * (D.titulo.mostrar ? 0.78 : 0.5), t.w - margen * 2, 48, D.subtitulo.fuente === "montserrat" ? 600 : null));
+        }
+        /* Las letras B I N G O: con arte propio o en el cartón sencillo se pueden apagar; los diseños siempre las traen. */
+        if (conTema || opts.letras !== false) {
             const l = G.letras;
             const w = l.w / 5;
             LETRAS.forEach((letra, i) => {
-                ctx.fillStyle = TINTA;
-                ctx.font = `900 ${Math.round(l.h * 0.86)}px ${familia}`;
-                ctx.fillText(letra, l.x + w * i + w / 2, l.y + l.h / 2 + 4);
+                const cx = l.x + w * i + w / 2;
+                const cy = l.y + l.h / 2;
+                if (D.def.letraFondo) {
+                    ctx.save();
+                    D.def.letraFondo(ctx, cx, cy, i);
+                    ctx.restore();
+                }
+                const fondoPropio = Boolean(D.def.letraFondo);
+                const dibujar = () => escribir(D.letras, letra, cx, cy + 4, w - 20, Math.round(l.h * (fondoPropio ? 0.72 : 0.86)));
+                if (fondoPropio) dibujar();
+                else conSombra(dibujar);
             });
         }
 
         const resaltadas = new Set((opts.resaltar || []).map(([f, c]) => `${f},${c}`));
+        const fNum = fuente(D.numeros.fuente);
         for (let f = 0; f < 5; f++) {
             for (let c = 0; c < 5; c++) {
                 const r = celdaRect(f, c);
-                ctx.fillStyle = resaltadas.has(`${f},${c}`) ? "#fff2b3" : "#ffffff";
+                const resaltada = resaltadas.has(`${f},${c}`);
+                ctx.fillStyle = resaltada ? "#fff2b3" : D.casillas.fondo;
                 ctx.fillRect(r.x, r.y, r.w, r.h);
-                ctx.strokeStyle = TINTA;
+                ctx.strokeStyle = D.casillas.borde;
                 ctx.lineWidth = 3;
                 ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
                 const n = grid[f][c];
-                ctx.fillStyle = TINTA;
+                ctx.fillStyle = resaltada ? TINTA : D.numeros.color;
                 if (n === 0 && opts.centroImg) {
                     ctx.drawImage(opts.centroImg, r.x, r.y, r.w, r.h);
                     ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
                 } else if (n === 0) {
-                    ctx.font = `800 34px ${familia}`;
-                    ctx.fillText("LIBRE", r.x + r.w / 2, r.y + r.h / 2);
+                    textoAjustado(ctx, "LIBRE", r.x + r.w / 2, r.y + r.h / 2, r.w - 24, Math.round(34 * Math.min(1.3, D.numeros.tam || 1)), fNum.w, fNum.css);
                 } else {
-                    ctx.font = `800 92px ${familia}`;
-                    ctx.fillText(String(n), r.x + r.w / 2, r.y + r.h / 2 + 4);
+                    textoAjustado(ctx, String(n), r.x + r.w / 2, r.y + r.h / 2 + 4, r.w - 24, Math.round(92 * (D.numeros.tam || 1)), fNum.w, fNum.css);
                 }
                 if (opts.marcas && opts.marcas[f][c] && n !== 0) dibujarX(ctx, r);
             }
         }
 
+        const fPie = fuente(D.pie.fuente);
         [["serie", `Serie ${serieTexto(opts.serie)}`], ["codigo", `Código ${codigo(opts.seed, opts.serie)}`]].forEach(
             ([zona, texto]) => {
                 const z = G[zona];
                 ctx.fillStyle = "#ffffff";
                 ctx.fillRect(z.x, z.y, z.w, z.h);
-                ctx.fillStyle = TINTA;
-                textoAjustado(ctx, texto, z.x + z.w / 2, z.y + z.h / 2, z.w - 20, 46, 800, familia);
+                if (conTema) {
+                    ctx.strokeStyle = D.casillas.borde;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(z.x + 1.5, z.y + 1.5, z.w - 3, z.h - 3);
+                }
+                ctx.fillStyle = D.pie.color;
+                textoAjustado(ctx, texto, z.x + z.w / 2, z.y + z.h / 2, z.w - 20, 46, fPie.w, fPie.css);
             }
         );
         if (opts.qrTexto) dibujarQR(ctx, opts.qrTexto, G.qr);
@@ -506,6 +1539,12 @@
         casillasGanadoras,
         dibujarCarton,
         dibujarTemplate,
+        FUENTES,
+        FUENTES_URL,
+        TEMAS: Object.fromEntries(ORDEN_TEMAS.map((k) => [k, { nombre: TEMAS[k].nombre, detalle: TEMAS[k].detalle }])),
+        ORDEN_TEMAS,
+        resolverDiseno,
+        fuentesDiseno,
         casillaEn,
         disposicion
     };

@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-03T16:45:00-06:00",
+    "actualizado": "2026-11-04T11:06:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -40,6 +40,55 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-04-bingo-disenos-y-lote-presencial",
+            "fecha": "2026-11-04T11:06:00-06:00",
+            "producto": "bingo",
+            "titulo": "Bingo Digital: diseños listos para el cartón y lote presencial",
+            "resumen": "El organizador elige entre 7 diseños listos para sus cartones y cambia títulos, colores y tipografías sin crear imágenes. En bingos con modalidad presencial y virtual, además imprime aparte los cartones presenciales y un lote para vender el día del evento.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "En Cartones → «Diseño del cartón» hay 7 diseños listos que se eligen con un toque: Clásico (rojo con BINGO en blanco), ChinoPCMaster, Ocean (turquesa con perlas, ancla y timón), Gold (negro y dorado), Navidad, Halloween y Pascua. El cartón blanco de siempre sigue como «Sencillo» y el arte propio aparece como «Mi arte»."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "El menú «Textos, colores y tipografía» permite escribir el título y el subtítulo, elegir si se muestran, y cambiar tipografía, color y tamaño del título, el subtítulo, las letras B I N G O y los números, además del fondo y el borde de las casillas y la letra de la serie y el código. Hay 24 tipografías."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "La vista previa se actualiza mientras editas. El diseño se aplica al tocar «Guardar diseño»: desde ahí lo usan los cartones en pantalla, las imágenes, los PDF y los links de los jugadores."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Los bingos que ya tenían arte propio se ven igual que antes. Con «Volver a los colores y letras del diseño» se deshacen los cambios de estilo sin perder los textos escritos."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En Cartones, la tarjeta «Cartones presenciales» descarga el PDF de los presenciales ya vendidos y de los cartones adicionales para vender en el evento, y en ese momento aparta el lote."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Con el lote apartado, cada compra presencial toma un cartón libre del lote y cada compra virtual, uno de fuera. Se pueden agregar cartones al lote, volver a descargar sus PDF, bajar la lista de vendidos o quitar el lote."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Al pasar una compra de virtual a presencial o al revés con el lote apartado, la app ofrece cambiar sus cartones al grupo correcto. El enlace del jugador no cambia."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "El PDF de cartones del jugador pasó al final de la página, para no estorbar mientras juega, y viene en 1 cartón por hoja."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "«Imprimir cartones» del organizador viene en 2 cartones por hoja."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "El lote es solo para bingos con modalidad «Presencial y virtual». Los bloques de los sectores no entran en el lote: cada sector imprime el suyo."
+                }
+            ]
+        },
         {
             "id": "2026-11-03-bingo-reiniciar",
             "fecha": "2026-11-03T16:45:00-06:00",

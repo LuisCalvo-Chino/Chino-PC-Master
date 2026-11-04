@@ -180,6 +180,30 @@ details.bn-card summary { cursor: pointer; font-weight: 700; }
 .bn-design { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 22px; }
 .bn-design-text { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .bn-design-preview { display: flex; flex-direction: column; gap: 8px; align-items: center; position: sticky; top: 12px; align-self: start; }
+
+/* Diseños listos del cartón */
+.bn-temas { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.bn-tema {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 10px;
+    background: var(--bn-surface-2); border: 2px solid var(--bn-line); border-radius: 10px;
+    color: var(--bn-text); font: inherit; cursor: pointer; text-align: center; transition: border-color 0.15s, transform 0.15s;
+}
+.bn-tema:hover { border-color: var(--bn-muted); transform: translateY(-2px); }
+.bn-tema:focus-visible { outline: 2px solid var(--bn-accent); outline-offset: 2px; }
+.bn-tema.is-on { border-color: var(--bn-accent); box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2); }
+.bn-tema b { font-size: 0.86rem; }
+.bn-tema small { font-size: 0.72rem; color: var(--bn-muted); line-height: 1.25; }
+.bn-tema-mini { width: 100%; max-width: 96px; height: auto; aspect-ratio: 1200 / 1680; border-radius: 4px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+.bn-editor-box summary { font-size: 1rem; }
+.bn-editor { display: flex; flex-direction: column; gap: 12px; }
+.bn-editor-fila { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--bn-line); border-radius: 10px; min-width: 0; }
+.bn-editor-fila legend { padding: 0 6px; font-weight: 700; font-size: 0.9rem; }
+.bn-editor-controles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px 12px; align-items: end; }
+.bn-editor-texto { grid-column: 1 / -1; }
+.bn-editor-ver { align-self: center; }
+.bn-color { width: 100%; height: 40px; padding: 2px; border: 1px solid var(--bn-line); border-radius: 8px; background: var(--bn-surface); cursor: pointer; }
+.bn-range { width: 100%; accent-color: var(--bn-accent); }
+.bn-guardar-diseno { align-items: center; }
 .bn-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
 .bn-search-result { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .bn-sectors { display: flex; flex-direction: column; gap: 12px; }
@@ -270,7 +294,9 @@ details.bn-card summary { cursor: pointer; font-weight: 700; }
 .bn-chip--out { color: var(--bn-danger); border-color: var(--bn-danger); }
 .bn-chip--presencial { color: var(--bn-warn); border-color: var(--bn-warn); margin-top: 4px; }
 .bn-chip--virtual { color: var(--bn-accent); border-color: var(--bn-accent); margin-top: 4px; }
-.bn-player-pdf { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 4px 0 12px; }
+.bn-player-pdf { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.bn-player-pdf-card { margin-top: 16px; }
+.bn-lote { display: flex; flex-direction: column; gap: 12px; }
 .bn-player-pdf .bn-input { width: auto; }
 .bn-banner--ok { border-color: rgba(61, 220, 132, 0.6); background: rgba(61, 220, 132, 0.1); }
 .bn-card--alert { border-color: rgba(61, 220, 132, 0.6); }
