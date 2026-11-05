@@ -550,6 +550,20 @@
         return fn;
     }
 
+    /** Cartones por archivo PDF: un rango mayor se descarga en varios PDF. */
+    const PDF_POR_ARCHIVO = 500;
+
+    /** JPEG de un canvas como bytes, sin pasar por texto base64 (gasta un tercio menos de memoria). */
+    async function bytesJpeg(canvas, calidad) {
+        const blob = await new Promise((ok, mal) => canvas.toBlob((b) => (b ? ok(b) : mal(new Error("No se pudo preparar la imagen del cartón."))), "image/jpeg", calidad));
+        return new Uint8Array(await blob.arrayBuffer());
+    }
+
+    /**
+     * Arma el PDF guardando una sola vez todo lo que se repite: el fondo del cartón (diseño, título, letras) y cada
+     * número del 1 al 75 en su casilla. Por cartón solo se agrega la franja de serie, QR y código; así 500 cartones
+     * caben en un archivo sin agotar la memoria del navegador.
+     */
     async function generarPdf({ seed, pub, cfg, desde, hasta, series, porHoja, imagenes, progreso }) {
         await Promise.all([cargarScript(LIB_JSPDF), cargarScript(LIB_QR)]);
         const arte = await cargarImagen(imagenes && imagenes.dataUrl);
@@ -559,23 +573,67 @@
         const { jsPDF } = window.jspdf;
         const d = C.disposicion(porHoja);
         const pdf = new jsPDF({ orientation: d.orient, unit: "mm", format: "letter", compress: true });
-        const cv = document.createElement("canvas");
+        const G = C.GEOMETRIA;
         const escala = porHoja >= 4 ? 0.62 : 0.85;
-        const chico = document.createElement("canvas");
-        chico.width = Math.round(C.GEOMETRIA.W * escala);
-        chico.height = Math.round(C.GEOMETRIA.H * escala);
         const t = tituloCarton(cfg);
         const lista = series || Array.from({ length: hasta - desde + 1 }, (_, k) => desde + k);
+        const base = {
+            seed, arte, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras: cfg.letras_sistema !== false && cfg.letras_sistema !== "false",
+            centroNumero: conCentro, centroImg
+        };
+
+        /* El fondo: se dibuja una vez y el PDF lo guarda una vez (alias "fondo"), aunque aparezca en cada cartón. */
+        const fondo = document.createElement("canvas");
+        C.dibujarCarton(fondo, { ...base, serie: lista[0] });
+        const fondoChico = document.createElement("canvas");
+        fondoChico.width = Math.round(G.W * escala);
+        fondoChico.height = Math.round(G.H * escala);
+        fondoChico.getContext("2d").drawImage(fondo, 0, 0, fondoChico.width, fondoChico.height);
+        const fondoBytes = await bytesJpeg(fondoChico, 0.9);
+
+        /* Cada número en su casilla, preparado la primera vez que aparece (alias "n7", "n42"…). */
+        const casilla = document.createElement("canvas");
+        const listos = new Map();
+        const numero = async (n) => {
+            if (!listos.has(n)) {
+                C.dibujarCasilla(casilla, base, n, Math.round(G.casillas.celda * escala));
+                listos.set(n, await bytesJpeg(casilla, 0.9));
+            }
+            return listos.get(n);
+        };
+
+        /* La franja de serie, QR y código, recortada en píxeles enteros para que no se note la unión con el fondo. */
+        const zp = C.ZONA_PIE;
+        const x0 = Math.floor(zp.x * escala);
+        const y0 = Math.floor(zp.y * escala);
+        const pie = document.createElement("canvas");
+        pie.width = Math.ceil((zp.x + zp.w) * escala) - x0;
+        pie.height = Math.ceil((zp.y + zp.h) * escala) - y0;
+        const pieOrigen = { x: x0 / escala, y: y0 / escala, w: pie.width / escala, h: pie.height / escala };
+        const cv = document.createElement("canvas");
+        cv.width = G.W;
+        cv.height = G.H;
+        const ctx = cv.getContext("2d");
+
         for (let i = 0; i < lista.length; i++) {
             const s = lista[i];
             if (i > 0 && i % d.posiciones.length === 0) pdf.addPage("letter", d.orient);
-            C.dibujarCarton(cv, {
-                seed, serie: s, arte, titulo: t.titulo, subtitulo: t.subtitulo, diseno: t.diseno, letras: cfg.letras_sistema !== false && cfg.letras_sistema !== "false",
-                centroNumero: conCentro, centroImg, qrTexto: links.carton(pub, seed, s)
-            });
-            chico.getContext("2d").drawImage(cv, 0, 0, chico.width, chico.height);
             const p = d.posiciones[i % d.posiciones.length];
-            pdf.addImage(chico.toDataURL("image/jpeg", 0.88), "JPEG", p.x, p.y, p.w, p.h, undefined, "FAST");
+            const mm = (r) => [p.x + (r.x / G.W) * p.w, p.y + (r.y / G.H) * p.h, (r.w / G.W) * p.w, (r.h / G.H) * p.h];
+            pdf.addImage(fondoBytes, "JPEG", p.x, p.y, p.w, p.h, "fondo", "FAST");
+            const grid = C.carton(seed, s, conCentro);
+            for (let f = 0; f < 5; f++) {
+                for (let c = 0; c < 5; c++) {
+                    const n = grid[f][c];
+                    if (n === 0) continue; /* LIBRE o la imagen del centro ya vienen en el fondo */
+                    const r = { x: G.casillas.x + c * G.casillas.celda, y: G.casillas.y + f * G.casillas.celda, w: G.casillas.celda, h: G.casillas.celda };
+                    pdf.addImage(await numero(n), "JPEG", ...mm(r), `n${n}`, "FAST");
+                }
+            }
+            ctx.drawImage(fondo, 0, 0);
+            C.dibujarCarton(cv, { ...base, serie: s, soloDatos: true, qrTexto: links.carton(pub, seed, s) });
+            pie.getContext("2d").drawImage(cv, pieOrigen.x, pieOrigen.y, pieOrigen.w, pieOrigen.h, 0, 0, pie.width, pie.height);
+            pdf.addImage(await bytesJpeg(pie, 0.88), "JPEG", ...mm(pieOrigen), `p${i}`, "FAST");
             if (progreso && i % 5 === 0) {
                 progreso(i + 1, lista.length);
                 await new Promise((r) => window.setTimeout(r, 0));
@@ -586,9 +644,9 @@
 
     function panelImprimir({ seed, pub, cfg, min, max, obtenerArte, sugerido }) {
         const desde = input("bn-pdf-desde", sugerido ? sugerido[0] : min, { type: "number", min, max });
-        const hasta = input("bn-pdf-hasta", sugerido ? sugerido[1] : Math.min(max, min + 99), { type: "number", min, max });
+        const hasta = input("bn-pdf-hasta", sugerido ? sugerido[1] : Math.min(max, min + PDF_POR_ARCHIVO - 1), { type: "number", min, max });
         const porHoja = select("bn-pdf-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"], ["6", "6 por hoja"]], "2");
-        const estado = el("p", { class: "bn-note", text: "Hasta 100 cartones por archivo; un rango mayor se descarga en varios PDF." });
+        const estado = el("p", { class: "bn-note", text: `Hasta ${PDF_POR_ARCHIVO} cartones por archivo; un rango mayor se descarga en varios PDF.` });
         const btn = el("button", { class: "bn-btn bn-btn--primary", text: "Descargar PDF" });
         btn.addEventListener("click", () =>
             conBoton(btn, async () => {
@@ -596,8 +654,8 @@
                 const z = Math.min(max, Number(hasta.value) || a);
                 if (z < a) throw new Error("El rango no es válido.");
                 const imagenes = await obtenerArte();
-                for (let ini = a; ini <= z; ini += 100) {
-                    const fin = Math.min(z, ini + 99);
+                for (let ini = a; ini <= z; ini += PDF_POR_ARCHIVO) {
+                    const fin = Math.min(z, ini + PDF_POR_ARCHIVO - 1);
                     const blob = await generarPdf({
                         seed, pub, cfg, desde: ini, hasta: fin, porHoja: Number(porHoja.value), imagenes,
                         progreso: (n, total) => { estado.textContent = `Cartones ${ini}–${fin}: ${n} de ${total}…`; }
@@ -695,7 +753,7 @@
         const cards = el("div", { class: "bn-player-cards" });
         const ganadores = el("section", { class: "bn-card bn-winners", hidden: true });
 
-        /* PDF con todos los cartones del jugador (hasta 100 por archivo), armado en su propio navegador. */
+        /* PDF con todos los cartones del jugador (hasta 500 por archivo), armado en su propio navegador. */
         const porHojaPdf = select("bn-pdf-jugador-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"]], "1");
         const estadoPdf = el("small", { class: "bn-note" });
         const botonPdf = el("button", { class: "bn-btn bn-btn--primary", text: series.length === 1 ? "Descargar mi cartón en PDF" : `Descargar mis ${series.length} cartones en PDF` });
@@ -703,13 +761,13 @@
             conBoton(botonPdf, async () => {
                 const r = cfg.arte_url || cfg.centro_url ? await imagenes() : {};
                 const nombreArchivo = `cartones-${String(cfg.nombre || "bingo").toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "bingo"}`;
-                for (let k = 0; k < series.length; k += 100) {
-                    const parte = series.slice(k, k + 100);
+                for (let k = 0; k < series.length; k += PDF_POR_ARCHIVO) {
+                    const parte = series.slice(k, k + PDF_POR_ARCHIVO);
                     const blob = await generarPdf({
                         seed, pub: cfg.public_id, cfg, series: parte, porHoja: Number(porHojaPdf.value), imagenes: r,
                         progreso: (n, total) => { estadoPdf.textContent = `Preparando ${n} de ${total}…`; }
                     });
-                    descargarBlob(blob, series.length > 100 ? `${nombreArchivo}-${k / 100 + 1}.pdf` : `${nombreArchivo}.pdf`);
+                    descargarBlob(blob, series.length > PDF_POR_ARCHIVO ? `${nombreArchivo}-${k / PDF_POR_ARCHIVO + 1}.pdf` : `${nombreArchivo}.pdf`);
                 }
                 estadoPdf.textContent = "Listo: revisa tus descargas.";
             }, "Generando PDF…")
@@ -1910,13 +1968,13 @@
                     const series = seriesDe(lista);
                     if (!series.length) return;
                     const imgs = await imagenes();
-                    for (let k = 0; k < series.length; k += 100) {
-                        const parte = series.slice(k, k + 100);
+                    for (let k = 0; k < series.length; k += PDF_POR_ARCHIVO) {
+                        const parte = series.slice(k, k + PDF_POR_ARCHIVO);
                         const blob = await generarPdf({
                             seed, pub, cfg, series: parte, porHoja: Number(porHoja.value), imagenes: imgs,
                             progreso: (n, total) => { estado.textContent = `${base}: ${n} de ${total}…`; }
                         });
-                        descargarBlob(blob, series.length > 100 ? `${base}-${k / 100 + 1}.pdf` : `${base}.pdf`);
+                        descargarBlob(blob, series.length > PDF_POR_ARCHIVO ? `${base}-${k / PDF_POR_ARCHIVO + 1}.pdf` : `${base}.pdf`);
                     }
                     estado.textContent = "Listo: revise sus descargas.";
                 }

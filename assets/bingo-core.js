@@ -1276,6 +1276,42 @@
         }
     }
 
+    /** Una casilla con su número (0 = LIBRE o la imagen del centro), con los colores y la tipografía del diseño. */
+    function pintarCasilla(ctx, D, r, n, resaltada, centroImg) {
+        const fNum = fuente(D.numeros.fuente);
+        ctx.fillStyle = resaltada ? "#fff2b3" : D.casillas.fondo;
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = D.casillas.borde;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+        ctx.fillStyle = resaltada ? TINTA : D.numeros.color;
+        if (n === 0 && centroImg) {
+            ctx.drawImage(centroImg, r.x, r.y, r.w, r.h);
+            ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+        } else if (n === 0) {
+            textoAjustado(ctx, "LIBRE", r.x + r.w / 2, r.y + r.h / 2, r.w - 24, Math.round(34 * Math.min(1.3, D.numeros.tam || 1)), fNum.w, fNum.css);
+        } else {
+            textoAjustado(ctx, String(n), r.x + r.w / 2, r.y + r.h / 2 + 4, r.w - 24, Math.round(92 * (D.numeros.tam || 1)), fNum.w, fNum.css);
+        }
+    }
+
+    /**
+     * Una sola casilla con el número n, al tamaño que se pida (lado en px). Un número se ve igual en cualquier cartón y
+     * en cualquier casilla del mismo bingo, así que el PDF guarda cada número una sola vez y lo reutiliza.
+     */
+    function dibujarCasilla(canvas, opts, n, lado) {
+        const ctx = canvas.getContext("2d");
+        const celda = G.casillas.celda;
+        canvas.width = lado || celda;
+        canvas.height = lado || celda;
+        const k = canvas.width / celda;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        pintarCasilla(ctx, resolverDiseno(opts.diseno, Boolean(opts.arte)), { x: 0, y: 0, w: celda, h: celda }, n, false, null);
+        return canvas;
+    }
+
     /**
      * Dibuja un cartón completo en un canvas de 1200 × 1680.
      * opts: { seed, serie, arte (Image|null), titulo, subtitulo, letras (bool), marcas (grid bool|null),
@@ -1283,94 +1319,85 @@
      */
     function dibujarCarton(canvas, opts) {
         const ctx = canvas.getContext("2d");
-        canvas.width = G.W;
-        canvas.height = G.H;
+        /* soloDatos: el canvas ya trae el fondo de este diseño; solo se pintan las casillas, la serie, el código y el QR. */
+        const soloDatos = Boolean(opts.soloDatos);
+        if (!soloDatos) {
+            canvas.width = G.W;
+            canvas.height = G.H;
+        }
         const familia = opts.familia || "'Montserrat', Arial, sans-serif";
         const grid = carton(opts.seed, opts.serie, opts.centroNumero);
         const D = resolverDiseno(opts.diseno, Boolean(opts.arte));
         const conTema = D.tema !== "arte" && D.tema !== "sencillo";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, G.W, G.H);
-
-        ctx.save();
-        if (D.tema === "arte" && opts.arte) ctx.drawImage(opts.arte, 0, 0, G.W, G.H);
-        else if (D.tema === "arte") TEMAS.sencillo.fondo(ctx);
-        else D.def.fondo(ctx);
-        ctx.restore();
-
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const conSombra = (fn) => {
-            ctx.save();
-            const s = D.def.sombra;
-            if (s) {
-                ctx.shadowColor = s.color;
-                ctx.shadowBlur = s.blur;
-                ctx.shadowOffsetY = s.dy || 0;
-            }
-            fn();
-            ctx.restore();
-        };
-        /** Escribe un texto con su tipografía, color y tamaño; se achica si no cabe a lo ancho. */
-        const escribir = (x, texto, cx, cy, maxW, size, peso) => {
-            const f = fuente(x.fuente);
-            const s0 = Math.round(size * (x.tam || 1));
-            ctx.font = `${peso || f.w} ${s0}px ${f.css}`;
-            ctx.fillStyle = rellenoTexto(ctx, D, x, cy, s0);
-            return textoAjustado(ctx, texto, cx, cy, maxW, s0, peso || f.w, f.css);
-        };
+        if (!soloDatos) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, G.W, G.H);
 
-        const t = G.titulo;
-        const margen = D.def.margenTitulo || 20;
-        const titulo = D.titulo.texto || String(opts.titulo || "BINGO");
-        const subtitulo = D.subtitulo.texto || String(opts.subtitulo || "");
-        const haySub = D.subtitulo.mostrar && subtitulo;
-        if (D.titulo.mostrar) {
-            conSombra(() => escribir(D.titulo, titulo, t.x + t.w / 2, t.y + t.h * (haySub ? 0.42 : 0.5), t.w - margen * 2, 96));
-        }
-        if (haySub) {
-            conSombra(() => escribir(D.subtitulo, subtitulo, t.x + t.w / 2, t.y + t.h * (D.titulo.mostrar ? 0.78 : 0.5), t.w - margen * 2, 48, D.subtitulo.fuente === "montserrat" ? 600 : null));
-        }
-        /* Las letras B I N G O: con arte propio o en el cartón sencillo se pueden apagar; los diseños siempre las traen. */
-        if (conTema || opts.letras !== false) {
-            const l = G.letras;
-            const w = l.w / 5;
-            LETRAS.forEach((letra, i) => {
-                const cx = l.x + w * i + w / 2;
-                const cy = l.y + l.h / 2;
-                if (D.def.letraFondo) {
-                    ctx.save();
-                    D.def.letraFondo(ctx, cx, cy, i);
-                    ctx.restore();
+            ctx.save();
+            if (D.tema === "arte" && opts.arte) ctx.drawImage(opts.arte, 0, 0, G.W, G.H);
+            else if (D.tema === "arte") TEMAS.sencillo.fondo(ctx);
+            else D.def.fondo(ctx);
+            ctx.restore();
+
+            const conSombra = (fn) => {
+                ctx.save();
+                const s = D.def.sombra;
+                if (s) {
+                    ctx.shadowColor = s.color;
+                    ctx.shadowBlur = s.blur;
+                    ctx.shadowOffsetY = s.dy || 0;
                 }
-                const fondoPropio = Boolean(D.def.letraFondo);
-                const dibujar = () => escribir(D.letras, letra, cx, cy + 4, w - 20, Math.round(l.h * (fondoPropio ? 0.72 : 0.86)));
-                if (fondoPropio) dibujar();
-                else conSombra(dibujar);
-            });
+                fn();
+                ctx.restore();
+            };
+            /** Escribe un texto con su tipografía, color y tamaño; se achica si no cabe a lo ancho. */
+            const escribir = (x, texto, cx, cy, maxW, size, peso) => {
+                const f = fuente(x.fuente);
+                const s0 = Math.round(size * (x.tam || 1));
+                ctx.font = `${peso || f.w} ${s0}px ${f.css}`;
+                ctx.fillStyle = rellenoTexto(ctx, D, x, cy, s0);
+                return textoAjustado(ctx, texto, cx, cy, maxW, s0, peso || f.w, f.css);
+            };
+
+            const t = G.titulo;
+            const margen = D.def.margenTitulo || 20;
+            const titulo = D.titulo.texto || String(opts.titulo || "BINGO");
+            const subtitulo = D.subtitulo.texto || String(opts.subtitulo || "");
+            const haySub = D.subtitulo.mostrar && subtitulo;
+            if (D.titulo.mostrar) {
+                conSombra(() => escribir(D.titulo, titulo, t.x + t.w / 2, t.y + t.h * (haySub ? 0.42 : 0.5), t.w - margen * 2, 96));
+            }
+            if (haySub) {
+                conSombra(() => escribir(D.subtitulo, subtitulo, t.x + t.w / 2, t.y + t.h * (D.titulo.mostrar ? 0.78 : 0.5), t.w - margen * 2, 48, D.subtitulo.fuente === "montserrat" ? 600 : null));
+            }
+            /* Las letras B I N G O: con arte propio o en el cartón sencillo se pueden apagar; los diseños siempre las traen. */
+            if (conTema || opts.letras !== false) {
+                const l = G.letras;
+                const w = l.w / 5;
+                LETRAS.forEach((letra, i) => {
+                    const cx = l.x + w * i + w / 2;
+                    const cy = l.y + l.h / 2;
+                    if (D.def.letraFondo) {
+                        ctx.save();
+                        D.def.letraFondo(ctx, cx, cy, i);
+                        ctx.restore();
+                    }
+                    const fondoPropio = Boolean(D.def.letraFondo);
+                    const dibujar = () => escribir(D.letras, letra, cx, cy + 4, w - 20, Math.round(l.h * (fondoPropio ? 0.72 : 0.86)));
+                    if (fondoPropio) dibujar();
+                    else conSombra(dibujar);
+                });
+            }
         }
 
         const resaltadas = new Set((opts.resaltar || []).map(([f, c]) => `${f},${c}`));
-        const fNum = fuente(D.numeros.fuente);
         for (let f = 0; f < 5; f++) {
             for (let c = 0; c < 5; c++) {
                 const r = celdaRect(f, c);
-                const resaltada = resaltadas.has(`${f},${c}`);
-                ctx.fillStyle = resaltada ? "#fff2b3" : D.casillas.fondo;
-                ctx.fillRect(r.x, r.y, r.w, r.h);
-                ctx.strokeStyle = D.casillas.borde;
-                ctx.lineWidth = 3;
-                ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
                 const n = grid[f][c];
-                ctx.fillStyle = resaltada ? TINTA : D.numeros.color;
-                if (n === 0 && opts.centroImg) {
-                    ctx.drawImage(opts.centroImg, r.x, r.y, r.w, r.h);
-                    ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
-                } else if (n === 0) {
-                    textoAjustado(ctx, "LIBRE", r.x + r.w / 2, r.y + r.h / 2, r.w - 24, Math.round(34 * Math.min(1.3, D.numeros.tam || 1)), fNum.w, fNum.css);
-                } else {
-                    textoAjustado(ctx, String(n), r.x + r.w / 2, r.y + r.h / 2 + 4, r.w - 24, Math.round(92 * (D.numeros.tam || 1)), fNum.w, fNum.css);
-                }
+                pintarCasilla(ctx, D, r, n, resaltadas.has(`${f},${c}`), opts.centroImg);
                 if (opts.marcas && opts.marcas[f][c] && n !== 0) dibujarX(ctx, r);
             }
         }
@@ -1412,6 +1439,9 @@
         }
         return canvas;
     }
+
+    /** Franja que cambia en cada cartón (en px del canvas): serie, QR y código. */
+    const ZONA_PIE = { x: G.serie.x, y: G.qr.y, w: G.codigo.x + G.codigo.w - G.serie.x, h: G.qr.h };
 
     /** Template vacío: solo zonas delimitadas y medidas, sin imagen. */
     function dibujarTemplate(canvas, opciones) {
@@ -1523,6 +1553,8 @@
         MAX_CARTONES,
         LETRAS,
         GEOMETRIA: G,
+        ZONA_PIE,
+        dibujarCasilla,
         FIGURAS,
         ORDEN_FIGURAS,
         alternativasDe,

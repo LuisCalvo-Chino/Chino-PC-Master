@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-04T11:06:00-06:00",
+    "actualizado": "2026-11-04T23:21:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -42,10 +42,10 @@
     "parches": [
         {
             "id": "2026-11-04-bingo-disenos-y-lote-presencial",
-            "fecha": "2026-11-04T11:06:00-06:00",
+            "fecha": "2026-11-04T23:21:00-06:00",
             "producto": "bingo",
-            "titulo": "Bingo Digital: diseños listos para el cartón y lote presencial",
-            "resumen": "El organizador elige entre 7 diseños listos para sus cartones y cambia títulos, colores y tipografías sin crear imágenes. En bingos con modalidad presencial y virtual, además imprime aparte los cartones presenciales y un lote para vender el día del evento.",
+            "titulo": "Bingo Digital: diseños listos para el cartón, lote presencial y PDF de hasta 500 cartones",
+            "resumen": "El organizador elige entre 7 diseños listos para sus cartones y cambia títulos, colores y tipografías sin crear imágenes. En bingos con modalidad presencial y virtual, además imprime aparte los cartones presenciales y un lote para vender el día del evento. Los PDF para imprimir traen hasta 500 cartones en un solo archivo.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -62,6 +62,14 @@
                 {
                     "tipo": "nota",
                     "texto": "Los bingos que ya tenían arte propio se ven igual que antes. Con «Volver a los colores y letras del diseño» se deshacen los cambios de estilo sin perder los textos escritos."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Los PDF de cartones traen hasta 500 cartones por archivo (antes eran 100); un rango mayor se descarga en varios PDF. Aplica al PDF para imprimir del organizador, al de los cartones presenciales y al del jugador."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "El PDF guarda una sola vez el fondo del cartón y cada número, y por cartón solo agrega la serie, el código y el QR. Un PDF de 500 cartones pesa de 8 a 13 MB (antes, unos 98 MB), se arma en unos 5 segundos y la pestaña usa unos 110 a 140 MB de memoria (antes, unos 410 MB). En papel se ve igual."
                 },
                 {
                     "tipo": "nuevo",
