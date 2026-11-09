@@ -717,9 +717,20 @@
     function guardarHojas(lista) { lsSet(LS_HOJAS, lista); }
     function hojaActiva() {
         if (ruta.demo) return { id: "demo", nombre: "Spreadsheet de prueba", url: "demo", clave: window.OPVIVE_DEMO.clave() };
-        const lista = hojasGuardadas();
+        // Solo cuenta un spreadsheet con su contraseña guardada (sesión abierta).
+        const lista = hojasGuardadas().filter((h) => h.clave);
         const id = lsGet(LS_ACTIVA, "");
         return lista.filter((h) => h.id === id)[0] || lista[0] || null;
+    }
+    /** Cierra la sesión: olvida las contraseñas, conserva los /exec para volver a entrar. */
+    function cerrarSesion() {
+        guardarHojas(hojasGuardadas().map((h) => Object.assign({}, h, { clave: "" })));
+        lsDel(LS.clave);
+        adm.hoja = null;
+        adm.datos = null;
+        adm.datosDe = "";
+        adm.ed = null;
+        adm.sucio = false;
     }
     function activarHoja(h) {
         lsSet(LS_ACTIVA, h.id);
@@ -740,9 +751,13 @@
         const necesitaDep = !ruta.demo && dep && (!fija || depDesdeUrl(fija) !== dep);
         return base() + "#op_vive/" + (ruta.demo ? "demo/" : "") + encodeURIComponent(id) + (necesitaDep ? "/s/" + dep : "");
     }
-    function enlaceAdminDe(h) {
+    /** Link de Admin: por defecto pide contraseña; con conClave entra directo. */
+    function enlaceAdminDe(h, conClave) {
         if (ruta.demo) return base() + "#op_vive/demo/admin";
-        return base() + "#op_vive/admin/k/" + encodeURIComponent(h.clave) + "/s/" + depDesdeUrl(h.url);
+        const dep = depDesdeUrl(h.url);
+        const fija = depDesdeUrl(urlFija()) === dep;
+        if (conClave) return base() + "#op_vive/admin/k/" + encodeURIComponent(h.clave) + "/s/" + dep;
+        return base() + "#op_vive/admin" + (fija ? "" : "/s/" + dep);
     }
 
     function shellAdmin(vista, contenido) {
@@ -754,9 +769,20 @@
             '<nav class="opv-admnav" aria-label="Menú de administración"><div class="opv-admnav__in">' +
             tabs.map((t) => '<a href="' + hashAdmin(t[2]) + '"' +
                 (vista === t[0] || (vista === "evento" && t[0] === "eventos") ? ' aria-current="page"' : "") + ">" + t[1] + "</a>").join("") +
+            (ruta.demo ? "" : '<span class="opv-top__sp"></span><button type="button" class="opv-admnav__salir" data-cerrar-sesion>Cerrar sesión</button>') +
             "</div></nav>" +
             '<main class="opv-main">' + contenido + "</main>";
         enlazarDemo();
+        const salir = app.querySelector("[data-cerrar-sesion]");
+        if (salir) {
+            salir.onclick = async () => {
+                if (adm.sucio && !(await confirmar("Tienes cambios sin guardar en este evento. Si cierras sesión se pierden.", { ok: "Cerrar sesión", peligro: true }))) return;
+                cerrarSesion();
+                if (ruta.vista === "eventos") pintarCandado();
+                else location.hash = hashAdmin("");
+                toast("Sesión cerrada");
+            };
+        }
     }
 
     function campo(etq, k, valor, opc) {
@@ -789,8 +815,23 @@
             hashPrevio = location.hash;
         }
 
+        // Link de Admin sin contraseña (#op_vive/admin/s/<id>): recuerda a qué spreadsheet entrar y pide la contraseña.
+        if (ruta.dep && !ruta.clave && !ruta.demo) {
+            const lista = hojasGuardadas();
+            if (!lista.some((x) => depDesdeUrl(x.url) === ruta.dep)) {
+                lista.push({ id: "h" + Date.now().toString(36), nombre: "VIVE", url: urlDesdeDep(ruta.dep), clave: "" });
+                guardarHojas(lista);
+            }
+            lsSet(LS.conexion, urlDesdeDep(ruta.dep));
+            history.replaceState(null, "", hashAdmin(""));
+            ruta = leerRuta();
+            hashPrevio = location.hash;
+        }
+
         adm.hoja = hojaActiva();
         if (adm.datosDe && (!adm.hoja || adm.datosDe !== adm.hoja.id)) { adm.datos = null; adm.datosDe = ""; }
+        // Sin sesión abierta no se ve nada del Admin: primero la contraseña.
+        if (!ruta.demo && !adm.hoja) return pintarCandado();
         if (ruta.vista === "hojas") return pintarHojas();
         if (ruta.vista === "codigo") return pintarCodigo();
         if (!adm.hoja) return pintarSinHoja();
@@ -810,12 +851,101 @@
             adm.datosDe = adm.hoja.id;
         } catch (e) {
             if (ruta.modo !== "admin" || ruta.vista !== vista) return;
+            if (e.codigo === "clave" && !ruta.demo) {
+                cerrarSesion();
+                return pintarCandado("La contraseña cambió en el Google Sheets. Escribe la nueva para continuar.");
+            }
             if (!enCache) pintarSinHoja(e.message);
             else toast(e.message, "error");
             return;
         }
         if (vista === "evento") return pintarEditor(ruta.id);
         pintarEventos();
+    }
+
+    // ---------- contraseña ----------
+
+    /** Los /exec conocidos en este navegador (o fijo en conexion.js) contra los que se prueba la contraseña. */
+    function urlsCandidatas() {
+        const vistas = {};
+        const out = [];
+        [urlFija(), String(lsGet(LS.conexion, "") || "")].concat(hojasGuardadas().map((h) => h.url)).forEach((u) => {
+            const dep = depDesdeUrl(u);
+            if (dep && !vistas[dep]) { vistas[dep] = true; out.push(urlDesdeDep(dep)); }
+        });
+        return out;
+    }
+
+    function pintarCandado(error, pedirExec) {
+        document.title = "Acceso · Operaciones VIVE";
+        const candidatas = urlsCandidatas();
+        const conExec = pedirExec || !candidatas.length;
+        app.innerHTML = barraSuperior() +
+            '<main class="opv-main"><div class="opv-candado">' +
+            '<img src="' + LOGO + '" alt="VIVE">' +
+            '<span class="opv-chip">Operaciones · Admin</span>' +
+            "<h1>Acceso de administración</h1>" +
+            "<p>Escribe la contraseña para crear eventos, editar posiciones y ver inscritos.</p>" +
+            (error ? '<p class="opv-error" role="alert">' + esc(error) + "</p>" : "") +
+            '<form data-candado autocomplete="on">' +
+            '<input type="text" name="username" value="Operaciones VIVE" autocomplete="username" hidden>' +
+            (conExec
+                ? '<label class="opv-field"><span>Enlace /exec del Google Sheets</span><input class="opv-input" data-exec placeholder="https://script.google.com/macros/s/…/exec"><small>Solo la primera vez en este dispositivo.</small></label>'
+                : "") +
+            '<label class="opv-field"><span>Contraseña</span><input class="opv-input" type="password" data-pass autocomplete="current-password" required></label>' +
+            '<button type="submit" class="opv-btn opv-btn--primary opv-btn--block" data-entrar>Entrar</button></form>' +
+            '<p class="opv-hint" style="margin-top:14px">La contraseña es la <b>Clave de administración</b> de la hoja CONFIG del Google Sheets.' +
+            (conExec ? "" : ' <a href="#" data-otro-exec>¿Entrar a otro spreadsheet?</a>') + "</p>" +
+            '<p style="margin-top:18px"><a class="opv-btn opv-btn--ghost opv-btn--sm" href="#op_vive/demo/admin">Ver la demostración</a></p>' +
+            "</div></main>";
+        enlazarDemo();
+        const otro = app.querySelector("[data-otro-exec]");
+        if (otro) otro.onclick = (e) => { e.preventDefault(); pintarCandado("", true); };
+        const pass = app.querySelector("[data-pass]");
+        setTimeout(() => (app.querySelector("[data-exec]") || pass).focus(), 50);
+
+        app.querySelector("[data-candado]").onsubmit = async (e) => {
+            e.preventDefault();
+            const clave = pass.value.trim();
+            const inExec = app.querySelector("[data-exec]");
+            let urls = candidatas;
+            if (inExec) {
+                const dep = depDesdeUrl(inExec.value);
+                if (!dep) return toast("Ese enlace no parece un /exec de Apps Script.", "error");
+                urls = [urlDesdeDep(dep)];
+            }
+            if (!clave) return;
+            const btn = app.querySelector("[data-entrar]");
+            btn.disabled = true;
+            btn.textContent = "Verificando…";
+            let ultimo = null;
+            for (const url of urls) {
+                try {
+                    const r = await api({ action: "admin_entrar", clave }, url);
+                    const lista = hojasGuardadas();
+                    let h = lista.filter((x) => depDesdeUrl(x.url) === depDesdeUrl(url))[0];
+                    if (!h) { h = { id: "h" + Date.now().toString(36), nombre: "VIVE", url }; lista.push(h); }
+                    if (!h.nombre || h.nombre === "VIVE") h.nombre = r.spreadsheet.nombre || "VIVE";
+                    h.clave = clave;
+                    guardarHojas(lista);
+                    activarHoja(h);
+                    adm.datos = r;
+                    adm.datosDe = h.id;
+                    toast("Sesión iniciada", "ok");
+                    return vistaAdmin();
+                } catch (err) {
+                    ultimo = err;
+                    if (err.codigo === "bloqueado") break;
+                }
+            }
+            btn.disabled = false;
+            btn.textContent = "Entrar";
+            const msg = !ultimo ? "No se pudo verificar." : ultimo.codigo === "clave" ? "Contraseña incorrecta." : ultimo.message;
+            const prev = app.querySelector(".opv-candado .opv-error");
+            if (prev) prev.textContent = msg;
+            else app.querySelector("[data-candado]").insertAdjacentHTML("beforebegin", '<p class="opv-error" role="alert">' + esc(msg) + "</p>");
+            pass.select();
+        };
     }
 
     function pintarSinHoja(error) {
@@ -857,7 +987,8 @@
                     "<h3>" + esc(x.nombre) + '</h3><p class="opv-hint" style="overflow-wrap:anywhere">' + esc(x.url) + "</p></div></div>" +
                     '<div class="opv-ev__actions">' +
                     (activo ? "" : '<button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-usar="' + esc(x.id) + '">Usar este</button>') +
-                    '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-copiar="' + esc(enlaceAdminDe(x)) + '">' + ICON.copiar + "Copiar link de Admin</button>" +
+                    '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-copiar="' + esc(enlaceAdminDe(x)) + '" title="Al abrirlo pide la contraseña">' + ICON.copiar + "Copiar link de Admin</button>" +
+                    (x.clave ? '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-copiar="' + esc(enlaceAdminDe(x, true)) + '" title="Entra directo, sin pedir contraseña">' + ICON.copiar + "Con contraseña incluida</button>" : "") +
                     '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-editar-hoja="' + esc(x.id) + '">Editar</button>' +
                     '<button type="button" class="opv-btn opv-btn--danger opv-btn--sm" data-quitar-hoja="' + esc(x.id) + '">Desligar</button>' +
                     "</div></article>";
@@ -872,7 +1003,7 @@
             '<label class="opv-field"><span>Clave de administración</span><input class="opv-input" data-h-clave placeholder="VIVE-XXXX-XXXX" autocomplete="off"></label>' +
             '<div class="opv-row"><button type="button" class="opv-btn opv-btn--primary" data-h-guardar>Probar y ligar</button>' +
             '<button type="button" class="opv-btn opv-btn--ghost" data-h-cancelar hidden>Cancelar</button></div></section>' +
-            '<p class="opv-hint">Los spreadsheets ligados se recuerdan en este navegador. Para abrir el panel desde otro teléfono o computadora usa «Copiar link de Admin» (lleva la clave: compártelo solo con coordinación).</p>';
+            '<p class="opv-hint">Los spreadsheets ligados se recuerdan en este navegador. «Copiar link de Admin» da un enlace que pide la contraseña al abrirlo. «Con contraseña incluida» entra directo: compártelo solo con coordinación.</p>';
         shellAdmin("hojas", h);
 
         const f = {
@@ -1100,7 +1231,7 @@
     }
 
     function enlaceWhatsApp(ev, link) {
-        return "https://wa.me/?text=" + encodeURIComponent("📋 " + ev.nombre + (ev.fechas ? " · " + ev.fechas : "") + "\nMira las listas y anótate donde quieras apoyar:\n" + link);
+        return "https://wa.me/?text=" + encodeURIComponent("✅ " + ev.nombre + (ev.fechas ? " · " + ev.fechas : "") + "\nMira las listas y anótate donde quieras apoyar:\n" + link);
     }
 
     // ---------- crear evento ----------

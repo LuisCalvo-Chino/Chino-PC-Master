@@ -487,3 +487,16 @@ body.opv-lock { overflow: hidden; }
 .opv-savebar__txt--sucio { color: var(--red-700); }
 .opv-grid2--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 560px) { .opv-grid2--2 { grid-template-columns: 1fr; } }
+
+/* ---------- acceso con contraseña ---------- */
+.opv-candado { max-width: 400px; margin: 7vh auto 0; text-align: center; }
+.opv-candado img { width: 170px; height: auto; margin: 0 auto 16px; }
+.opv-candado h1 { margin: 10px 0 6px; font-size: 1.6rem; font-weight: 900; }
+.opv-candado > p { color: var(--ink-2); margin: 0 0 18px; }
+.opv-candado form { text-align: left; }
+.opv-candado .opv-error { text-align: left; }
+.opv-admnav__salir {
+    flex: none; align-self: center; border: 0; background: transparent; color: var(--red-700);
+    font-weight: 800; font-size: 0.88rem; padding: 8px 6px;
+}
+.opv-admnav__salir:hover { text-decoration: underline; }

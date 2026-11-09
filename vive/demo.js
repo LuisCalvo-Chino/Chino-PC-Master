@@ -121,6 +121,15 @@
         createTextOutput(s) { return { setMimeType() { return this; }, getContent() { return s; } }; }
     };
     window.Logger = { log() {} };
+    const cache = {};
+    window.CacheService = {
+        getScriptCache() {
+            return {
+                get(k) { const v = cache[k]; return v && v.hasta > Date.now() ? v.valor : null; },
+                put(k, valor, seg) { cache[k] = { valor: String(valor), hasta: Date.now() + (seg || 600) * 1000 }; }
+            };
+        }
+    };
 
     function post(payload) {
         const salida = window.doPost({ parameter: {}, postData: { contents: JSON.stringify(payload) } });

@@ -8663,6 +8663,13 @@ body.cpm-no-footer .site-footer {
     color: #b8f6f6;
 }
 
+/* Operaciones VIVE: rojo de la marca VIVE */
+.patch-tag--vive {
+    border-color: rgba(253, 30, 36, 0.6);
+    background: rgba(253, 30, 36, 0.16);
+    color: #ffc4c6;
+}
+
 .patch-card__date {
     font-size: 0.74rem;
     color: var(--text-muted);

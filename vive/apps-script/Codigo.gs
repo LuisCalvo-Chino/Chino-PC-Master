@@ -21,7 +21,7 @@
 const ID_HOJA = '';
 
 /** Se muestra en el link de Admin para saber qué versión está publicada. */
-const OPV_VERSION = '1.1';
+const OPV_VERSION = '1.2';
 
 const OPV_HOJAS = { CONFIG: 'CONFIG', EVENTOS: 'EVENTOS' };
 
@@ -130,10 +130,21 @@ function despachar_(p) {
   }
 }
 
+/**
+ * Valida la contraseña del Admin (la "Clave de administración" de CONFIG).
+ * Después de 20 intentos fallidos se bloquea el acceso 15 minutos, para que
+ * nadie pueda adivinarla probando una y otra vez.
+ */
 function conClave_(p, fn) {
+  const cache = CacheService.getScriptCache();
+  const fallos = Number(cache.get('opv_fallos') || 0);
+  if (fallos >= 20) {
+    return { ok: false, codigo: 'bloqueado', mensaje: 'Demasiados intentos con una contraseña incorrecta. Espera 15 minutos e intenta de nuevo.' };
+  }
   const clave = texto_(leerConfig_().clave_de_administracion);
   if (!clave || texto_(p.clave) !== clave) {
-    return { ok: false, codigo: 'clave', mensaje: 'La clave de administración no coincide con la de la hoja CONFIG.' };
+    cache.put('opv_fallos', String(fallos + 1), 900);
+    return { ok: false, codigo: 'clave', mensaje: 'La contraseña no coincide con la Clave de administración de la hoja CONFIG.' };
   }
   return fn(p);
 }

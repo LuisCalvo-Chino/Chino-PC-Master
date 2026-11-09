@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-06T09:34:00-06:00",
+    "actualizado": "2026-11-09T12:58:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -19,6 +19,12 @@
             "nombre": "Bingo Digital",
             "tipo": "webapp",
             "descripcion": "Bingo con venta de cartones por combos, vendedores por sector, cartones impresos y juego en vivo con rifa de desempate."
+        },
+        {
+            "id": "vive",
+            "nombre": "Operaciones VIVE",
+            "tipo": "webapp",
+            "descripcion": "Listas de apoyo de VIVE para Introductorios y Avanzados: la comunidad se anota en cada posición y coordinación edita horarios, vestimenta y cupos."
         },
         {
             "id": "certificados",
@@ -40,6 +46,55 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-09-vive-operaciones",
+            "fecha": "2026-11-09T12:58:00-06:00",
+            "producto": "vive",
+            "titulo": "Nuevo: Operaciones VIVE, listas de apoyo para Introductorios y Avanzados",
+            "resumen": "VIVE ya tiene su propia app para armar las listas de cada entrenamiento: la comunidad ve quién está en cada posición y se anota desde el teléfono, y coordinación crea y edita los eventos desde un Admin con contraseña.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cada evento tiene su propio enlace con la imagen de VIVE: muestra cada posición con su hora de entrada, vestimenta y punto de encuentro, y quién está anotado en cada una."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Botón flotante «Anotarme»: abre un formulario en ventana flotante para elegir una o varias posiciones a la vez."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Avanzado: Ángeles de Cuna y Cena y el Equipo de Estiramientos no se pueden combinar porque ocurren a la misma hora, y cada rol de Estiramientos lo toma una sola persona."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Introductorio: listas libres para Montaje de Salón, Línea de Elección y Camino de Luz, Upgrade y Graduación, sin restricciones."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Cada persona puede quitarse de una lista desde el mismo teléfono donde se anotó, y las listas se actualizan solas cada 45 segundos."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Admin con menú de Eventos, Spreadsheets y Código: crear eventos nuevos (cada uno guarda sus inscripciones en su propia hoja de Google Sheets), copiar las posiciones de un evento anterior y compartir el enlace por WhatsApp."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Página de edición de cada evento: hora de entrada, vestimenta, punto de encuentro, avisos, instrucciones, cupos y roles de cada posición, con aviso si quedan cambios sin guardar."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Lista de inscritos para coordinación: quitar o reactivar personas, anotar a alguien a mano y copiar la lista con formato para WhatsApp."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "El Admin pide contraseña y se bloquea 15 minutos después de 20 intentos incorrectos."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Para conocer la app con datos de prueba está el modo demostración en chinopcmaster.com/vive/#op_vive/demo/admin."
+                }
+            ]
+        },
         {
             "id": "2026-11-06-bingo-guia-disenos",
             "fecha": "2026-11-06T09:34:00-06:00",
