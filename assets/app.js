@@ -335,6 +335,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (mobileMenuAdmin) mobileMenuAdmin.hidden = !canAdmin;
         const mobileMenuAngels = mobileSidebar?.querySelector('[data-page="angels-dashboard"]');
         if (mobileMenuAngels) mobileMenuAngels.hidden = !canAdmin;
+        // Operaciones VIVE (vive/): solo administradores, en el menú de escritorio y en el móvil
+        document.querySelectorAll("[data-opvive]").forEach((el) => { el.hidden = !canAdmin; });
 
         // El acceso queda discreto en el pie de página; el registro ya no se ofrece en la página.
         if (btnLoginOpen) btnLoginOpen.hidden = Boolean(session);
