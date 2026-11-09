@@ -58,9 +58,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (el) el.textContent = String(new Date().getFullYear());
     })();
 
+    // Operaciones VIVE también si el #op_vive/… llega sin recargar la página
+    window.addEventListener("hashchange", () => {
+        if (/^#op_vive(\/|$)/.test(window.location.hash)) {
+            window.location.replace(`${window.location.pathname.replace(/[^/]*$/, "")}vive/${window.location.hash}`);
+        }
+    });
+
     // Evitar flash del header del sitio en links públicos #r/<hash> y #u/|#a/
     (function applyStandaloneChromeEarly() {
         const raw = String(window.location.hash || "").replace(/^#/, "").trim();
+        if (/^op_vive(\/|$)/.test(raw)) {
+            // Operaciones VIVE tiene su propia entrada: chinopcmaster.com/#op_vive/… se pasa a vive/ con el mismo enlace
+            window.location.replace(`${window.location.pathname.replace(/[^/]*$/, "")}vive/${window.location.hash}`);
+            return;
+        }
         if (/^r\/.+$/.test(raw)) {
             document.body.classList.add("cpm-rifa-standalone");
         } else if (BINGO_ROUTE_RE.test(raw)) {

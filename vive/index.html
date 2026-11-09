@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Operaciones VIVE</title>
+    <meta name="description" content="Listas de apoyo de VIVE: mira quién está en cada sección y anótate en un par de toques.">
+    <!-- Los links de los eventos se comparten, pero no se indexan -->
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#ffffff">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="../imagenes/vive/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../imagenes/vive/icon-16.png">
+    <link rel="apple-touch-icon" href="../imagenes/vive/icon-180.png">
+    <link rel="manifest" href="manifest.webmanifest">
+
+    <!-- Vista previa al compartir (la parte después de # no llega a las redes) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Operaciones VIVE">
+    <meta property="og:locale" content="es_CR">
+    <meta property="og:url" content="https://chinopcmaster.com/vive/">
+    <meta property="og:title" content="Operaciones VIVE">
+    <meta property="og:description" content="Mira quién está en cada sección y anótate en un par de toques.">
+    <meta property="og:image" content="https://chinopcmaster.com/imagenes/vive/og-vive.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Logo de VIVE con la palabra Operaciones">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Operaciones VIVE">
+    <meta name="twitter:image" content="https://chinopcmaster.com/imagenes/vive/og-vive.jpg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        /** Subirlo cuando cambien vive.css / vive.js / demo.js, para que los navegadores no usen la copia vieja. */
+        window.OPVIVE_ASSET_V = "1";
+    </script>
+    <script src="conexion.js?v=1"></script>
+    <script>
+        document.write('<link rel="stylesheet" href="vive.css?v=' + window.OPVIVE_ASSET_V + '">');
+    </script>
+</head>
+<body>
+    <div id="app" class="opv-app" aria-live="polite">
+        <div class="opv-boot">
+            <img src="../imagenes/vive/logo-vive.png" alt="VIVE" width="180" height="71">
+            <div class="opv-spinner" aria-hidden="true"></div>
+        </div>
+    </div>
+    <div id="opv-toast" class="opv-toast" role="status" aria-live="polite"></div>
+    <script>
+        document.write('<script src="vive.js?v=' + window.OPVIVE_ASSET_V + '"><\/script>');
+    </script>
+</body>
+</html>
