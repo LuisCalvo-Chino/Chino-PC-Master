@@ -117,7 +117,14 @@
         let dep = null;
         const si = partes.indexOf("s");
         if (si >= 0) { dep = partes[si + 1] || null; partes = partes.slice(0, si); }
-        if (partes[0] === "admin") return { modo: "admin", clave: partes[1] || "", dep, demo };
+        if (partes[0] === "admin") {
+            const sub = partes[1] || "";
+            if (sub === "k") return { modo: "admin", vista: "eventos", clave: partes[2] || "", dep, demo };
+            if (sub === "hojas" || sub === "codigo") return { modo: "admin", vista: sub, dep, demo };
+            if (sub === "evento") return { modo: "admin", vista: "evento", id: partes[2] || "", dep, demo };
+            // Links de Admin de la primera versión: #op_vive/admin/<clave>/s/<id>
+            return { modo: "admin", vista: "eventos", clave: sub, dep, demo };
+        }
         if (partes[0]) return { modo: "evento", id: partes[0], dep, demo };
         return { modo: "inicio", dep, demo };
     }
@@ -410,7 +417,7 @@
 
         app.innerHTML = html;
         enlazarDemo();
-        if (conservarScroll) window.scrollTo(0, y);
+        if (conservarScroll) window.scrollTo({ top: y, behavior: "instant" });
 
         app.querySelectorAll("[data-ir]").forEach((a) => {
             a.onclick = (e) => {
@@ -681,89 +688,277 @@
 
     // ======================================================================
     //  ADMIN
+    //  Menú: Eventos · Spreadsheets · Código Apps Script
+    //  Cada spreadsheet ligado guarda todos sus eventos; cada evento tiene su
+    //  página de edición de posiciones y su enlace para la comunidad.
     // ======================================================================
 
-    const adm = { url: "", clave: "", datos: null, verArchivados: false, codigo: {} };
+    const LS_HOJAS = "opvive-hojas";
+    const LS_ACTIVA = "opvive-hoja-activa";
+    const adm = { hoja: null, datos: null, datosDe: "", verArchivados: false, filtroTipo: "", codigo: {}, ed: null, sucio: false };
+
+    function hashAdmin(sub) {
+        return "#op_vive/" + (ruta.demo ? "demo/" : "") + "admin" + (sub ? "/" + sub : "");
+    }
+
+    /** Spreadsheets ligados en este navegador: [{ id, nombre, url, clave }]. */
+    function hojasGuardadas() {
+        let lista = lsGet(LS_HOJAS, null);
+        if (!Array.isArray(lista)) {
+            // Conexión guardada por la primera versión del Admin.
+            lista = [];
+            const url = String(lsGet(LS.conexion, "") || "");
+            const cl = String(lsGet(LS.clave, "") || "");
+            if (url && cl) lista.push({ id: "h" + Date.now().toString(36), nombre: "VIVE", url, clave: cl });
+            lsSet(LS_HOJAS, lista);
+        }
+        return lista;
+    }
+    function guardarHojas(lista) { lsSet(LS_HOJAS, lista); }
+    function hojaActiva() {
+        if (ruta.demo) return { id: "demo", nombre: "Spreadsheet de prueba", url: "demo", clave: window.OPVIVE_DEMO.clave() };
+        const lista = hojasGuardadas();
+        const id = lsGet(LS_ACTIVA, "");
+        return lista.filter((h) => h.id === id)[0] || lista[0] || null;
+    }
+    function activarHoja(h) {
+        lsSet(LS_ACTIVA, h.id);
+        lsSet(LS.conexion, h.url);
+        adm.hoja = h;
+        adm.datos = null;
+        adm.datosDe = "";
+    }
+
+    /** Llamada al backend del spreadsheet activo, con su clave. */
+    function A(payload) {
+        return api(Object.assign({ clave: adm.hoja.clave }, payload), adm.hoja.url);
+    }
+
+    function enlaceEvento(id) {
+        const fija = urlFija();
+        const dep = depDesdeUrl(adm.hoja && adm.hoja.url);
+        const necesitaDep = !ruta.demo && dep && (!fija || depDesdeUrl(fija) !== dep);
+        return base() + "#op_vive/" + (ruta.demo ? "demo/" : "") + encodeURIComponent(id) + (necesitaDep ? "/s/" + dep : "");
+    }
+    function enlaceAdminDe(h) {
+        if (ruta.demo) return base() + "#op_vive/demo/admin";
+        return base() + "#op_vive/admin/k/" + encodeURIComponent(h.clave) + "/s/" + depDesdeUrl(h.url);
+    }
+
+    function shellAdmin(vista, contenido) {
+        const tabs = [["eventos", "Eventos", ""], ["hojas", "Spreadsheets", "hojas"], ["codigo", "Código Apps Script", "codigo"]];
+        const pill = adm.hoja
+            ? '<span class="opv-top__pill"><span class="opv-dot' + (adm.datos && adm.datosDe === adm.hoja.id ? " opv-dot--ok" : "") + '"></span>' + esc(adm.hoja.nombre) + "</span>"
+            : "";
+        app.innerHTML = barraSuperior(pill) +
+            '<nav class="opv-admnav" aria-label="Menú de administración"><div class="opv-admnav__in">' +
+            tabs.map((t) => '<a href="' + hashAdmin(t[2]) + '"' +
+                (vista === t[0] || (vista === "evento" && t[0] === "eventos") ? ' aria-current="page"' : "") + ">" + t[1] + "</a>").join("") +
+            "</div></nav>" +
+            '<main class="opv-main">' + contenido + "</main>";
+        enlazarDemo();
+    }
+
+    function campo(etq, k, valor, opc) {
+        opc = opc || {};
+        const ctrl = opc.area
+            ? '<textarea class="opv-textarea" data-k="' + k + '" placeholder="' + esc(opc.ph || "") + '">' + esc(valor) + "</textarea>"
+            : '<input class="opv-input opv-input--sm" data-k="' + k + '"' + (opc.num ? ' type="number" min="0" inputmode="numeric" data-num' : "") +
+            ' placeholder="' + esc(opc.ph || "") + '" value="' + esc(valor == null ? "" : valor) + '">';
+        return '<label class="opv-field"><span>' + esc(etq) + "</span>" + ctrl + (opc.hint ? "<small>" + esc(opc.hint) + "</small>" : "") + "</label>";
+    }
 
     async function vistaAdmin() {
         clearInterval(temporizador);
         document.title = "Admin · Operaciones VIVE";
+        if (ruta.demo) await cargarDemo();
 
-        // Link de Admin con la clave adentro: se guarda y se limpia de la barra de direcciones.
-        if (ruta.clave || ruta.dep) {
-            if (ruta.dep) lsSet(LS.conexion, urlDesdeDep(ruta.dep));
-            if (ruta.clave) lsSet(LS.clave, ruta.clave);
-            history.replaceState(null, "", "#op_vive/" + (ruta.demo ? "demo/" : "") + "admin");
+        // Link de Admin compartible (#op_vive/admin/k/<clave>/s/<id>): liga el spreadsheet y limpia la barra.
+        if (ruta.clave && ruta.dep && !ruta.demo) {
+            const lista = hojasGuardadas();
+            let h = lista.filter((x) => depDesdeUrl(x.url) === ruta.dep)[0];
+            if (h) h.clave = ruta.clave;
+            else {
+                h = { id: "h" + Date.now().toString(36), nombre: "VIVE", url: urlDesdeDep(ruta.dep), clave: ruta.clave };
+                lista.push(h);
+            }
+            guardarHojas(lista);
+            activarHoja(h);
+            history.replaceState(null, "", hashAdmin(""));
             ruta = leerRuta();
+            hashPrevio = location.hash;
         }
 
-        if (ruta.demo) {
-            await cargarDemo();
-            adm.url = "demo";
-            adm.clave = window.OPVIVE_DEMO.clave();
+        adm.hoja = hojaActiva();
+        if (adm.datosDe && (!adm.hoja || adm.datosDe !== adm.hoja.id)) { adm.datos = null; adm.datosDe = ""; }
+        if (ruta.vista === "hojas") return pintarHojas();
+        if (ruta.vista === "codigo") return pintarCodigo();
+        if (!adm.hoja) return pintarSinHoja();
+
+        const vista = ruta.vista;
+        const enCache = !!adm.datos;
+        if (enCache) {
+            if (vista === "evento") return pintarEditor(ruta.id);
+            pintarEventos();
         } else {
-            adm.url = String(lsGet(LS.conexion, "") || urlFija() || "");
-            adm.clave = String(lsGet(LS.clave, "") || "");
+            shellAdmin(vista, '<div class="opv-boot" style="min-height:40vh"><div class="opv-spinner"></div></div>');
         }
-
-        if (!adm.url || !adm.clave) return pintarConexion();
-        app.innerHTML = barraSuperior() + '<main class="opv-main"><div class="opv-boot" style="min-height:50vh"><div class="opv-spinner"></div></div></main>';
         try {
-            adm.datos = await api({ action: "admin_entrar", clave: adm.clave }, adm.url);
-            pintarAdmin();
+            const r = await A({ action: "admin_entrar" });
+            if (ruta.modo !== "admin" || ruta.vista !== vista) return;
+            adm.datos = r;
+            adm.datosDe = adm.hoja.id;
         } catch (e) {
-            pintarConexion(e.message);
+            if (ruta.modo !== "admin" || ruta.vista !== vista) return;
+            if (!enCache) pintarSinHoja(e.message);
+            else toast(e.message, "error");
+            return;
         }
+        if (vista === "evento") return pintarEditor(ruta.id);
+        pintarEventos();
     }
 
-    function pintarConexion(error) {
-        app.innerHTML = barraSuperior() +
-            '<main class="opv-main">' +
-            '<div class="opv-admin-title"><div><h1>Link de Admin</h1><p>Conecta Operaciones VIVE con el Google Sheets de la compañía.</p></div>' +
-            '<a class="opv-btn opv-btn--ghost opv-btn--sm" href="#op_vive/demo/admin">Ver la demostración</a></div>' +
-            (error ? '<p class="opv-error" role="alert">' + esc(error) + "</p>" : "") +
-            '<section class="opv-card"><h2>Conectar</h2><p>Pega el enlace <b>/exec</b> de la implementación y la clave que aparece en la hoja <b>CONFIG</b>.</p>' +
-            '<label class="opv-field"><span>Enlace /exec de Apps Script</span><input class="opv-input" data-url placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(adm.url) + '"></label>' +
-            '<label class="opv-field"><span>Clave de administración</span><input class="opv-input" data-clave placeholder="VIVE-XXXX-XXXX" autocomplete="off" value="' + esc(adm.clave) + '"></label>' +
-            '<button type="button" class="opv-btn opv-btn--primary" data-conectar>Conectar</button></section>' +
-            '<section class="opv-card"><h2>¿Primera vez? Instala el backend</h2>' +
-            '<ol class="opv-steps">' +
-            "<li>Crea (o abre) el <b>Google Sheets</b> donde vivirán los eventos de VIVE.</li>" +
-            "<li>En el menú: <b>Extensiones ▸ Apps Script</b>.</li>" +
-            "<li>Borra lo que haya en <b>Código.gs</b> y pega el código de abajo (botón <b>Copiar</b>).</li>" +
-            "<li>En <b>Configuración del proyecto</b> (engranaje) marca <i>Mostrar el archivo de manifiesto appsscript.json</i> y reemplázalo por el segundo archivo.</li>" +
-            "<li>Arriba elige la función <b>prepararHojas</b> y presiona <b>▶ Ejecutar</b>. Acepta los permisos. Se crean las hojas <b>CONFIG</b> y <b>EVENTOS</b>, y la clave queda en CONFIG.</li>" +
-            "<li><b>Implementar ▸ Nueva implementación ▸ Aplicación web</b>. Ejecutar como: <b>Yo</b>. Quién tiene acceso: <b>Cualquier usuario</b>.</li>" +
-            "<li>Copia el enlace que termina en <b>/exec</b>, pégalo arriba junto con la clave y presiona <b>Conectar</b>.</li>" +
-            "</ol>" + visorCodigo() + "</section></main>";
-        enlazarDemo();
-        enlazarVisorCodigo();
-        app.querySelector("[data-conectar]").onclick = async () => {
-            const url = app.querySelector("[data-url]").value.trim();
-            const cl = app.querySelector("[data-clave]").value.trim();
+    function pintarSinHoja(error) {
+        shellAdmin("eventos",
+            '<div class="opv-admin-title"><div><h1>Eventos</h1><p>Aquí creas cada Introductorio y cada Avanzado, editas sus posiciones y copias su enlace.</p></div></div>' +
+            '<section class="opv-card opv-card--cyan"><h2>' +
+            (adm.hoja ? "No hay conexión con «" + esc(adm.hoja.nombre) + "»" : "Liga primero el spreadsheet de VIVE") + "</h2>" +
+            "<p>" + (adm.hoja
+                ? esc(error || "No se pudo leer el spreadsheet.")
+                : "Los eventos y la configuración de cada uno se guardan en un Google Sheets. Lígalo una vez y desde aquí creas y editas todos los eventos.") + "</p>" +
+            '<div class="opv-row">' +
+            (adm.hoja ? '<button type="button" class="opv-btn opv-btn--cyan" data-reintentar>Reintentar</button>' : "") +
+            '<a class="opv-btn opv-btn--primary" href="' + hashAdmin("hojas") + '">' + (adm.hoja ? "Revisar spreadsheets" : "Ligar un spreadsheet") + "</a>" +
+            (ruta.demo ? "" : '<a class="opv-btn opv-btn--ghost" href="#op_vive/demo/admin">Ver la demostración</a>') +
+            "</div></section>");
+        const r = app.querySelector("[data-reintentar]");
+        if (r) r.onclick = () => vistaAdmin();
+    }
+
+    // ---------- Spreadsheets ----------
+
+    function pintarHojas() {
+        const lista = ruta.demo ? [] : hojasGuardadas();
+        let h = '<div class="opv-admin-title"><div><h1>Spreadsheets</h1>' +
+            "<p>Cada spreadsheet guarda todos sus eventos y la configuración de cada uno. Aquí los ligas con Operaciones VIVE.</p></div></div>";
+
+        if (ruta.demo) {
+            h += '<section class="opv-card opv-card--cyan"><h2>Spreadsheet de prueba</h2>' +
+                "<p>La demostración usa un spreadsheet ficticio que vive en este navegador. Para ligar el de VIVE, sal de la demostración.</p>" +
+                '<a class="opv-btn opv-btn--primary" href="#op_vive/admin/hojas">Ir a los spreadsheets reales</a></section>';
+            return shellAdmin("hojas", h);
+        }
+
+        if (lista.length) {
+            h += '<div class="opv-eventos" style="margin-bottom:16px">' + lista.map((x) => {
+                const activo = adm.hoja && adm.hoja.id === x.id;
+                return '<article class="opv-ev"><div class="opv-ev__head"><div class="opv-ev__info">' +
+                    (activo ? '<span class="opv-chip opv-chip--green">En uso</span>' : '<span class="opv-chip opv-chip--gray">Ligado</span>') +
+                    "<h3>" + esc(x.nombre) + '</h3><p class="opv-hint" style="overflow-wrap:anywhere">' + esc(x.url) + "</p></div></div>" +
+                    '<div class="opv-ev__actions">' +
+                    (activo ? "" : '<button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-usar="' + esc(x.id) + '">Usar este</button>') +
+                    '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-copiar="' + esc(enlaceAdminDe(x)) + '">' + ICON.copiar + "Copiar link de Admin</button>" +
+                    '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-editar-hoja="' + esc(x.id) + '">Editar</button>' +
+                    '<button type="button" class="opv-btn opv-btn--danger opv-btn--sm" data-quitar-hoja="' + esc(x.id) + '">Desligar</button>' +
+                    "</div></article>";
+            }).join("") + "</div>";
+        }
+
+        h += '<section class="opv-card" data-form-hoja><h2 data-form-titulo>Ligar un spreadsheet</h2>' +
+            "<p>Pega el enlace <b>/exec</b> de su implementación y la clave que aparece en su hoja <b>CONFIG</b>. ¿Todavía no tiene el código? Está en <a href=\"" + hashAdmin("codigo") + "\">Código Apps Script</a>.</p>" +
+            '<input type="hidden" data-h-id>' +
+            '<label class="opv-field"><span>Nombre para reconocerlo</span><input class="opv-input" data-h-nombre maxlength="60" placeholder="Ej.: VIVE Costa Rica"></label>' +
+            '<label class="opv-field"><span>Enlace /exec de Apps Script</span><input class="opv-input" data-h-url placeholder="https://script.google.com/macros/s/…/exec"></label>' +
+            '<label class="opv-field"><span>Clave de administración</span><input class="opv-input" data-h-clave placeholder="VIVE-XXXX-XXXX" autocomplete="off"></label>' +
+            '<div class="opv-row"><button type="button" class="opv-btn opv-btn--primary" data-h-guardar>Probar y ligar</button>' +
+            '<button type="button" class="opv-btn opv-btn--ghost" data-h-cancelar hidden>Cancelar</button></div></section>' +
+            '<p class="opv-hint">Los spreadsheets ligados se recuerdan en este navegador. Para abrir el panel desde otro teléfono o computadora usa «Copiar link de Admin» (lleva la clave: compártelo solo con coordinación).</p>';
+        shellAdmin("hojas", h);
+
+        const f = {
+            id: app.querySelector("[data-h-id]"), nombre: app.querySelector("[data-h-nombre]"),
+            url: app.querySelector("[data-h-url]"), clave: app.querySelector("[data-h-clave]"),
+            btn: app.querySelector("[data-h-guardar]"), cancelar: app.querySelector("[data-h-cancelar]"),
+            titulo: app.querySelector("[data-form-titulo]")
+        };
+        app.querySelectorAll("[data-copiar]").forEach((b) => { b.onclick = () => copiar(b.getAttribute("data-copiar"), "Link de Admin copiado"); });
+        app.querySelectorAll("[data-usar]").forEach((b) => {
+            b.onclick = () => {
+                activarHoja(lista.filter((x) => x.id === b.getAttribute("data-usar"))[0]);
+                location.hash = hashAdmin("");
+            };
+        });
+        app.querySelectorAll("[data-editar-hoja]").forEach((b) => {
+            b.onclick = () => {
+                const x = lista.filter((y) => y.id === b.getAttribute("data-editar-hoja"))[0];
+                f.id.value = x.id; f.nombre.value = x.nombre; f.url.value = x.url; f.clave.value = x.clave;
+                f.titulo.textContent = "Editar «" + x.nombre + "»";
+                f.btn.textContent = "Probar y guardar";
+                f.cancelar.hidden = false;
+                app.querySelector("[data-form-hoja]").scrollIntoView({ behavior: "smooth" });
+            };
+        });
+        f.cancelar.onclick = () => pintarHojas();
+        app.querySelectorAll("[data-quitar-hoja]").forEach((b) => {
+            b.onclick = async () => {
+                const x = lista.filter((y) => y.id === b.getAttribute("data-quitar-hoja"))[0];
+                if (!(await confirmar("Se deja de ver «" + x.nombre + "» en este navegador. El spreadsheet y sus eventos no se tocan; los enlaces de la comunidad siguen funcionando.", { ok: "Desligar", peligro: true }))) return;
+                guardarHojas(lista.filter((y) => y.id !== x.id));
+                if (lsGet(LS_ACTIVA, "") === x.id) lsDel(LS_ACTIVA);
+                adm.datos = null;
+                adm.datosDe = "";
+                adm.hoja = hojaActiva();
+                pintarHojas();
+            };
+        });
+        f.btn.onclick = async () => {
+            const url = f.url.value.trim();
+            const cl = f.clave.value.trim();
             if (!depDesdeUrl(url)) return toast("Ese enlace no parece un /exec de Apps Script.", "error");
             if (!cl) return toast("Falta la clave de administración.", "error");
-            const btn = app.querySelector("[data-conectar]");
-            btn.disabled = true;
-            btn.textContent = "Conectando…";
+            const texto = f.btn.textContent;
+            f.btn.disabled = true;
+            f.btn.textContent = "Probando…";
             try {
                 const limpio = urlDesdeDep(depDesdeUrl(url));
-                adm.datos = await api({ action: "admin_entrar", clave: cl }, limpio);
-                adm.url = limpio;
-                adm.clave = cl;
-                lsSet(LS.conexion, limpio);
-                lsSet(LS.clave, cl);
-                pintarAdmin();
-                toast("Conectado con " + adm.datos.spreadsheet.nombre, "ok");
+                const r = await api({ action: "admin_entrar", clave: cl }, limpio);
+                const todas = hojasGuardadas();
+                let x = todas.filter((y) => y.id === f.id.value)[0] || todas.filter((y) => depDesdeUrl(y.url) === depDesdeUrl(limpio))[0];
+                if (!x) { x = { id: "h" + Date.now().toString(36) }; todas.push(x); }
+                x.nombre = f.nombre.value.trim() || r.spreadsheet.nombre || "VIVE";
+                x.url = limpio;
+                x.clave = cl;
+                guardarHojas(todas);
+                activarHoja(x);
+                adm.datos = r;
+                adm.datosDe = x.id;
+                toast("«" + x.nombre + "» ligado", "ok");
+                location.hash = hashAdmin("");
             } catch (e) {
-                btn.disabled = false;
-                btn.textContent = "Conectar";
+                f.btn.disabled = false;
+                f.btn.textContent = texto;
                 toast(e.message, "error");
             }
         };
     }
 
-    // ---------- código de Apps Script para copiar ----------
+    // ---------- Código de Apps Script ----------
+
+    function pintarCodigo() {
+        shellAdmin("codigo",
+            '<div class="opv-admin-title"><div><h1>Código Apps Script</h1><p>El backend que se pega en cada Google Sheets de Operaciones VIVE.</p></div></div>' +
+            '<section class="opv-card"><h2>Instalar en un spreadsheet nuevo</h2><ol class="opv-steps">' +
+            "<li>Crea (o abre) el <b>Google Sheets</b> donde vivirán los eventos.</li>" +
+            "<li>En el menú: <b>Extensiones ▸ Apps Script</b>.</li>" +
+            "<li>Borra lo que haya en <b>Código.gs</b> y pega el código de abajo (botón <b>Copiar</b>).</li>" +
+            "<li>En <b>Configuración del proyecto</b> (engranaje) marca <i>Mostrar el archivo de manifiesto appsscript.json</i> y reemplázalo por el segundo archivo.</li>" +
+            "<li>Arriba elige la función <b>prepararHojas</b> y presiona <b>▶ Ejecutar</b>. Acepta los permisos. Se crean las hojas <b>CONFIG</b> y <b>EVENTOS</b>, y la clave queda en CONFIG.</li>" +
+            "<li><b>Implementar ▸ Nueva implementación ▸ Aplicación web</b>. Ejecutar como: <b>Yo</b>. Quién tiene acceso: <b>Cualquier usuario</b>.</li>" +
+            '<li>Copia el enlace que termina en <b>/exec</b> y lígalo en <a href="' + hashAdmin("hojas") + '">Spreadsheets</a> junto con la clave.</li>' +
+            "</ol>" + visorCodigo() +
+            '<p class="opv-hint" style="margin-top:12px">Para actualizar uno que ya funciona: pega el código encima del anterior y en <b>Implementar ▸ Gestionar implementaciones</b> edita la implementación actual con <b>Versión: nueva</b>. Así el /exec y todos los enlaces siguen iguales.</p></section>');
+        enlazarVisorCodigo();
+    }
 
     function visorCodigo() {
         return '<div data-visor><div class="opv-tabs" role="tablist">' +
@@ -800,52 +995,59 @@
         mostrar(actual);
     }
 
-    // ---------- tablero ----------
+    // ---------- Eventos ----------
 
-    function enlaceEvento(id) {
-        const fija = urlFija();
-        const dep = depDesdeUrl(adm.url);
-        const necesitaDep = !ruta.demo && dep && (!fija || depDesdeUrl(fija) !== dep);
-        return base() + "#op_vive/" + (ruta.demo ? "demo/" : "") + encodeURIComponent(id) + (necesitaDep ? "/s/" + dep : "");
-    }
-    function enlaceAdmin() {
-        if (ruta.demo) return base() + "#op_vive/demo/admin";
-        return base() + "#op_vive/admin/" + encodeURIComponent(adm.clave) + "/s/" + depDesdeUrl(adm.url);
+    function tipoDe(ev) {
+        return ev.tipo === "avanzado" || ev.tipo === "introductorio" ? ev.tipo : "otro";
     }
 
-    function pintarAdmin() {
+    function pintarEventos() {
         const d = adm.datos;
-        const visibles = d.eventos.filter((e) => adm.verArchivados || e.estado !== "ARCHIVADO");
+        const lista = ruta.demo ? [] : hojasGuardadas();
+        const noArch = d.eventos.filter((e) => e.estado !== "ARCHIVADO");
+        const cuenta = (t) => noArch.filter((e) => !t || tipoDe(e) === t).length;
+        const visibles = d.eventos.filter((e) => (adm.verArchivados || e.estado !== "ARCHIVADO") && (!adm.filtroTipo || tipoDe(e) === adm.filtroTipo));
         const archivados = d.eventos.filter((e) => e.estado === "ARCHIVADO").length;
 
-        let h = barraSuperior('<span class="opv-top__pill"><span class="opv-dot opv-dot--ok"></span>' + esc(d.spreadsheet.nombre) + "</span>");
-        h += '<main class="opv-main">';
-        h += '<div class="opv-admin-title"><div><h1>Eventos</h1><p>' + esc(d.organizacion) + " · cada evento guarda sus inscripciones en su propia hoja.</p></div>" +
+        let h = '<div class="opv-admin-title"><div><h1>Eventos</h1><p>Cada Introductorio y cada Avanzado guarda su configuración e inscripciones en su propia hoja.</p></div>' +
             '<button type="button" class="opv-btn opv-btn--primary" data-nuevo>' + ICON.mas + "Nuevo evento</button></div>";
 
+        if (lista.length > 1) {
+            h += '<label class="opv-field" style="max-width:420px"><span>Spreadsheet</span><select class="opv-select opv-select--sm" data-cambiar-hoja>' +
+                lista.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === adm.hoja.id ? " selected" : "") + ">" + esc(x.nombre) + "</option>").join("") +
+                "</select></label>";
+        }
+
+        h += '<div class="opv-tabs" role="tablist" aria-label="Filtrar por tipo">' +
+            [["", "Todos"], ["avanzado", "Operaciones Avanzado"], ["introductorio", "Operaciones Introductorio"], ["otro", "Otros"]]
+                .filter((t) => !t[0] || t[0] !== "otro" || cuenta("otro"))
+                .map((t) => '<button type="button" role="tab" data-filtro-tipo="' + t[0] + '" aria-selected="' + (adm.filtroTipo === t[0]) + '">' + t[1] + " · " + cuenta(t[0]) + "</button>").join("") +
+            "</div>";
+
         if (!visibles.length) {
-            h += '<section class="opv-card opv-card--cyan"><h2>Todavía no hay eventos</h2><p>Crea el primero: elige <b>Operaciones Avanzado</b> o <b>Operaciones Introductorio</b> y ya nace con sus secciones listas para editar.</p>' +
-                '<button type="button" class="opv-btn opv-btn--primary" data-nuevo>' + ICON.mas + "Crear el primer evento</button></section>";
+            h += '<section class="opv-card opv-card--cyan"><h2>' + (d.eventos.length ? "No hay eventos de este tipo" : "Todavía no hay eventos") + "</h2>" +
+                "<p>Crea uno: elige <b>Operaciones Avanzado</b> u <b>Operaciones Introductorio</b> y nace con sus posiciones listas para editar.</p>" +
+                '<button type="button" class="opv-btn opv-btn--primary" data-nuevo>' + ICON.mas + "Nuevo evento</button></section>";
         }
 
         h += '<div class="opv-eventos">' + visibles.map((ev) => {
             const link = enlaceEvento(ev.id);
             const estadoChip = ev.estado === "ABIERTO" ? "opv-chip--green" : ev.estado === "CERRADO" ? "opv-chip--amber" : "opv-chip--gray";
+            const pos = (ev.config.secciones || []).filter((s) => s.activa !== false);
             return '<article class="opv-ev opv-ev--' + esc(ev.tipo) + (ev.estado === "ARCHIVADO" ? " opv-ev--archivado" : "") + '">' +
                 '<div class="opv-ev__head"><div class="opv-ev__info">' +
                 '<span class="opv-chip' + (ev.tipo === "avanzado" ? " opv-chip--red" : "") + '">' + esc(ev.tipoNombre) + "</span> " +
                 '<span class="opv-chip ' + estadoChip + '">' + esc(ESTADOS[ev.estado] || ev.estado) + "</span>" +
-                "<h3>" + esc(ev.nombre) + "</h3>" + (ev.fechas ? "<p>" + esc(ev.fechas) + "</p>" : "") +
-                '<p class="opv-hint">Hoja: ' + esc(ev.hoja) + "</p></div>" +
+                "<h3>" + esc(ev.nombre) + "</h3>" + (ev.fechas ? "<p>" + esc(ev.fechas) + "</p>" : "") + "</div>" +
                 '<div class="opv-ev__stats"><b>' + ev.personas + "</b><small>persona" + (ev.personas === 1 ? "" : "s") + "<br>" + ev.inscripciones + " lugar" + (ev.inscripciones === 1 ? "" : "es") + "</small></div></div>" +
+                (pos.length ? '<ul class="opv-ev__pos">' + pos.map((s) => "<li><b>" + esc(s.titulo) + "</b>" + (s.cuando ? " · " + esc(s.cuando) : "") + "</li>").join("") + "</ul>" : "") +
                 '<div class="opv-ev__link"><div class="opv-link-box"><code>' + esc(link) + "</code>" +
                 '<button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-copiar="' + esc(link) + '">' + ICON.copiar + "Copiar</button></div></div>" +
                 '<div class="opv-ev__actions">' +
-                '<a class="opv-btn opv-btn--ghost opv-btn--sm" href="' + esc(link) + '" target="_blank" rel="noopener">Abrir</a>' +
-                '<a class="opv-btn opv-btn--ghost opv-btn--sm" target="_blank" rel="noopener" href="https://wa.me/?text=' +
-                encodeURIComponent("📋 " + ev.nombre + (ev.fechas ? " · " + ev.fechas : "") + "\nMira las listas y anótate donde quieras apoyar:\n" + link) + '">WhatsApp</a>' +
-                '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-editar="' + esc(ev.id) + '">Editar secciones</button>' +
+                '<a class="opv-btn opv-btn--primary opv-btn--sm" href="' + hashAdmin("evento/" + encodeURIComponent(ev.id)) + '">Editar posiciones y textos</a>' +
                 '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-inscritos="' + esc(ev.id) + '">Inscritos</button>' +
+                '<a class="opv-btn opv-btn--ghost opv-btn--sm" href="' + esc(link) + '" target="_blank" rel="noopener">Abrir</a>' +
+                '<a class="opv-btn opv-btn--ghost opv-btn--sm" target="_blank" rel="noopener" href="' + esc(enlaceWhatsApp(ev, link)) + '">WhatsApp</a>' +
                 '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-vista="' + esc(ev.id) + '">Vista en Sheets</button>' +
                 '<select class="opv-select opv-select--sm" style="width:auto" data-estado="' + esc(ev.id) + '" aria-label="Estado del evento">' +
                 Object.keys(ESTADOS).map((k) => '<option value="' + k + '"' + (k === ev.estado ? " selected" : "") + ">" + ESTADOS[k] + "</option>").join("") +
@@ -857,65 +1059,54 @@
                 (adm.verArchivados ? "Ocultar archivados" : "Mostrar " + archivados + " archivado" + (archivados > 1 ? "s" : "")) + "</button></p>";
         }
 
-        h += '<section class="opv-card" style="margin-top:22px"><h2>Enlaces y conexión</h2>' +
-            "<p>El link de Admin lleva la clave adentro: compártelo solo con coordinación.</p>" +
-            '<div class="opv-label">Link de Admin</div><div class="opv-link-box"><code>' + esc(enlaceAdmin()) + "</code>" +
-            '<button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-copiar="' + esc(enlaceAdmin()) + '">' + ICON.copiar + "Copiar</button></div>" +
-            '<div class="opv-row" style="margin-top:10px">' +
-            (d.spreadsheet.url && d.spreadsheet.url !== "#" ? '<a class="opv-btn opv-btn--ghost opv-btn--sm" href="' + esc(d.spreadsheet.url) + '" target="_blank" rel="noopener">Abrir el Google Sheets</a>' : "") +
-            '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-salir>' + (ruta.demo ? "Salir de la demostración" : "Cambiar conexión") + "</button>" +
-            '<span class="opv-hint">Backend versión ' + esc(d.version) + '<span data-version-aviso></span></span></div></section>';
+        h += '<p class="opv-hint" style="margin-top:22px">Spreadsheet: <b>' + esc(d.spreadsheet.nombre) + "</b>" +
+            (d.spreadsheet.url && d.spreadsheet.url !== "#" ? ' · <a href="' + esc(d.spreadsheet.url) + '" target="_blank" rel="noopener">Abrir en Google Sheets</a>' : "") +
+            " · Backend versión " + esc(d.version) + '<span data-version-aviso></span></p>';
 
-        h += '<details class="opv-card"><summary style="cursor:pointer;font-weight:900;font-size:1.1rem">Código de Apps Script</summary>' +
-            '<p style="margin:10px 0 12px;color:var(--ink-2)">Cuando haya una versión nueva: pega el código encima del anterior y en <b>Implementar ▸ Gestionar implementaciones</b> edita la implementación actual con <b>Versión: nueva</b>. Así el /exec y todos los enlaces siguen iguales.</p>' +
-            visorCodigo() + "</details>";
-        h += "</main>";
-
-        app.innerHTML = h;
-        enlazarDemo();
+        shellAdmin("eventos", h);
 
         app.querySelectorAll("[data-nuevo]").forEach((b) => { b.onclick = nuevoEvento; });
         app.querySelectorAll("[data-copiar]").forEach((b) => { b.onclick = () => copiar(b.getAttribute("data-copiar"), "Enlace copiado"); });
-        app.querySelectorAll("[data-editar]").forEach((b) => { b.onclick = () => editarEvento(b.getAttribute("data-editar")); });
         app.querySelectorAll("[data-inscritos]").forEach((b) => { b.onclick = () => verInscritos(b.getAttribute("data-inscritos")); });
+        app.querySelectorAll("[data-filtro-tipo]").forEach((b) => { b.onclick = () => { adm.filtroTipo = b.getAttribute("data-filtro-tipo"); pintarEventos(); }; });
         app.querySelectorAll("[data-vista]").forEach((b) => {
             b.onclick = async () => {
                 b.disabled = true;
-                try { toast((await api({ action: "admin_vista", clave: adm.clave, id: b.getAttribute("data-vista") }, adm.url)).mensaje, "ok"); }
+                try { toast((await A({ action: "admin_vista", id: b.getAttribute("data-vista") })).mensaje, "ok"); }
                 catch (e) { toast(e.message, "error"); }
                 b.disabled = false;
             };
         });
         app.querySelectorAll("[data-estado]").forEach((s) => {
             s.onchange = async () => {
-                const id = s.getAttribute("data-estado");
                 try {
-                    adm.datos = await api({ action: "admin_guardar_evento", clave: adm.clave, id, evento: { estado: s.value } }, adm.url);
-                    pintarAdmin();
+                    adm.datos = await A({ action: "admin_guardar_evento", id: s.getAttribute("data-estado"), evento: { estado: s.value } });
+                    pintarEventos();
                     toast("Estado: " + ESTADOS[s.value], "ok");
-                } catch (e) { toast(e.message, "error"); pintarAdmin(); }
+                } catch (e) { toast(e.message, "error"); pintarEventos(); }
             };
         });
+        const cambiar = app.querySelector("[data-cambiar-hoja]");
+        if (cambiar) cambiar.onchange = () => { activarHoja(lista.filter((x) => x.id === cambiar.value)[0]); vistaAdmin(); };
         const arch = app.querySelector("[data-archivados]");
-        if (arch) arch.onclick = () => { adm.verArchivados = !adm.verArchivados; pintarAdmin(); };
-        app.querySelector("[data-salir]").onclick = () => {
-            if (ruta.demo) { location.hash = "#op_vive/admin"; return; }
-            lsDel(LS.clave);
-            adm.clave = "";
-            pintarConexion();
-        };
-        enlazarVisorCodigo();
+        if (arch) arch.onclick = () => { adm.verArchivados = !adm.verArchivados; pintarEventos(); };
         leerArchivo("Codigo.gs").then((txt) => {
             const m = txt.match(/OPV_VERSION\s*=\s*'([^']+)'/);
             const aviso = app.querySelector("[data-version-aviso]");
-            if (m && aviso && m[1] !== d.version) aviso.textContent = " · hay una versión nueva (" + m[1] + "): actualiza el código.";
+            if (m && aviso && m[1] !== d.version) {
+                aviso.innerHTML = ' · <a href="' + hashAdmin("codigo") + '">hay una versión nueva (' + esc(m[1]) + "): actualiza el código</a>";
+            }
         }).catch(() => {});
+    }
+
+    function enlaceWhatsApp(ev, link) {
+        return "https://wa.me/?text=" + encodeURIComponent("📋 " + ev.nombre + (ev.fechas ? " · " + ev.fechas : "") + "\nMira las listas y anótate donde quieras apoyar:\n" + link);
     }
 
     // ---------- crear evento ----------
 
     function nuevoEvento() {
-        const f = { tipo: "avanzado", nombre: "", fechas: "", copiarDe: "" };
+        const f = { tipo: adm.filtroTipo === "introductorio" ? "introductorio" : "avanzado", nombre: "", fechas: "", copiarDe: "" };
         const m = abrirModal({ titulo: "Nuevo evento" });
         function pintar() {
             const tipo = TIPOS_UI.filter((t) => t.id === f.tipo)[0];
@@ -930,10 +1121,10 @@
                 "<small>También será el nombre de su hoja y de su enlace.</small></label>" +
                 '<label class="opv-field"><span>Fechas</span><input class="opv-input" data-f maxlength="120" placeholder="Ej.: Nov 11 – 15" value="' + esc(f.fechas) + '"></label>' +
                 (mismos.length
-                    ? '<label class="opv-field"><span>Secciones iniciales</span><select class="opv-select" data-c>' +
+                    ? '<label class="opv-field"><span>Posiciones iniciales</span><select class="opv-select" data-c>' +
                     '<option value="">Plantilla de ' + esc(tipo.nombre) + "</option>" +
                     mismos.map((e) => '<option value="' + esc(e.id) + '"' + (f.copiarDe === e.id ? " selected" : "") + ">Copiar las de «" + esc(e.nombre) + "»</option>").join("") +
-                    "</select><small>Copiar trae secciones, roles y textos; las inscripciones no se copian.</small></label>"
+                    "</select><small>Copiar trae posiciones, horarios, vestimenta y textos; las inscripciones no se copian.</small></label>"
                     : "");
             m.body.querySelectorAll("[data-tipo]").forEach((c) => { c.onchange = () => { f.tipo = c.getAttribute("data-tipo"); f.copiarDe = ""; pintar(); }; });
             m.body.querySelector("[data-n]").oninput = (e) => { f.nombre = e.target.value; };
@@ -941,7 +1132,7 @@
             const c = m.body.querySelector("[data-c]");
             if (c) c.onchange = () => { f.copiarDe = c.value; };
         }
-        m.foot.innerHTML = '<button type="button" class="opv-btn opv-btn--ghost" data-x>Cancelar</button><button type="button" class="opv-btn opv-btn--primary" data-ok>Crear evento</button>';
+        m.foot.innerHTML = '<button type="button" class="opv-btn opv-btn--ghost" data-x>Cancelar</button><button type="button" class="opv-btn opv-btn--primary" data-ok>Crear y editar posiciones</button>';
         m.foot.querySelector("[data-x]").onclick = () => m.cerrar();
         m.foot.querySelector("[data-ok]").onclick = async (e) => {
             const btn = e.currentTarget;
@@ -949,13 +1140,14 @@
             btn.disabled = true;
             btn.textContent = "Creando…";
             try {
-                adm.datos = await api({ action: "admin_crear_evento", clave: adm.clave, tipo: f.tipo, nombre: f.nombre, fechas: f.fechas, copiarDe: f.copiarDe }, adm.url);
+                adm.datos = await A({ action: "admin_crear_evento", tipo: f.tipo, nombre: f.nombre, fechas: f.fechas, copiarDe: f.copiarDe });
+                adm.datosDe = adm.hoja.id;
                 m.cerrar();
-                pintarAdmin();
                 toast(adm.datos.mensaje, "ok");
+                location.hash = hashAdmin("evento/" + encodeURIComponent(adm.datos.creado));
             } catch (err) {
                 btn.disabled = false;
-                btn.textContent = "Crear evento";
+                btn.textContent = "Crear y editar posiciones";
                 toast(err.message, "error");
             }
         };
@@ -963,159 +1155,191 @@
         setTimeout(() => { const n = m.body.querySelector("[data-n]"); if (n) n.focus(); }, 60);
     }
 
-    // ---------- editar evento y secciones ----------
+    // ---------- página de edición: datos del evento y posiciones ----------
 
-    function editarEvento(id) {
-        const ev = adm.datos.eventos.filter((e) => e.id === id)[0];
-        if (!ev) return;
-        const ed = {
-            nombre: ev.nombre,
-            fechas: ev.fechas,
-            estado: ev.estado,
-            config: JSON.parse(JSON.stringify(ev.config))
-        };
-        ed.config.notasTxt = (ed.config.notas || []).join("\n");
-        const abiertas = {};
-        const m = abrirModal({ titulo: "Editar · " + ev.nombre, ancho: true, fijo: true });
-
-        function fijar(ruta2, valor) {
-            const p = ruta2.split(".");
-            let o = ed;
-            for (let i = 0; i < p.length - 1; i++) o = o[p[i]];
-            o[p[p.length - 1]] = valor;
+    function pintarEditor(id) {
+        const ev = adm.datos.eventos.filter((e) => clave(e.id) === clave(id))[0];
+        if (!ev) {
+            return shellAdmin("evento", '<div class="opv-msg"><h1>No encontramos ese evento</h1><p>Puede que se haya creado en otro spreadsheet.</p>' +
+                '<p><a class="opv-btn opv-btn--ghost" href="' + hashAdmin("") + '">Volver a Eventos</a></p></div>');
         }
-        function campo(etq, ruta2, valor, opc) {
-            opc = opc || {};
-            const ctrl = opc.area
-                ? '<textarea class="opv-textarea" data-k="' + ruta2 + '" placeholder="' + esc(opc.ph || "") + '">' + esc(valor) + "</textarea>"
-                : '<input class="opv-input opv-input--sm" data-k="' + ruta2 + '"' + (opc.num ? ' type="number" min="0" inputmode="numeric" data-num' : "") +
-                ' placeholder="' + esc(opc.ph || "") + '" value="' + esc(valor) + '">';
-            return '<label class="opv-field"><span>' + esc(etq) + "</span>" + ctrl + (opc.hint ? "<small>" + esc(opc.hint) + "</small>" : "") + "</label>";
+        if (!adm.ed || adm.ed.id !== ev.id) {
+            adm.ed = { id: ev.id, nombre: ev.nombre, fechas: ev.fechas, estado: ev.estado, config: JSON.parse(JSON.stringify(ev.config)) };
+            adm.ed.config.notasTxt = (adm.ed.config.notas || []).join("\n");
+            adm.sucio = false;
         }
+        const ed = adm.ed;
+        const c = ed.config;
+        const link = enlaceEvento(ev.id);
+        document.title = "Editar " + ev.nombre + " · Operaciones VIVE";
+        const y = window.scrollY;
 
-        function pintar() {
-            const c = ed.config;
-            let h = '<div class="opv-grid2">' +
-                campo("Nombre del evento", "nombre", ed.nombre) +
-                campo("Fechas", "fechas", ed.fechas, { ph: "Nov 11 – 15" }) + "</div>" +
-                campo("Presentación", "config.presentacion", c.presentacion, { area: true, ph: "Frase de bienvenida" }) +
-                campo("Notas generales (una por línea)", "config.notasTxt", c.notasTxt, { area: true, hint: "Aparecen arriba, en rojo suave, para todo el evento." }) +
-                campo("Mensaje cuando está cerrado", "config.mensajeCerrado", c.mensajeCerrado, { ph: "Las inscripciones de este evento están cerradas." }) +
-                '<label class="opv-check"><input type="checkbox" data-k="config.permitirQuitarse"' + (c.permitirQuitarse ? " checked" : "") + "> Permitir que cada persona se quite desde su teléfono</label>" +
-                '<label class="opv-check"><input type="checkbox" data-k="config.pedirContacto"' + (c.pedirContacto ? " checked" : "") + "> Pedir un dato de contacto (solo lo ve coordinación)</label>" +
-                (c.pedirContacto ? campo("Nombre del campo de contacto", "config.etiquetaContacto", c.etiquetaContacto, { ph: "WhatsApp" }) : "") +
-                '<h3 style="margin:22px 0 10px;font-weight:900">Secciones</h3>';
+        let h = '<p style="margin:0 0 6px"><a class="opv-back" href="' + hashAdmin("") + '">← Eventos</a></p>' +
+            '<div class="opv-admin-title"><div>' +
+            '<span class="opv-chip' + (ev.tipo === "avanzado" ? " opv-chip--red" : "") + '">' + esc(ev.tipoNombre) + "</span>" +
+            '<h1 style="margin-top:6px">' + esc(ev.nombre) + "</h1><p>Hoja: " + esc(ev.hoja) + " · " + ev.personas + " persona" + (ev.personas === 1 ? "" : "s") + " anotada" + (ev.personas === 1 ? "" : "s") + "</p></div>" +
+            '<label class="opv-field" style="margin:0"><span>Estado</span><select class="opv-select opv-select--sm" data-k="estado">' +
+            Object.keys(ESTADOS).map((k) => '<option value="' + k + '"' + (k === ed.estado ? " selected" : "") + ">" + ESTADOS[k] + "</option>").join("") +
+            "</select></label></div>";
 
-            c.secciones.forEach((s, i) => {
-                const abierta = !!abiertas[i];
-                h += '<div class="opv-ed-sec' + (s.activa === false ? " opv-ed-sec--off" : "") + '">' +
-                    '<div class="opv-ed-sec__head">' +
-                    '<button type="button" class="opv-icon-btn" data-abrir="' + i + '" aria-label="' + (abierta ? "Cerrar" : "Abrir") + '">' + (abierta ? "−" : "+") + "</button>" +
-                    "<strong>" + esc(s.titulo || "Sin título") + '</strong><span class="opv-chip opv-chip--gray">' + (s.tipo === "ROLES" ? s.roles.length + " roles" : (s.cupos ? s.cupos + " cupos" : "sin límite")) + "</span>" +
-                    '<button type="button" class="opv-icon-btn" data-subir="' + i + '"' + (i === 0 ? " disabled" : "") + ' aria-label="Subir">↑</button>' +
-                    '<button type="button" class="opv-icon-btn" data-bajar="' + i + '"' + (i === c.secciones.length - 1 ? " disabled" : "") + ' aria-label="Bajar">↓</button>' +
-                    '<button type="button" class="opv-icon-btn opv-icon-btn--danger" data-borrar="' + i + '" aria-label="Eliminar">×</button></div>';
-                if (abierta) {
-                    const p = "config.secciones." + i + ".";
-                    h += '<div class="opv-ed-sec__body"><div class="opv-grid2">' +
-                        campo("Título", p + "titulo", s.titulo) +
-                        '<label class="opv-field"><span>Tipo</span><select class="opv-select opv-select--sm" data-k="' + p + 'tipo" data-repintar>' +
-                        '<option value="LISTA"' + (s.tipo !== "ROLES" ? " selected" : "") + ">Lista de nombres</option>" +
-                        '<option value="ROLES"' + (s.tipo === "ROLES" ? " selected" : "") + ">Roles fijos (un puesto por persona)</option></select></label>" +
-                        (s.tipo !== "ROLES" ? campo("Cupos", p + "cupos", s.cupos, { num: true, hint: "0 = sin límite" }) : "") +
-                        campo("Cuándo", p + "cuando", s.cuando, { ph: "Sábado 14 · 4:00 pm" }) +
-                        campo("Dónde nos vemos", p + "donde", s.donde, { ph: "Salón principal" }) +
-                        campo("Vestimenta", p + "vestimenta", s.vestimenta) +
-                        campo("Aviso (amarillo)", p + "aviso", s.aviso, { ph: "Hora sujeta al avance del equipo" }) +
-                        campo("Grupo de horario", p + "grupo", s.grupo, { ph: "sabado-tarde", hint: "Secciones con el mismo grupo no se pueden combinar." }) +
-                        "</div>" +
-                        campo("Instrucciones", p + "instrucciones", s.instrucciones, { area: true }) +
-                        '<label class="opv-check"><input type="checkbox" data-k="' + p + 'activa"' + (s.activa !== false ? " checked" : "") + " data-repintar> Visible en la página</label>";
-                    if (s.tipo === "ROLES") {
-                        h += '<div class="opv-label" style="margin:6px 0">Roles</div><div class="opv-ed-roles">' +
-                            s.roles.map((r, j) => {
-                                const q = p + "roles." + j + ".";
-                                return '<div class="opv-ed-rol">' +
-                                    '<input class="opv-input opv-input--sm" data-k="' + q + 'rol" placeholder="Nombre del rol" value="' + esc(r.rol) + '">' +
-                                    '<input class="opv-input opv-input--sm" data-k="' + q + 'cupos" data-num type="number" min="1" title="Personas" value="' + esc(r.cupos || 1) + '">' +
-                                    '<input class="opv-input opv-input--sm opv-ed-rol__nota" data-k="' + q + 'nota" placeholder="Nota (opcional)" value="' + esc(r.nota) + '">' +
-                                    '<button type="button" class="opv-icon-btn opv-icon-btn--danger" data-borrar-rol="' + i + "." + j + '" aria-label="Quitar rol">×</button></div>';
-                            }).join("") + "</div>" +
-                            '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-agregar-rol="' + i + '">' + ICON.mas + "Agregar rol</button>";
-                    }
-                    h += "</div>";
-                }
-                h += "</div>";
-            });
-            h += '<button type="button" class="opv-btn opv-btn--ghost" data-agregar-sec>' + ICON.mas + "Agregar sección</button>";
-            m.body.innerHTML = h;
+        h += '<section class="opv-card"><h2>Enlace para la comunidad</h2><p>Compártelo para que cada persona vea las listas y se anote.</p>' +
+            '<div class="opv-link-box"><code>' + esc(link) + '</code><button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-copiar="' + esc(link) + '">' + ICON.copiar + "Copiar</button></div>" +
+            '<div class="opv-row" style="margin-top:8px"><a class="opv-btn opv-btn--ghost opv-btn--sm" href="' + esc(link) + '" target="_blank" rel="noopener">Ver como la comunidad</a>' +
+            '<a class="opv-btn opv-btn--ghost opv-btn--sm" target="_blank" rel="noopener" href="' + esc(enlaceWhatsApp(ev, link)) + '">Compartir por WhatsApp</a>' +
+            '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-inscritos="' + esc(ev.id) + '">Inscritos</button></div></section>';
 
-            m.body.querySelectorAll("[data-k]").forEach((el) => {
-                const k = el.getAttribute("data-k");
-                const evento = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
-                el.addEventListener(evento, () => {
-                    let v = el.type === "checkbox" ? el.checked : el.value;
-                    if (el.hasAttribute("data-num")) v = Math.max(0, parseInt(v, 10) || 0);
-                    fijar(k, v);
-                    if (el.hasAttribute("data-repintar") || k === "config.pedirContacto") pintar();
-                });
+        h += '<section class="opv-card"><h2>Datos del evento</h2><p>Lo primero que ve la comunidad al abrir el enlace.</p>' +
+            '<div class="opv-grid2">' + campo("Nombre del evento", "nombre", ed.nombre) + campo("Fechas", "fechas", ed.fechas, { ph: "Nov 11 – 15" }) + "</div>" +
+            campo("Presentación", "config.presentacion", c.presentacion, { area: true, ph: "Frase de bienvenida" }) +
+            campo("Notas generales (una por línea)", "config.notasTxt", c.notasTxt, { area: true, hint: "Aparecen arriba, en rojo suave, para todo el evento." }) +
+            campo("Mensaje cuando está cerrado", "config.mensajeCerrado", c.mensajeCerrado, { ph: "Las inscripciones de este evento están cerradas." }) +
+            '<label class="opv-check"><input type="checkbox" data-k="config.permitirQuitarse"' + (c.permitirQuitarse ? " checked" : "") + "> Permitir que cada persona se quite desde su teléfono</label>" +
+            '<label class="opv-check"><input type="checkbox" data-k="config.pedirContacto" data-repintar' + (c.pedirContacto ? " checked" : "") + "> Pedir un dato de contacto (solo lo ve coordinación)</label>" +
+            (c.pedirContacto ? campo("Nombre del campo de contacto", "config.etiquetaContacto", c.etiquetaContacto, { ph: "WhatsApp" }) : "") +
+            "</section>";
+
+        h += '<div class="opv-admin-title" style="margin-top:26px"><div><h1 style="font-size:1.5rem">Posiciones</h1>' +
+            "<p>Horarios, vestimenta y textos tal como los ve la comunidad. Ordénalas con las flechas.</p></div>" +
+            '<button type="button" class="opv-btn opv-btn--ghost" data-agregar-sec>' + ICON.mas + "Agregar posición</button></div>";
+
+        h += c.secciones.map((s, i) => posicionHtml(s, i, c.secciones.length)).join("");
+        if (!c.secciones.length) h += '<p class="opv-hint">Este evento todavía no tiene posiciones.</p>';
+        h += '<p style="text-align:center"><button type="button" class="opv-btn opv-btn--ghost" data-agregar-sec>' + ICON.mas + "Agregar posición</button></p>";
+
+        h += '<div class="opv-savebar"><div class="opv-savebar__in"><span class="opv-savebar__txt" data-estado-cambios></span>' +
+            '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-descartar>Descartar</button>' +
+            '<button type="button" class="opv-btn opv-btn--primary" data-guardar>Guardar cambios</button></div></div>';
+
+        shellAdmin("evento", h);
+        window.scrollTo({ top: y, behavior: "instant" });
+        marcarCambios();
+
+        app.querySelectorAll("[data-copiar]").forEach((b) => { b.onclick = () => copiar(b.getAttribute("data-copiar"), "Enlace copiado"); });
+        app.querySelectorAll("[data-inscritos]").forEach((b) => { b.onclick = () => verInscritos(b.getAttribute("data-inscritos")); });
+
+        app.querySelectorAll("[data-k]").forEach((el) => {
+            const k = el.getAttribute("data-k");
+            const evento = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
+            el.addEventListener(evento, () => {
+                let v = el.type === "checkbox" ? el.checked : el.value;
+                if (el.hasAttribute("data-num")) v = Math.max(0, parseInt(v, 10) || 0);
+                const p = k.split(".");
+                let o = ed;
+                for (let i = 0; i < p.length - 1; i++) o = o[p[i]];
+                o[p[p.length - 1]] = v;
+                adm.sucio = true;
+                if (el.hasAttribute("data-repintar")) pintarEditor(id);
+                else marcarCambios();
             });
-            m.body.querySelectorAll("[data-abrir]").forEach((b) => { b.onclick = () => { const i = +b.getAttribute("data-abrir"); abiertas[i] = !abiertas[i]; pintar(); }; });
-            m.body.querySelectorAll("[data-subir],[data-bajar]").forEach((b) => {
-                b.onclick = () => {
-                    const i = +(b.getAttribute("data-subir") || b.getAttribute("data-bajar"));
-                    const j = b.hasAttribute("data-subir") ? i - 1 : i + 1;
-                    const arr = ed.config.secciones;
-                    [arr[i], arr[j]] = [arr[j], arr[i]];
-                    [abiertas[i], abiertas[j]] = [abiertas[j], abiertas[i]];
-                    pintar();
-                };
+        });
+
+        const cambiar = (fn) => { fn(); adm.sucio = true; pintarEditor(id); };
+        app.querySelectorAll("[data-subir],[data-bajar]").forEach((b) => {
+            b.onclick = () => cambiar(() => {
+                const i = +(b.getAttribute("data-subir") || b.getAttribute("data-bajar"));
+                const j = b.hasAttribute("data-subir") ? i - 1 : i + 1;
+                const arr = c.secciones;
+                [arr[i], arr[j]] = [arr[j], arr[i]];
             });
-            m.body.querySelectorAll("[data-borrar]").forEach((b) => {
-                b.onclick = async () => {
-                    const i = +b.getAttribute("data-borrar");
-                    if (!(await confirmar("¿Eliminar «" + (ed.config.secciones[i].titulo || "esta sección") + "»? Si tiene gente anotada, el servidor no lo permitirá: mejor desactívala.", { ok: "Eliminar", peligro: true }))) return;
-                    ed.config.secciones.splice(i, 1);
-                    Object.keys(abiertas).forEach((k) => delete abiertas[k]);
-                    pintar();
-                };
-            });
-            m.body.querySelectorAll("[data-agregar-rol]").forEach((b) => {
-                b.onclick = () => { ed.config.secciones[+b.getAttribute("data-agregar-rol")].roles.push({ rol: "", cupos: 1, nota: "" }); pintar(); };
-            });
-            m.body.querySelectorAll("[data-borrar-rol]").forEach((b) => {
-                b.onclick = () => { const [i, j] = b.getAttribute("data-borrar-rol").split(".").map(Number); ed.config.secciones[i].roles.splice(j, 1); pintar(); };
-            });
-            m.body.querySelector("[data-agregar-sec]").onclick = () => {
-                ed.config.secciones.push({ id: "", activa: true, titulo: "Nueva sección", cuando: "", donde: "", vestimenta: "", instrucciones: "", aviso: "", tipo: "LISTA", cupos: 10, grupo: "", roles: [] });
-                abiertas[ed.config.secciones.length - 1] = true;
-                pintar();
-                m.body.scrollTop = m.body.scrollHeight;
+        });
+        app.querySelectorAll("[data-borrar]").forEach((b) => {
+            b.onclick = async () => {
+                const i = +b.getAttribute("data-borrar");
+                if (!(await confirmar("¿Eliminar «" + (c.secciones[i].titulo || "esta posición") + "»? Si ya tiene gente anotada no se podrá guardar: en ese caso desmarca «Visible en la página».", { ok: "Eliminar", peligro: true }))) return;
+                cambiar(() => c.secciones.splice(i, 1));
             };
-        }
+        });
+        app.querySelectorAll("[data-agregar-rol]").forEach((b) => {
+            b.onclick = () => cambiar(() => c.secciones[+b.getAttribute("data-agregar-rol")].roles.push({ rol: "", cupos: 1, nota: "" }));
+        });
+        app.querySelectorAll("[data-borrar-rol]").forEach((b) => {
+            b.onclick = () => cambiar(() => { const [i, j] = b.getAttribute("data-borrar-rol").split(".").map(Number); c.secciones[i].roles.splice(j, 1); });
+        });
+        app.querySelectorAll("[data-agregar-sec]").forEach((b) => {
+            b.onclick = () => {
+                cambiar(() => c.secciones.push({ id: "", activa: true, titulo: "Nueva posición", cuando: "", donde: "", vestimenta: "", instrucciones: "", aviso: "", tipo: "LISTA", cupos: 10, grupo: "", roles: [] }));
+                const ultimo = app.querySelectorAll(".opv-pos");
+                if (ultimo.length) {
+                    const t = ultimo[ultimo.length - 1];
+                    t.scrollIntoView({ behavior: "smooth", block: "center" });
+                    const inp = t.querySelector(".opv-pos__titulo");
+                    if (inp) { inp.focus(); inp.select(); }
+                }
+            };
+        });
 
-        m.foot.innerHTML = '<a class="opv-btn opv-btn--ghost" href="' + esc(enlaceEvento(id)) + '" target="_blank" rel="noopener">Ver página</a>' +
-            '<span class="opv-top__sp"></span>' +
-            '<button type="button" class="opv-btn opv-btn--ghost" data-x>Cancelar</button><button type="button" class="opv-btn opv-btn--primary" data-ok>Guardar cambios</button>';
-        m.foot.querySelector("[data-x]").onclick = () => m.cerrar();
-        m.foot.querySelector("[data-ok]").onclick = async (e) => {
+        app.querySelector("[data-descartar]").onclick = async () => {
+            if (!(await confirmar("Se pierden los cambios que no guardaste en este evento.", { ok: "Descartar", peligro: true }))) return;
+            adm.ed = null;
+            adm.sucio = false;
+            pintarEditor(id);
+        };
+        app.querySelector("[data-guardar]").onclick = async (e) => {
             const btn = e.currentTarget;
-            const config = Object.assign({}, ed.config, { notas: String(ed.config.notasTxt || "").split("\n") });
+            const config = Object.assign({}, c, { notas: String(c.notasTxt || "").split("\n") });
             delete config.notasTxt;
             btn.disabled = true;
             btn.textContent = "Guardando…";
             try {
-                adm.datos = await api({ action: "admin_guardar_evento", clave: adm.clave, id, evento: { nombre: ed.nombre, fechas: ed.fechas, estado: ed.estado, config } }, adm.url);
-                m.cerrar();
-                pintarAdmin();
-                toast("Cambios guardados", "ok");
+                adm.datos = await A({ action: "admin_guardar_evento", id: ev.id, evento: { nombre: ed.nombre, fechas: ed.fechas, estado: ed.estado, config } });
+                adm.ed = null;
+                adm.sucio = false;
+                pintarEditor(id);
+                toast("Cambios guardados. La comunidad ya los ve en el enlace.", "ok");
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = "Guardar cambios";
                 toast(err.message, "error");
             }
         };
-        pintar();
+    }
+
+    function marcarCambios() {
+        const t = app.querySelector("[data-estado-cambios]");
+        if (!t) return;
+        t.textContent = adm.sucio ? "Tienes cambios sin guardar" : "Todo está guardado";
+        t.classList.toggle("opv-savebar__txt--sucio", adm.sucio);
+        app.querySelector("[data-guardar]").disabled = !adm.sucio;
+        app.querySelector("[data-descartar]").disabled = !adm.sucio;
+    }
+
+    function posicionHtml(s, i, total) {
+        const p = "config.secciones." + i + ".";
+        let h = '<section class="opv-pos' + (s.activa === false ? " opv-pos--off" : "") + (i % 2 ? " opv-pos--red" : "") + '">' +
+            '<div class="opv-pos__head"><span class="opv-pos__n">' + (i + 1) + "</span>" +
+            '<input class="opv-input opv-pos__titulo" data-k="' + p + 'titulo" value="' + esc(s.titulo) + '" placeholder="Nombre de la posición" aria-label="Nombre de la posición">' +
+            '<button type="button" class="opv-icon-btn" data-subir="' + i + '"' + (i === 0 ? " disabled" : "") + ' aria-label="Subir">↑</button>' +
+            '<button type="button" class="opv-icon-btn" data-bajar="' + i + '"' + (i === total - 1 ? " disabled" : "") + ' aria-label="Bajar">↓</button>' +
+            '<button type="button" class="opv-icon-btn opv-icon-btn--danger" data-borrar="' + i + '" aria-label="Eliminar posición">×</button></div>' +
+            '<div class="opv-pos__body"><div class="opv-grid2 opv-grid2--2">' +
+            campo("Día y hora de entrada", p + "cuando", s.cuando, { ph: "Sábado 14 de nov · 4:00 pm" }) +
+            campo("Vestimenta", p + "vestimenta", s.vestimenta, { ph: "Pantalón, camisa y zapatos negros" }) +
+            campo("Punto de encuentro", p + "donde", s.donde, { ph: "Salón principal" }) +
+            campo("Aviso (resaltado en amarillo)", p + "aviso", s.aviso, { ph: "Hora sujeta al avance del equipo" }) +
+            "</div>" +
+            campo("Instrucciones", p + "instrucciones", s.instrucciones, { area: true, ph: "Requisitos, qué traer, qué evitar…" }) +
+            '<div class="opv-grid3">' +
+            '<label class="opv-field"><span>Cómo se anota la gente</span><select class="opv-select opv-select--sm" data-k="' + p + 'tipo" data-repintar>' +
+            '<option value="LISTA"' + (s.tipo !== "ROLES" ? " selected" : "") + ">Lista de nombres</option>" +
+            '<option value="ROLES"' + (s.tipo === "ROLES" ? " selected" : "") + ">Roles fijos</option></select></label>" +
+            (s.tipo !== "ROLES" ? campo("Cupos", p + "cupos", s.cupos, { num: true, hint: "0 = sin límite" }) : "") +
+            campo("Grupo de horario", p + "grupo", s.grupo, { ph: "sabado-tarde", hint: "Mismo grupo = no se pueden combinar." }) +
+            "</div>";
+        if (s.tipo === "ROLES") {
+            h += '<div class="opv-label" style="margin:2px 0 6px">Roles <span class="opv-hint">(nombre · personas · nota)</span></div><div class="opv-ed-roles">' +
+                s.roles.map((r, j) => {
+                    const q = p + "roles." + j + ".";
+                    return '<div class="opv-ed-rol">' +
+                        '<input class="opv-input opv-input--sm" data-k="' + q + 'rol" placeholder="Nombre del rol" value="' + esc(r.rol) + '">' +
+                        '<input class="opv-input opv-input--sm" data-k="' + q + 'cupos" data-num type="number" min="1" title="Personas" value="' + esc(r.cupos || 1) + '">' +
+                        '<input class="opv-input opv-input--sm opv-ed-rol__nota" data-k="' + q + 'nota" placeholder="Nota (opcional)" value="' + esc(r.nota) + '">' +
+                        '<button type="button" class="opv-icon-btn opv-icon-btn--danger" data-borrar-rol="' + i + "." + j + '" aria-label="Quitar rol">×</button></div>';
+                }).join("") + "</div>" +
+                '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-agregar-rol="' + i + '" style="margin-bottom:12px">' + ICON.mas + "Agregar rol</button>";
+        }
+        h += '<label class="opv-check" style="margin:0"><input type="checkbox" data-k="' + p + 'activa"' + (s.activa !== false ? " checked" : "") + " data-repintar> Visible en la página</label>" +
+            "</div></section>";
+        return h;
     }
 
     // ---------- inscritos ----------
@@ -1128,7 +1352,7 @@
         let verCanceladas = false;
 
         async function cargar() {
-            datos = await api({ action: "admin_inscritos", clave: adm.clave, id }, adm.url);
+            datos = await A({ action: "admin_inscritos", id });
             m.titulo("Inscritos · " + datos.evento.nombre);
         }
 
@@ -1160,19 +1384,19 @@
             m.body.innerHTML =
                 '<div class="opv-card opv-card--cyan" style="padding:14px"><div class="opv-label" style="margin-bottom:8px">Anotar a alguien</div>' +
                 '<div class="opv-grid2"><label class="opv-field"><span>Nombre y apellido</span><input class="opv-input opv-input--sm" data-an></label>' +
-                '<label class="opv-field"><span>Sección</span><select class="opv-select opv-select--sm" data-as>' +
+                '<label class="opv-field"><span>Posición</span><select class="opv-select opv-select--sm" data-as>' +
                 secs.map((s) => '<option value="' + esc(s.id) + '">' + esc(s.titulo) + "</option>").join("") + "</select></label>" +
                 '<label class="opv-field" data-ar-wrap' + (secSel && secSel.tipo === "ROLES" ? "" : " hidden") + '><span>Rol</span><select class="opv-select opv-select--sm" data-ar></select></label></div>' +
                 '<button type="button" class="opv-btn opv-btn--cyan opv-btn--sm" data-anotar>' + ICON.mas + "Anotar</button>" +
                 ' <span class="opv-hint">Funciona aunque el evento esté cerrado.</span></div>' +
                 '<div class="opv-row" style="margin-bottom:10px">' +
-                '<select class="opv-select opv-select--sm" style="width:auto" data-filtro><option value="">Todas las secciones</option>' +
+                '<select class="opv-select opv-select--sm" style="width:auto" data-filtro><option value="">Todas las posiciones</option>' +
                 secs.map((s) => '<option value="' + esc(s.id) + '"' + (filtro === s.id ? " selected" : "") + ">" + esc(s.titulo) + "</option>").join("") + "</select>" +
                 '<label class="opv-check" style="margin:0"><input type="checkbox" data-vc' + (verCanceladas ? " checked" : "") + "> Ver canceladas</label>" +
                 '<span class="opv-top__sp"></span>' +
                 '<button type="button" class="opv-btn opv-btn--ghost opv-btn--sm" data-wa>' + ICON.copiar + "Copiar lista para WhatsApp</button></div>" +
                 (filas.length
-                    ? '<div class="opv-table-wrap"><table class="opv-table"><thead><tr><th>Nombre</th><th>Sección</th><th>Rol</th>' +
+                    ? '<div class="opv-table-wrap"><table class="opv-table"><thead><tr><th>Nombre</th><th>Posición</th><th>Rol</th>' +
                     (ev.config.pedirContacto ? "<th>" + esc(ev.config.etiquetaContacto) + "</th>" : "") + "<th>Fecha</th><th></th></tr></thead><tbody>" +
                     filas.map((i) => '<tr class="' + (i.estado === "CANCELADA" ? "opv-cancelada" : "") + '"><td><b>' + esc(i.nombre) + "</b></td><td>" + esc(i.seccionTitulo) + "</td><td>" + esc(i.rol || "—") + "</td>" +
                         (ev.config.pedirContacto ? "<td>" + esc(i.contacto || "—") + "</td>" : "") +
@@ -1197,7 +1421,7 @@
                 const btn = e.currentTarget;
                 btn.disabled = true;
                 try {
-                    await api({ action: "admin_inscribir", clave: adm.clave, id, nombre: m.body.querySelector("[data-an]").value, selecciones: [{ id: selS.value, rol: selR.value || "" }] }, adm.url);
+                    await A({ action: "admin_inscribir", id, nombre: m.body.querySelector("[data-an]").value, selecciones: [{ id: selS.value, rol: selR.value || "" }] });
                     await cargar();
                     pintar();
                     toast("Anotado", "ok");
@@ -1215,7 +1439,7 @@
                         if (!(await confirmar("¿Quitar a " + fila.nombre + " de «" + fila.seccionTitulo + "»? La fila queda en la hoja como CANCELADA.", { ok: "Quitar", peligro: true }))) return;
                     }
                     try {
-                        datos = await api({ action: "admin_estado_inscripcion", clave: adm.clave, id, comprobante: comp, estado: reactivar ? "ACTIVA" : "CANCELADA" }, adm.url);
+                        datos = await A({ action: "admin_estado_inscripcion", id, comprobante: comp, estado: reactivar ? "ACTIVA" : "CANCELADA" });
                         pintar();
                     } catch (err) { toast(err.message, "error"); }
                 };
@@ -1234,7 +1458,7 @@
         const cerrarOriginal = m.cerrar;
         m.cerrar = function () {
             cerrarOriginal();
-            api({ action: "admin_eventos", clave: adm.clave }, adm.url).then((r) => { adm.datos = r; if (ruta.modo === "admin") pintarAdmin(); }).catch(() => {});
+            A({ action: "admin_eventos" }).then((r) => { adm.datos = r; if (ruta.modo === "admin" && ruta.vista === "eventos") pintarEventos(); }).catch(() => {});
         };
         m.el.querySelector(".opv-modal__x").onclick = () => m.cerrar();
         m.el.querySelector(".opv-modal__bg").onclick = () => m.cerrar();
@@ -1245,14 +1469,29 @@
     //  ARRANQUE
     // ======================================================================
 
+    let hashPrevio = location.hash;
     function iniciar() {
-        ruta = leerRuta();
+        const nueva = leerRuta();
+        const saliendoDelEditor = ruta.modo === "admin" && ruta.vista === "evento" &&
+            !(nueva.modo === "admin" && nueva.vista === "evento" && clave(nueva.id) === clave(ruta.id));
+        if (saliendoDelEditor && adm.sucio) {
+            if (!window.confirm("Tienes cambios sin guardar en este evento. ¿Salir sin guardar?")) {
+                history.replaceState(null, "", hashPrevio);
+                return;
+            }
+        }
+        if (saliendoDelEditor) { adm.ed = null; adm.sucio = false; }
+        hashPrevio = location.hash;
+        ruta = nueva;
         while (pila.length) pila[pila.length - 1].cerrar();
         if (ruta.modo === "admin") return vistaAdmin();
         if (ruta.modo === "evento") return vistaEvento();
         return vistaInicio();
     }
 
+    window.addEventListener("beforeunload", (e) => {
+        if (adm.sucio) { e.preventDefault(); e.returnValue = ""; }
+    });
     window.addEventListener("hashchange", iniciar);
     iniciar();
 })();
