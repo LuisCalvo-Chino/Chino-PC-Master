@@ -21,7 +21,7 @@
 const ID_HOJA = '';
 
 /** Se muestra en el link de Admin para saber qué versión está publicada. */
-const OPV_VERSION = '1.0';
+const OPV_VERSION = '1.1';
 
 const OPV_HOJAS = { CONFIG: 'CONFIG', EVENTOS: 'EVENTOS' };
 
@@ -345,15 +345,19 @@ function plantilla_(tipo) {
   }
   if (tipo === 'introductorio') {
     return normalizarConfig_({
+      // Introductorio: sin roles ni choques de horario, solo listas de nombres.
       presentacion: 'Elige dónde quieres apoyar en este Introductorio. Cada lugar cuenta.',
       notas: ['Horas sujetas a cambio según el progreso del entrenamiento.'],
       secciones: [
-        { id: 'armado', titulo: 'Armado de Salón', tipo: 'LISTA', cupos: 9 },
-        { id: 'registro', titulo: 'Registro y bienvenida', tipo: 'LISTA', cupos: 10 },
-        { id: 'angeles', titulo: 'Ángeles', vestimenta: 'Pantalón, camisa y zapatos negros.', tipo: 'LISTA', cupos: 30 },
-        { id: 'upgrade', titulo: 'Upgrade (Inscripción al Avanzado)', vestimenta: 'Camisa VIVE, jeans sin huecos.',
-          instrucciones: 'Trae computadora o tablet si puedes.', tipo: 'LISTA', cupos: 15 },
-        { id: 'graduacion', titulo: 'Graduación', tipo: 'LISTA', cupos: 60 }
+        { id: 'montaje', titulo: 'Montaje de Salón', cuando: 'Martes · 2:00 pm', tipo: 'LISTA', cupos: 9 },
+        { id: 'linea-eleccion', titulo: 'Línea de Elección y Camino de Luz', cuando: 'Sábado · 7:00 pm',
+          vestimenta: 'Casual, zapatos cómodos. Desodorante sí, perfume no.',
+          instrucciones: 'No fumar ni tomar antes de ir.\nNo traer joyería, para cuidar la integridad y la experiencia de los participantes.',
+          tipo: 'LISTA', cupos: 60 },
+        { id: 'upgrade', titulo: 'Upgrade (Inscripción al Avanzado)', cuando: 'Domingo · 4:30 pm',
+          vestimenta: 'Camisa de VIVE o de equipo.',
+          instrucciones: 'Traer computadora o tablet.', tipo: 'LISTA', cupos: 15 },
+        { id: 'graduacion', titulo: 'Graduación', cuando: 'Domingo · 7:00 pm', tipo: 'LISTA', cupos: 30 }
       ]
     });
   }

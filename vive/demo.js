@@ -9,7 +9,7 @@
 (function () {
     "use strict";
 
-    const LLAVE = "opvive-demo-libro-v1";
+    const LLAVE = "opvive-demo-libro-v2";
     let libro = cargar();
 
     function cargar() {
@@ -153,6 +153,15 @@
             ["Gabriel Méndez", [{ id: "armado" }, { id: "contratos" }, { id: "angeles" }]]
         ];
         gente.forEach(([nombre, sel]) => post({ action: "inscribir", id, nombre, selecciones: sel }));
+
+        post({ action: "admin_crear_evento", clave, tipo: "introductorio", nombre: "Intro 39", fechas: "Dic 9 – 13" });
+        [
+            ["Andrea Quesada", ["linea-eleccion", "graduacion"]],
+            ["Esteban Rojas", ["montaje", "linea-eleccion"]],
+            ["Valeria Chaves", ["linea-eleccion", "upgrade"]],
+            ["Mauricio Solano", ["linea-eleccion", "graduacion"]],
+            ["Paola Jiménez", ["montaje"]]
+        ].forEach(([nombre, ids]) => post({ action: "inscribir", id: "intro-39", nombre, selecciones: ids.map((x) => ({ id: x })) }));
     }
 
     const listo = fetch("apps-script/Codigo.gs?v=" + (window.OPVIVE_ASSET_V || "1"), { cache: "no-cache" })

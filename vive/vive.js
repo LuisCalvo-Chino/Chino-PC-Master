@@ -24,7 +24,7 @@
     const ESTADOS = { ABIERTO: "Abierto", CERRADO: "Cerrado", ARCHIVADO: "Archivado" };
     const TIPOS_UI = [
         { id: "avanzado", nombre: "Operaciones Avanzado", ejemplo: "Avanzado 40", detalle: "Armado, Contratos, Ángeles de Cuna, Estiramientos con roles, Upgrade y Graduación." },
-        { id: "introductorio", nombre: "Operaciones Introductorio", ejemplo: "Introductorio 52", detalle: "Armado, Registro, Ángeles, Upgrade y Graduación." },
+        { id: "introductorio", nombre: "Operaciones Introductorio", ejemplo: "Intro 39", detalle: "Montaje de Salón, Línea de Elección y Camino de Luz, Upgrade y Graduación. Sin reglas: solo listas." },
         { id: "otro", nombre: "Otro evento", ejemplo: "Reunión de equipo", detalle: "Una lista general para armar a tu gusto." }
     ];
 
