@@ -3920,6 +3920,16 @@
         const vendedor = D.sectores.length ? null : input("bn-c-vendedor", "", { placeholder: "Opcional" });
         const metodo = select("bn-c-metodo", [["SINPE", "SINPE Móvil"], ...(D.iban ? [["Transferencia", "Transferencia"]] : [])], "SINPE");
         const comprobante = el("input", { type: "file", id: "bn-c-comp", class: "bn-file", accept: "image/*,application/pdf" });
+        /* Botón con la apariencia del formulario en lugar del «Choose file» del navegador. */
+        const textoArchivo = el("span", { text: "Elegir foto o PDF" });
+        const nombreArchivo = el("small", { class: "bn-note bn-file-name", text: "Todavía no elegiste el comprobante." });
+        const botonArchivo = el("label", { class: "bn-btn bn-btn--primary bn-file-btn" }, comprobante, textoArchivo);
+        comprobante.addEventListener("change", () => {
+            const f = comprobante.files && comprobante.files[0];
+            textoArchivo.textContent = f ? "Cambiar comprobante" : "Elegir foto o PDF";
+            nombreArchivo.textContent = f ? `Elegiste: ${f.name}` : "Todavía no elegiste el comprobante.";
+            nombreArchivo.classList.toggle("is-listo", Boolean(f));
+        });
         const total = el("strong", { class: "bn-total" });
         const desglose = el("small", { class: "bn-note bn-block" });
         const combos = (D.precios || []).filter((x) => x.cantidad > 1);
@@ -3969,7 +3979,8 @@
                 el("section", { class: "bn-card" }, el("h2", { text: "2. Cartones" }),
                     combos.length ? el("div", { class: "bn-combo-chips" }, combos.map((x) => el("span", { class: "bn-chip", text: `${x.cantidad} por ${colones(x.precio)}` }))) : null,
                     el("div", { class: "bn-buy-qty" }, campo("Cantidad", cantidad), el("div", {}, el("span", { class: "bn-label", text: "Total a pagar" }), total, desglose))),
-                el("section", { class: "bn-card" }, el("h2", { text: "3. Pago" }), pago, el("div", { class: "bn-form-grid" }, campo("Forma de pago", metodo), campo("Comprobante (foto o PDF)", comprobante))),
+                el("section", { class: "bn-card" }, el("h2", { text: "3. Pago" }), pago, el("div", { class: "bn-form-grid" }, campo("Forma de pago", metodo),
+                    el("div", { class: "bn-field" }, el("span", { class: "bn-label", text: "Comprobante (foto o PDF)" }), botonArchivo, nombreArchivo))),
                 enviar
             )
         );
