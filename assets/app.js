@@ -167,19 +167,40 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentPage = "home";
 
     let messageTimerId = null;
+    function hideMessage() {
+        if (!authMessage) return;
+        authMessage.classList.remove("show");
+        if (messageTimerId) {
+            window.clearTimeout(messageTimerId);
+            messageTimerId = null;
+        }
+    }
+
+    /** Aviso flotante: siempre encima de todo (modales incluidos) y con una ✕ para cerrarlo. */
     function showMessage(text, kind = "info", durationMs = 4200) {
         if (!authMessage) return;
-        authMessage.textContent = text;
+        const texto = document.createElement("span");
+        texto.className = "auth-message__text";
+        texto.textContent = text;
+        const cerrar = document.createElement("button");
+        cerrar.type = "button";
+        cerrar.className = "auth-message__close";
+        cerrar.setAttribute("aria-label", "Cerrar aviso");
+        cerrar.textContent = "×";
+        cerrar.addEventListener("click", hideMessage);
+        authMessage.replaceChildren(texto, cerrar);
         authMessage.className = `auth-message show ${kind}`;
+        authMessage.setAttribute("role", kind === "error" ? "alert" : "status");
+        // Al final del body: si un modal se agregó después, el aviso sigue arriba.
+        if (authMessage.parentNode === document.body && document.body.lastElementChild !== authMessage) {
+            document.body.appendChild(authMessage);
+        }
         if (messageTimerId) {
             window.clearTimeout(messageTimerId);
             messageTimerId = null;
         }
         if (durationMs > 0) {
-            messageTimerId = window.setTimeout(() => {
-                authMessage.classList.remove("show");
-                messageTimerId = null;
-            }, durationMs);
+            messageTimerId = window.setTimeout(hideMessage, durationMs);
         }
     }
 
@@ -819,7 +840,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.body.classList.remove("cpm-rifa-standalone");
             }
             if (pageName !== "bingo") {
-                document.body.classList.remove("cpm-bingo-standalone");
+                document.body.classList.remove("cpm-bingo-standalone", "bn-form-pintado");
+                document.body.style.removeProperty("--bn-form-fondo");
             }
 
             setupContactFormOnCurrentPage();

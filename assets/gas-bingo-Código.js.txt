@@ -55,6 +55,7 @@ var CONFIG_DEFAULTS_ = {
   cartones_habilitados: String(LOTE_DEFAULT_), lote: String(LOTE_DEFAULT_),
   arte_file_id: "", letras_sistema: "true", setup_done: "false",
   marcado: "manual", sorteo: "app", digitos: "5", centro: "libre", centro_file_id: "",
+  formulario: "", logo_file_id: "",
   plantilla_whatsapp: "Hola *{{nombre}}* 🎉\nGracias por tu compra en *{{bingo}}* ({{fecha}}).\nTus cartones: {{cartones}}\nModalidad: *{{modalidad}}*\n\n👇 Aquí juegas en línea y ves cada bola cantada:\n{{link}}",
   plantilla_email_asunto: "Tus cartones para {{bingo}}",
   plantilla_email: "<p>Hola {{nombre}}:</p><p>Gracias por tu compra en <b>{{bingo}}</b>, que se juega el {{fecha}}.</p><p>Tus {{cantidad}} cartones: <b>{{cartones}}</b>.</p><p>Modalidad: <b>{{modalidad}}</b>.</p><p>Aquí juegas en línea y ves cada bola cantada:</p><p><a href=\"{{link}}\" style=\"display:inline-block;padding:12px 22px;background:#0097a7;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold\">Ver mis cartones</a></p><p>Si compras más cartones con este mismo correo, aparecen en este mismo link.</p>",
@@ -131,6 +132,8 @@ function doPost(e) {
     if (action === "delete_arte") return ok_(conLock_(function () { return updateConfig_(b, { arte_file_id: "" }); }));
     if (action === "upload_centro") return ok_(conLock_(function () { return uploadCentro_(b, data); }));
     if (action === "delete_centro") return ok_(conLock_(function () { return updateConfig_(b, { centro_file_id: "" }); }));
+    if (action === "upload_logo") return ok_(conLock_(function () { return uploadLogo_(b, data); }));
+    if (action === "delete_logo") return ok_(conLock_(function () { return deleteLogo_(b); }));
     if (action === "save_precios") return ok_(conLock_(function () { return savePrecios_(b, data.precios || []); }));
     if (action === "save_sectores") return ok_(conLock_(function () { return saveSectores_(b, data.sectores || []); }));
     if (action === "list_entradas") return ok_(listEntradas_(b));
@@ -537,7 +540,7 @@ function readConfig_(b) {
 
 var CONFIG_EDITABLES_ = ["nombre", "fecha", "hora", "lugar", "modalidad", "whatsapp", "sinpe_numero", "sinpe_nombre",
   "iban", "precio_unitario", "lote", "setup_done", "plantilla_whatsapp", "plantilla_email_asunto", "plantilla_email",
-  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "sorteo", "digitos", "centro", "centro_file_id", "diseno"];
+  "arte_file_id", "letras_sistema", "sitio_url", "marcado", "sorteo", "digitos", "centro", "centro_file_id", "diseno", "formulario"];
 
 /** Diseño del cartón (JSON del organizador): solo se guarda si es un objeto válido y de tamaño razonable. */
 function disenoValido_(v) {
@@ -547,6 +550,24 @@ function disenoValido_(v) {
   try { o = JSON.parse(v); } catch (e) { throw new Error("El diseño del cartón no es válido."); }
   if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("El diseño del cartón no es válido.");
   return JSON.stringify(o);
+}
+
+/** Apariencia del formulario de compra (JSON): colores, letra y alineación del logo. */
+var FORM_COLORES_ = ["fondo", "tarjeta", "acento", "texto"];
+var FORM_FUENTES_ = ["inter", "montserrat", "poppins", "roboto", "lato", "nunito", "raleway", "oswald", "merriweather", "playfair", "fredoka", "righteous"];
+function formularioValido_(v) {
+  if (!v) return "";
+  if (v.length > 2000) throw new Error("La apariencia del formulario es demasiado larga.");
+  var o;
+  try { o = JSON.parse(v); } catch (e) { throw new Error("La apariencia del formulario no es válida."); }
+  if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("La apariencia del formulario no es válida.");
+  var limpio = {};
+  FORM_COLORES_.forEach(function (k) {
+    if (/^#[0-9a-fA-F]{6}$/.test(String(o[k] || ""))) limpio[k] = String(o[k]).toLowerCase();
+  });
+  if (FORM_FUENTES_.indexOf(String(o.fuente)) !== -1) limpio.fuente = String(o.fuente);
+  if (/^(izquierda|centro|derecha)$/.test(String(o.logo_alineacion || ""))) limpio.logo_alineacion = String(o.logo_alineacion);
+  return Object.keys(limpio).length ? JSON.stringify(limpio) : "";
 }
 
 function updateConfig_(b, changes) {
@@ -564,6 +585,7 @@ function updateConfig_(b, changes) {
     if (k === "digitos") v = v === "3" || v === "4" ? v : "5";
     if (k === "centro") v = v === "numero" ? "numero" : "libre";
     if (k === "diseno") v = disenoValido_(v);
+    if (k === "formulario") v = formularioValido_(v);
     if (byKey[k]) sh.getRange(byKey[k], 2).setValue(v);
     else { sh.appendRow([k, v]); byKey[k] = sh.getLastRow(); }
   });
@@ -659,6 +681,7 @@ function publicConfig_(b, cfg) {
     letras_sistema: cfg.letras_sistema !== "false", diseno: cfg.diseno || "",
     marcado_auto: cfg.marcado === "auto", sorteo: cfg.sorteo === "tombola" ? "tombola" : "app", digitos: digitos_(cfg), centro_numero: cfg.centro === "numero",
     centro_url: cfg.centro !== "numero" && cfg.centro_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.centro_file_id : "",
+    formulario: cfg.formulario || "", logo_url: logoUrl_(cfg),
     vivo_id: prop_("VIVO_SPREADSHEET_ID")
   };
 }
@@ -903,6 +926,35 @@ function uploadCentro_(b, data) {
   }
   setConfigValue_(b, "centro_file_id", file.getId());
   return { centro_file_id: file.getId(), centro_url: "https://lh3.googleusercontent.com/d/" + file.getId() };
+}
+
+function logoUrl_(cfg) {
+  return cfg.logo_file_id ? "https://lh3.googleusercontent.com/d/" + cfg.logo_file_id : "";
+}
+
+/** Logo del formulario de compra: PNG, JPG o WEBP de hasta 1 MB (el panel lo reduce antes de subirlo). */
+function uploadLogo_(b, data) {
+  var ext = /png/.test(String(data.archivo || "")) ? "png" : /webp/.test(String(data.archivo || "")) ? "webp" : "jpg";
+  var blob = decodeDataUrl_(data.archivo, "logo-formulario-" + Date.now() + "." + ext);
+  if (!/^image\/(png|jpe?g|webp)$/.test(blob.getContentType())) throw new Error("El logo debe ser PNG, JPG o WEBP.");
+  if (blob.getBytes().length > 1024 * 1024) throw new Error("El logo pesa más de 1 MB.");
+  var file = subcarpeta_(b, "diseño").createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var cfg = readConfig_(b);
+  if (cfg.logo_file_id) {
+    try { DriveApp.getFileById(cfg.logo_file_id).setTrashed(true); } catch (e) { /* ya no existe */ }
+  }
+  setConfigValue_(b, "logo_file_id", file.getId());
+  return { config: readConfig_(b), logo_url: logoUrl_({ logo_file_id: file.getId() }) };
+}
+
+function deleteLogo_(b) {
+  var cfg = readConfig_(b);
+  if (cfg.logo_file_id) {
+    try { DriveApp.getFileById(cfg.logo_file_id).setTrashed(true); } catch (e) { /* ya no existe */ }
+  }
+  setConfigValue_(b, "logo_file_id", "");
+  return { config: readConfig_(b), logo_url: "" };
 }
 
 function dataUrlDe_(fileId) {
@@ -1294,7 +1346,7 @@ function resolveAdmin_(b) {
   var entradas = entradas_(b);
   var vendidos = cartonesVendidos_(b);
   return {
-    bingo: bingoPublico_(b), seed: b.seed, config: cfg, arte_url: arteUrl_(cfg),
+    bingo: bingoPublico_(b), seed: b.seed, config: cfg, arte_url: arteUrl_(cfg), logo_url: logoUrl_(cfg),
     precios: preciosObj_(b), sectores: sectores_(b), vivo_id: prop_("VIVO_SPREADSHEET_ID"),
     resumen: resumen_(entradas, vendidos, cfg)
   };

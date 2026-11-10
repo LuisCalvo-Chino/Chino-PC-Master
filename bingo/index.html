@@ -59,14 +59,22 @@
 
         /* Avisos (mismo comportamiento que en el sitio) */
         .auth-message {
-            position: fixed; right: 20px; bottom: 20px; z-index: 4000;
+            position: fixed; right: 20px; bottom: 20px; z-index: 2147483000;
+            display: flex; align-items: flex-start; gap: 10px;
             min-width: 240px; max-width: min(420px, calc(100vw - 40px));
-            padding: 12px 14px; border-radius: 10px;
+            padding: 12px 10px 12px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
             border: 1px solid #0047ab; background: rgba(33, 33, 33, 0.95); color: #fff;
             opacity: 0; transform: translateY(8px); pointer-events: none;
             transition: opacity 0.2s ease, transform 0.2s ease;
         }
-        .auth-message.show { opacity: 1; transform: translateY(0); }
+        .auth-message.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .auth-message__text { flex: 1; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+        .auth-message__close {
+            flex: none; width: 28px; height: 28px; margin: -4px 0; border: 0; border-radius: 6px;
+            background: rgba(255, 255, 255, 0.12); color: inherit; font-size: 1.25rem; line-height: 1; cursor: pointer;
+        }
+        .auth-message__close:hover, .auth-message__close:focus-visible { background: rgba(255, 255, 255, 0.25); outline: none; }
+        @media (max-width: 520px) { .auth-message { left: 12px; right: 12px; bottom: 12px; max-width: none; min-width: 0; } }
         .auth-message.success { border-color: #00ffff; background: rgba(18, 108, 54, 0.92); color: #dcffe9; }
         .auth-message.error { border-color: #ff7a00; background: rgba(144, 24, 24, 0.94); color: #ffe5e5; }
         .auth-message.info { border-color: #0047ab; background: rgba(0, 71, 171, 0.92); color: #e8f2ff; }
@@ -74,7 +82,7 @@
 
     <script>
         /** Igual que en index.html: subirlo al cambiar los JS/CSS del bingo. */
-        window.CPM_ASSET_V = "68";
+        window.CPM_ASSET_V = "69";
         window.CPM_BINGO_GAS_URL = "https://script.google.com/macros/s/AKfycbwh5GKUlr6WAg3EJiGo79maMndJLeMPoZ64W6cw1Yn5Dg-Orrgy07UVHSI2fpMJlBhf/exec";
     </script>
 </head>
@@ -98,11 +106,28 @@
             const aviso = document.getElementById("auth-message");
             let temporizador = null;
 
-            function showMessage(texto, tipo = "info", ms = 4200) {
-                aviso.textContent = texto;
-                aviso.className = `auth-message show ${tipo}`;
+            function ocultarAviso() {
+                aviso.classList.remove("show");
                 clearTimeout(temporizador);
-                if (ms > 0) temporizador = setTimeout(() => aviso.classList.remove("show"), ms);
+            }
+
+            /** Aviso siempre encima de todo, con una ✕ para cerrarlo. */
+            function showMessage(texto, tipo = "info", ms = 4200) {
+                const t = document.createElement("span");
+                t.className = "auth-message__text";
+                t.textContent = texto;
+                const x = document.createElement("button");
+                x.type = "button";
+                x.className = "auth-message__close";
+                x.setAttribute("aria-label", "Cerrar aviso");
+                x.textContent = "×";
+                x.addEventListener("click", ocultarAviso);
+                aviso.replaceChildren(t, x);
+                aviso.className = `auth-message show ${tipo}`;
+                aviso.setAttribute("role", tipo === "error" ? "alert" : "status");
+                if (document.body.lastElementChild !== aviso) document.body.appendChild(aviso);
+                clearTimeout(temporizador);
+                if (ms > 0) temporizador = setTimeout(ocultarAviso, ms);
             }
 
             function cargar(src) {

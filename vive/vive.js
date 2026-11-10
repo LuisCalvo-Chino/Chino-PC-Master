@@ -64,10 +64,20 @@
     function toast(msg, tipo) {
         const el = document.getElementById("opv-toast");
         if (!el) return;
-        el.textContent = msg;
+        // Texto + ✕ para cerrarlo; siempre encima de las ventanas.
+        const texto = document.createElement("span");
+        texto.textContent = msg;
+        const cerrar = document.createElement("button");
+        cerrar.type = "button";
+        cerrar.className = "opv-toast__close";
+        cerrar.setAttribute("aria-label", "Cerrar aviso");
+        cerrar.textContent = "×";
+        cerrar.addEventListener("click", () => { clearTimeout(toastTimer); el.className = "opv-toast"; });
+        el.replaceChildren(texto, cerrar);
         el.className = "opv-toast show" + (tipo ? " " + tipo : "");
+        el.setAttribute("role", tipo === "error" ? "alert" : "status");
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { el.className = "opv-toast"; }, 3200);
+        toastTimer = setTimeout(() => { el.className = "opv-toast"; }, tipo === "error" ? 6000 : 3200);
     }
 
     async function copiar(texto, aviso) {

@@ -340,12 +340,19 @@ body.opv-lock { overflow: hidden; }
 
 /* ---------- avisos breves ---------- */
 .opv-toast {
-    position: fixed; left: 50%; bottom: 24px; z-index: 200; transform: translate(-50%, 20px);
-    max-width: min(520px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 14px;
+    position: fixed; left: 50%; bottom: 24px; z-index: 2147483000; transform: translate(-50%, 20px);
+    display: flex; align-items: center; gap: 12px;
+    max-width: min(520px, calc(100vw - 32px)); padding: 10px 10px 10px 18px; border-radius: 14px;
     background: var(--ink); color: #fff; font-weight: 800; font-size: 0.95rem; text-align: center;
     opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.opv-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.opv-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.opv-toast > span { flex: 1; min-width: 0; }
+.opv-toast__close {
+    flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.16); color: inherit; font-size: 1.3rem; line-height: 1;
+}
+.opv-toast__close:hover, .opv-toast__close:focus-visible { background: rgba(255, 255, 255, 0.3); outline: none; }
 .opv-toast.error { background: var(--red-700); }
 .opv-toast.ok { background: var(--cyan-700); }
 

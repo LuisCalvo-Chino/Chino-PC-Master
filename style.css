@@ -804,11 +804,16 @@ body.nav-active .mobile-sidebar {
     position: fixed;
     right: 20px;
     bottom: 20px;
-    z-index: 2000;
+    /* Por encima de cualquier modal, loader o panel del sitio */
+    z-index: 2147483000;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     min-width: 240px;
     max-width: 420px;
-    padding: 12px 14px;
+    padding: 12px 10px 12px 14px;
     border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     border: 1px solid var(--cobalt-blue);
     background: rgba(33, 33, 33, 0.95);
     color: var(--white);
@@ -821,6 +826,34 @@ body.nav-active .mobile-sidebar {
 .auth-message.show {
     opacity: 1;
     transform: translateY(0);
+    pointer-events: auto;
+}
+
+.auth-message__text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.auth-message__close {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin: -4px 0 -4px 0;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.auth-message__close:hover,
+.auth-message__close:focus-visible {
+    background: rgba(255, 255, 255, 0.25);
+    outline: none;
 }
 
 .auth-message.success {

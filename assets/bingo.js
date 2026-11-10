@@ -280,27 +280,60 @@
         });
     }
 
-    function modal(titulo, contenido, acciones) {
+    /**
+     * Ventana modal. Con opciones.avisarSinGuardar, tocar afuera no la cierra y, si el usuario
+     * cambió algo, la ✕ o "Cancelar" preguntan antes de descartar lo escrito.
+     * La función que reciben las acciones (y que se devuelve) cierra sin preguntar: es la de "Guardar".
+     */
+    function modal(titulo, contenido, acciones, opciones) {
+        const o = opciones || {};
+        let cambios = false;
         const cerrar = () => fondo.remove();
+        const intentarCerrar = async () => {
+            if (!o.avisarSinGuardar || !cambios) return cerrar();
+            const salir = await confirmar(
+                "¿Cerrar sin guardar?",
+                o.avisarSinGuardar === true ? "Si cierras esta ventana sin guardar, se pierde la información que escribiste." : o.avisarSinGuardar,
+                "Cerrar sin guardar",
+                true,
+                "Seguir editando"
+            );
+            if (salir) cerrar();
+        };
+        const cuerpo = el("div", { class: "bn-modal-body" }, contenido);
+        if (o.avisarSinGuardar) {
+            const marcar = () => { cambios = true; };
+            cuerpo.addEventListener("input", marcar);
+            cuerpo.addEventListener("change", marcar);
+            cuerpo.addEventListener("click", (e) => { if (e.target.closest("button")) marcar(); });
+        }
         const fondo = el(
             "div",
-            { class: "bn-modal-bg", onclick: (e) => e.target === fondo && cerrar() },
+            {
+                class: "bn-modal-bg",
+                onclick: (e) => {
+                    if (e.target !== fondo) return;
+                    // Ventana protegida: un toque accidental afuera no la cierra; solo avisa si hay algo que perder.
+                    if (!o.avisarSinGuardar) cerrar();
+                    else if (cambios) intentarCerrar();
+                }
+            },
             el(
                 "div",
                 { class: "bn-modal", role: "dialog", "aria-modal": "true", "aria-label": titulo },
-                el("div", { class: "bn-modal-head" }, el("h3", { text: titulo }), el("button", { class: "bn-icon-btn", "aria-label": "Cerrar", onclick: cerrar, text: "×" })),
-                el("div", { class: "bn-modal-body" }, contenido),
-                acciones ? el("div", { class: "bn-modal-actions" }, acciones(cerrar)) : null
+                el("div", { class: "bn-modal-head" }, el("h3", { text: titulo }), el("button", { class: "bn-icon-btn", "aria-label": "Cerrar", onclick: intentarCerrar, text: "×" })),
+                cuerpo,
+                acciones ? el("div", { class: "bn-modal-actions" }, acciones(cerrar, intentarCerrar)) : null
             )
         );
         document.body.appendChild(fondo);
         return cerrar;
     }
 
-    function confirmar(titulo, texto, textoBoton, peligro) {
+    function confirmar(titulo, texto, textoBoton, peligro, textoCancelar) {
         return new Promise((resolve) => {
             modal(titulo, el("p", { text: texto }), (cerrar) => [
-                el("button", { class: "bn-btn", onclick: () => { cerrar(); resolve(false); }, text: "Cancelar" }),
+                el("button", { class: "bn-btn", onclick: () => { cerrar(); resolve(false); }, text: textoCancelar || "Cancelar" }),
                 el("button", { class: `bn-btn ${peligro ? "bn-btn--danger" : "bn-btn--primary"}`, onclick: () => { cerrar(); resolve(true); }, text: textoBoton })
             ]);
         });
@@ -1452,7 +1485,7 @@
         }
 
         const TABS = rol === "organizador"
-            ? [["resumen", "Resumen", "▦"], ["ventas", "Ventas", "₡"], ["cartones", "Cartones", "▤"], ["sectores", "Sectores", "◎"], ["juego", "Juego", "●"], ["ajustes", "Ajustes", "⚙"]]
+            ? [["resumen", "Resumen", "▦"], ["ventas", "Ventas", "₡"], ["cartones", "Cartones", "▤"], ["sectores", "Sectores", "◎"], ["juego", "Juego", "●"], ["formulario", "Formulario", "✎"], ["ajustes", "Ajustes", "⚙"]]
             : [["juego", "Juego", "●"]];
         if (rol !== "organizador") S.tab = "juego";
 
@@ -1479,7 +1512,7 @@
                 vivoActual.detener();
                 vivoActual = null;
             }
-            const vistas = { resumen: vistaResumen, ventas: vistaVentas, cartones: vistaCartones, sectores: vistaSectores, juego: vistaJuego, ajustes: vistaAjustes };
+            const vistas = { resumen: vistaResumen, ventas: vistaVentas, cartones: vistaCartones, sectores: vistaSectores, juego: vistaJuego, formulario: vistaFormulario, ajustes: vistaAjustes };
             poner(cuerpo, );
             try {
                 const p = vistas[tab](cuerpo);
@@ -2580,7 +2613,7 @@
                 modal(ronda ? "Editar ronda" : "Nueva ronda", el("div", { class: "bn-stack" },
                     el("div", { class: "bn-form-grid" }, campo("Nombre", nombre), campo("Tipo de ronda", tipo)),
                     explicacion, cajaFiguras, cajaUnico
-                ), (cerrar) => {
+                ), (cerrar, intentarCerrar) => {
                     const ok = el("button", { class: "bn-btn bn-btn--primary", text: "Guardar" });
                     ok.addEventListener("click", async () => {
                         if (tipo.value === "figuras" && premios.some((p) => p.figura === "custom" && !p.celdas)) {
@@ -2590,8 +2623,10 @@
                         const r = await accion(ok, { action: "game_save_ronda", ronda: { ronda_id: ronda ? ronda.ronda_id : 0, nombre: nombre.value, tipo: tipo.value, premios: lista } });
                         if (r) { cerrar(); pintar(); }
                     });
-                    return [el("button", { class: "bn-btn", onclick: cerrar, text: "Cancelar" }), ok];
-                });
+                    return [el("button", { class: "bn-btn", onclick: intentarCerrar, text: "Cancelar" }), ok];
+                }, { avisarSinGuardar: ronda
+                    ? "Si cierras esta ventana sin guardar, se pierden los cambios que hiciste a esta ronda."
+                    : "Si cierras esta ventana sin guardar, se pierde la ronda que estás creando." });
             }
 
             function pintar() {
@@ -3124,6 +3159,217 @@
         }
 
         /* ---------- Ajustes ---------- */
+        /* ---------- Formulario de compra: colores, letra y logo ---------- */
+        function vistaFormulario(root) {
+            const cfg = S.data.config;
+            let f = leerFormulario(cfg.formulario);
+            const logoGuardado = () => S.data.logo_url || (S.data.config.logo_file_id ? `https://lh3.googleusercontent.com/d/${S.data.config.logo_file_id}` : "");
+            let logoNuevo = null; /* data URL elegido y todavía sin subir */
+
+            const guardar = el("button", { class: "bn-btn bn-btn--primary", text: "Guardar apariencia" });
+            const estadoGuardar = el("small", { class: "bn-note" });
+            guardar.disabled = true;
+            const marcar = () => {
+                guardar.disabled = false;
+                estadoGuardar.textContent = "Hay cambios sin guardar.";
+                pintarVista();
+            };
+
+            /* Vista previa: el mismo encabezado y estilos que ve el comprador */
+            const vista = el("div", { class: "bn-form-preview" });
+            const avisos = el("div", { class: "bn-stack" });
+            function pintarVista() {
+                const precio = precioLocal(S.data.precios, cfg.precio_unitario, 1);
+                const caja = el("div", { class: "bn-buy" },
+                    cabeceraCompra(cfg, f, logoNuevo || logoGuardado()),
+                    el("section", { class: "bn-card" }, el("h2", { text: "1. Tus datos" }), el("div", { class: "bn-form-grid" },
+                        campo("Nombre", el("input", { class: "bn-input", placeholder: "Nombre y apellido" })),
+                        campo("¿Cómo vas a jugar?", select(null, [["Presencial", "Presencial"], ["Virtual", "Virtual"]], "Virtual")))),
+                    el("section", { class: "bn-card" }, el("h2", { text: "2. Cartones" }),
+                        el("div", {}, el("span", { class: "bn-label", text: "Total a pagar" }), el("strong", { class: "bn-total", text: colones(precio || 3000) }))),
+                    el("span", { class: "bn-btn bn-btn--primary bn-btn--xl", text: "Enviar compra" })
+                );
+                caja.inert = true;
+                aplicarFormulario(caja, f);
+                vista.style.background = f.fondo;
+                poner(vista, caja);
+                const lista = [];
+                if (contraste(f.texto, f.tarjeta) < 4.5) lista.push("La letra casi no se lee sobre las secciones. Usa una letra clara sobre secciones oscuras, o una letra oscura sobre secciones claras.");
+                if (contraste(f.texto, f.fondo) < 4.5) lista.push("El nombre del bingo casi no se lee sobre el fondo de la página.");
+                if (contraste(f.acento, f.tarjeta) < 1.6 && contraste(f.acento, f.fondo) < 1.6) lista.push("El color de los botones casi no se distingue del fondo.");
+                poner(avisos, ...lista.map((t) => el("div", { class: "bn-combo-alert" }, el("p", { text: t }))));
+            }
+
+            /* Colores y letra */
+            const controles = el("div", { class: "bn-form-grid" });
+            const COLORES = [["fondo", "Fondo de la página"], ["tarjeta", "Fondo de las secciones"], ["acento", "Botones y detalles"], ["texto", "Color de la letra"]];
+            function pintarControles() {
+                const letra = select("bn-form-fuente", FORM_FUENTES.map((id) => [id, id === "inter" ? "Inter (la de siempre)" : fuenteNombre(id)]), f.fuente);
+                letra.addEventListener("change", () => { f.fuente = letra.value; marcar(); });
+                poner(controles,
+                    ...COLORES.map(([k, nombre]) => {
+                        const c = el("input", { type: "color", class: "bn-color", id: `bn-form-${k}`, value: f[k] });
+                        c.addEventListener("input", () => { f[k] = c.value; marcar(); });
+                        return campo(nombre, c);
+                    }),
+                    campo("Tipo de letra", letra, "Se usa en títulos, campos y botones.")
+                );
+            }
+            const restablecer = el("button", { class: "bn-btn bn-btn--sm", text: "Volver a los colores y la letra de siempre" });
+            restablecer.addEventListener("click", () => {
+                f = { ...FORM_BASE, logo_alineacion: f.logo_alineacion };
+                pintarControles();
+                marcar();
+            });
+
+            /* Logo */
+            const alineacion = opcionesGrandes("bn-form-alin", [
+                ["izquierda", "Izquierda", "Logo y nombre pegados al lado izquierdo."],
+                ["centro", "Centrado", "Logo y nombre al centro."],
+                ["derecha", "Derecha", "Logo y nombre pegados al lado derecho."]
+            ], f.logo_alineacion);
+            alineacion.addEventListener("change", () => { f.logo_alineacion = alineacion.value; marcar(); });
+            const logoArchivo = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", id: "bn-logo-file", class: "bn-file" });
+            const logoEstado = el("p", { class: "bn-note" });
+            const logoAcciones = el("div", { class: "bn-btnrow" });
+
+            function pintarLogo() {
+                const plantilla = el("button", { class: "bn-btn bn-btn--sm", onclick: descargarPlantillaLogo, text: `Plantilla del logo (PNG ${LOGO.recAncho} × ${LOGO.recAlto})` });
+                if (logoNuevo) {
+                    const subir = el("button", { class: "bn-btn bn-btn--sm bn-btn--primary", text: "Usar este logo" });
+                    subir.addEventListener("click", () => conBoton(subir, async () => {
+                        const r = await llamar({ action: "upload_logo", hash, archivo: logoNuevo }, { timeoutMs: 90000 });
+                        if (!r || !r.logo_url) throw new Error("El servidor del bingo no guardó el logo: falta publicar la versión nueva del Apps Script.");
+                        S.data.logo_url = r.logo_url;
+                        if (r.config) S.data.config = r.config;
+                        logoNuevo = null;
+                        logoEstado.textContent = "Logo guardado. Ya aparece en el formulario de compra.";
+                        pintarLogo();
+                        pintarVista();
+                        showMessage("Logo guardado.", "success");
+                    }, "Subiendo…"));
+                    const descartar = el("button", { class: "bn-btn bn-btn--sm", text: "Descartar" });
+                    descartar.addEventListener("click", () => {
+                        logoNuevo = null;
+                        logoEstado.textContent = "";
+                        pintarLogo();
+                        pintarVista();
+                    });
+                    return poner(logoAcciones, subir, descartar);
+                }
+                const quitar = el("button", { class: "bn-btn bn-btn--sm bn-btn--danger", text: "Quitar logo" });
+                quitar.addEventListener("click", () => conBoton(quitar, async () => {
+                    if (!(await confirmar("Quitar logo", "El formulario vuelve a mostrar las bolas de BINGO arriba. El archivo se borra de la carpeta del bingo en Drive.", "Quitar", true))) return;
+                    const r = await llamar({ action: "delete_logo", hash });
+                    S.data.logo_url = "";
+                    if (r && r.config) S.data.config = r.config;
+                    logoEstado.textContent = "Sin logo: arriba se muestran las bolas de BINGO.";
+                    pintarLogo();
+                    pintarVista();
+                }));
+                poner(logoAcciones, plantilla, logoGuardado() ? quitar : null);
+            }
+
+            /** PNG transparente del tamaño recomendado, con la zona segura marcada, para diseñar encima. */
+            async function descargarPlantillaLogo() {
+                const cv = document.createElement("canvas");
+                cv.width = LOGO.recAncho;
+                cv.height = LOGO.recAlto;
+                const ctx = cv.getContext("2d");
+                ctx.strokeStyle = "#d23a3a";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 8]);
+                ctx.strokeRect(20, 20, LOGO.recAncho - 40, LOGO.recAlto - 40);
+                ctx.fillStyle = "#d23a3a";
+                ctx.textAlign = "center";
+                ctx.font = "700 34px Arial";
+                ctx.fillText(`${LOGO.recAncho} × ${LOGO.recAlto} px`, LOGO.recAncho / 2, LOGO.recAlto / 2 - 4);
+                ctx.font = "400 22px Arial";
+                ctx.fillText("Logo dentro de la línea · fondo transparente", LOGO.recAncho / 2, LOGO.recAlto / 2 + 34);
+                descargarBlob(await canvasABlob(cv, "image/png"), `plantilla-logo-${LOGO.recAncho}x${LOGO.recAlto}.png`);
+            }
+
+            logoArchivo.addEventListener("change", async () => {
+                const archivo = logoArchivo.files && logoArchivo.files[0];
+                logoArchivo.value = "";
+                if (!archivo) return;
+                if (!/^image\/(png|jpeg|webp)$/.test(archivo.type)) return showMessage("El logo debe ser PNG, JPG o WEBP.", "error");
+                if (archivo.size > 15 * 1024 * 1024) return showMessage("La imagen pesa más de 15 MB.", "error");
+                const url = await new Promise((res) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result)); rd.readAsDataURL(archivo); });
+                const img = await cargarImagen(url);
+                if (!img) return showMessage("No se pudo leer la imagen.", "error");
+                const w = img.naturalWidth;
+                const h = img.naturalHeight;
+                /* Se reduce a 1200 × 400 px como máximo, sin cambiar su forma. */
+                const k = Math.min(1, LOGO.maxAncho / w, LOGO.maxAlto / h);
+                const cv = document.createElement("canvas");
+                cv.width = Math.max(1, Math.round(w * k));
+                cv.height = Math.max(1, Math.round(h * k));
+                cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+                const transparente = archivo.type !== "image/jpeg";
+                let dataUrl = transparente ? cv.toDataURL("image/png") : cv.toDataURL("image/jpeg", 0.9);
+                if (dataUrl.length > 1300000) dataUrl = cv.toDataURL(transparente ? "image/webp" : "image/jpeg", 0.85);
+                if (dataUrl.length > 1300000) return showMessage("El logo sigue pesando más de 1 MB. Prueba con una imagen de menos detalle.", "error");
+                const notas = [`Tu imagen mide ${w} × ${h} px.`];
+                if (h < 150) notas.push(`Con ${h} px de alto puede verse borrosa: lo ideal son ${LOGO.recAlto} px de alto.`);
+                if (w / h > 4.5) notas.push("Es muy ancha: en celular se reduce para caber y se ve pequeña. Lo ideal es 3 de ancho por 1 de alto.");
+                if (w / h < 0.8) notas.push("Es alta y angosta: se ve pequeña junto al nombre. Lo ideal es 3 de ancho por 1 de alto, o cuadrada.");
+                if (k < 1) notas.push(`Se redujo a ${cv.width} × ${cv.height} px para que cargue rápido.`);
+                notas.push("Así se ve en la vista previa. Si te gusta, toca «Usar este logo».");
+                logoEstado.textContent = notas.join(" ");
+                logoNuevo = dataUrl;
+                pintarLogo();
+                pintarVista();
+            });
+
+            guardar.addEventListener("click", () => conBoton(guardar, async () => {
+                const res = await llamar({ action: "update_config", hash, config: { formulario: formularioJson(f) } });
+                /* Un Apps Script sin esta versión ignora el campo: se avisa en vez de decir «guardado». */
+                if (!res || !res.config || res.config.formulario === undefined) throw new Error("El servidor del bingo no guardó la apariencia: falta publicar la versión nueva del Apps Script.");
+                S.data.config = res.config;
+                estadoGuardar.textContent = "";
+                showMessage("Apariencia guardada. El formulario de compra ya se ve así.", "success", 6000);
+                window.setTimeout(() => { guardar.disabled = true; }, 0);
+            }, "Guardando…"));
+
+            pintarControles();
+            pintarLogo();
+            pintarVista();
+            agregar(root,
+                el("div", { class: "bn-form-layout" },
+                    el("div", { class: "bn-stack" },
+                        el("section", { class: "bn-card" },
+                            el("h2", { text: "Logo" }),
+                            el("p", { class: "bn-note", text: "Se muestra arriba del formulario, en lugar de las bolas de BINGO." }),
+                            el("ul", { class: "bn-note bn-logo-reglas" },
+                                el("li", {}, el("b", { text: `Medidas recomendadas: ${LOGO.recAncho} × ${LOGO.recAlto} px` }), " (3 de ancho por 1 de alto). Si tu logo es cuadrado: 300 × 300 px."),
+                                el("li", { text: "Formato: PNG con fondo transparente. También sirve JPG o WEBP." }),
+                                el("li", { text: `Siempre se muestra a ${LOGO.altoPc} px de alto en computadora y ${LOGO.altoCel} px en celular; el ancho se ajusta solo, sin deformarlo.` }),
+                                el("li", { text: "Mínimo 150 px de alto para que se vea nítido. Si la imagen es de mayor tamaño, se reduce sola antes de subirla." })
+                            ),
+                            campo("Elegir imagen del logo", logoArchivo),
+                            logoEstado,
+                            logoAcciones,
+                            el("div", {}, el("span", { class: "bn-label", text: "Alineación del logo y el nombre" }), alineacion)
+                        ),
+                        el("section", { class: "bn-card" },
+                            el("h2", { text: "Colores y letra" }),
+                            el("p", { class: "bn-note", text: "Los campos del formulario no cambian: solo su apariencia." }),
+                            controles,
+                            avisos,
+                            el("div", { class: "bn-btnrow" }, restablecer)
+                        )
+                    ),
+                    el("section", { class: "bn-card bn-form-preview-card" },
+                        el("div", { class: "bn-card-head" }, el("h2", { text: "Vista previa" }),
+                            el("a", { class: "bn-btn bn-btn--sm", href: links.compra(S.data.bingo.public_id), target: "_blank", rel: "noopener", text: "Abrir el formulario" })),
+                        vista
+                    )
+                ),
+                el("div", { class: "bn-toolbar bn-toolbar--end bn-sticky-save" }, estadoGuardar, guardar)
+            );
+        }
+
         function vistaAjustes(root) {
             const c = S.data.config;
             const fechaVista = el("small", { class: "bn-note" });
@@ -3365,7 +3611,7 @@
         const nombre = input(null, "", { placeholder: "Nombre y apellido", autocomplete: "off" });
         const correo = input(null, "", { type: "email", placeholder: "correo@gmail.com", autocomplete: "off" });
         const tel = input(null, "", { type: "tel", placeholder: "8888 8888", autocomplete: "off" });
-        const modalidad = select(null, [["Presencial", "Juega en el salón"], ["Virtual", "Juega en línea"]], "Presencial");
+        const modalidad = select(null, [["Presencial", "Presencial"], ["Virtual", "Virtual"]], "Presencial");
         const entrega = select(null, [
             ["series", "Impresos: anoto las series"],
             ["asignar", bloque && bloque[0] ? "Asignar de mi bloque" : "Asignar cartones libres"]
@@ -3557,6 +3803,90 @@
             : el("img", { class: "bn-proof", src: r.dataUrl, alt: "Comprobante de pago" }));
     }
 
+    /* ================= Apariencia del formulario de compra ================= */
+
+    /** Colores y letra de siempre (los del sitio). Deben coincidir con FORM_FUENTES_ del Apps Script. */
+    const FORM_BASE = { fondo: "#1b1d22", tarjeta: "#24272e", acento: "#00e5ff", texto: "#eceef3", fuente: "inter", logo_alineacion: "centro" };
+    const FORM_FUENTES = ["inter", "montserrat", "poppins", "roboto", "lato", "nunito", "raleway", "oswald", "merriweather", "playfair", "fredoka", "righteous"];
+    /** Medidas del logo: alto con el que se muestra y medidas recomendadas para subirlo. */
+    const LOGO = { altoPc: 96, altoCel: 64, recAncho: 900, recAlto: 300, maxAncho: 1200, maxAlto: 400 };
+
+    function leerFormulario(json) {
+        let o = {};
+        try { o = typeof json === "string" ? (json ? JSON.parse(json) : {}) : json || {}; } catch (e) { o = {}; }
+        const f = { ...FORM_BASE };
+        ["fondo", "tarjeta", "acento", "texto"].forEach((k) => { if (/^#[0-9a-f]{6}$/i.test(String(o[k] || ""))) f[k] = String(o[k]).toLowerCase(); });
+        if (FORM_FUENTES.includes(o.fuente)) f.fuente = o.fuente;
+        if (["izquierda", "centro", "derecha"].includes(o.logo_alineacion)) f.logo_alineacion = o.logo_alineacion;
+        return f;
+    }
+
+    /** Solo lo que cambia respecto a lo de siempre (vacío = apariencia del sitio). */
+    function formularioJson(f) {
+        const o = {};
+        Object.keys(FORM_BASE).forEach((k) => { if (f[k] !== FORM_BASE[k]) o[k] = f[k]; });
+        return Object.keys(o).length ? JSON.stringify(o) : "";
+    }
+
+    const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const rgbHex = (c) => "#" + c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
+    /** Mezcla dos colores: p = cuánto del segundo (0 a 1). */
+    const mezclar = (a, b, p) => { const x = hexRgb(a); const y = hexRgb(b); return rgbHex(x.map((v, i) => v + (y[i] - v) * p)); };
+    function luminancia(h) {
+        const [r, g, b] = hexRgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function contraste(a, b) {
+        const [x, y] = [luminancia(a), luminancia(b)].sort((m, n) => n - m);
+        return (x + 0.05) / (y + 0.05);
+    }
+
+    const fuenteCss = (id) => (id === "inter" ? "'Inter', system-ui, sans-serif" : (C.FUENTES[id] || C.FUENTES.montserrat).css);
+    const fuenteNombre = (id) => (id === "inter" ? "Inter" : (C.FUENTES[id] || C.FUENTES.montserrat).n);
+
+    /** Carga desde Google Fonts solo la letra elegida (una vez). */
+    const fuentesFormulario = {};
+    function cargarFuenteFormulario(id) {
+        if (!id || fuentesFormulario[id]) return;
+        fuentesFormulario[id] = true;
+        const nombre = fuenteNombre(id).replace(/ /g, "+");
+        const conPeso = id === "inter" || (C.FUENTES[id] && C.FUENTES[id].w === 700);
+        document.head.appendChild(el("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${nombre}${conPeso ? ":wght@400;600;700" : ""}&display=swap` }));
+    }
+
+    /** Pinta un contenedor (.bn-buy o la vista previa) con la apariencia elegida. */
+    function aplicarFormulario(nodo, f) {
+        const oscuro = luminancia(f.fondo) < 0.35;
+        const vars = {
+            "--bn-bg": f.fondo,
+            "--bn-surface": f.tarjeta,
+            "--bn-surface-2": mezclar(f.tarjeta, f.texto, 0.08),
+            "--bn-line": mezclar(f.tarjeta, f.texto, 0.2),
+            "--bn-text": f.texto,
+            "--bn-muted": mezclar(f.tarjeta, f.texto, 0.7),
+            "--bn-accent": f.acento,
+            "--bn-accent-ink": contraste(f.acento, "#000000") >= contraste(f.acento, "#ffffff") ? "#111111" : "#ffffff",
+            "--bn-field": mezclar(f.tarjeta, oscuro ? "#000000" : "#ffffff", 0.35),
+            "--bn-form-fondo": f.fondo,
+            "--bn-form-font": fuenteCss(f.fuente),
+            "color-scheme": oscuro ? "dark" : "light"
+        };
+        Object.entries(vars).forEach(([k, v]) => nodo.style.setProperty(k, v));
+        nodo.classList.add("bn-buy--tema");
+        cargarFuenteFormulario(f.fuente);
+    }
+
+    /** Cabecera del formulario: el logo (si hay) reemplaza las bolas; todo se alinea como se eligió. */
+    function cabeceraCompra(cfg, f, logoUrl) {
+        const logo = logoUrl ? el("img", { class: "bn-buy-logo", src: logoUrl, alt: cfg.nombre ? `Logo de ${cfg.nombre}` : "Logo" }) : null;
+        if (logo) logo.addEventListener("error", () => logo.remove());
+        return el("header", { class: `bn-buy-head bn-buy-head--${f.logo_alineacion}` },
+            logo || el("div", { class: "bn-balls-row", "aria-hidden": "true" }, C.LETRAS.map((l, i) => bolaEl([7, 22, 38, 51, 69][i]))),
+            el("h1", { class: "bn-title", text: cfg.nombre || "Nombre del bingo" }),
+            el("p", { class: "bn-sub", text: cuando(cfg) || "Fecha y hora del bingo" })
+        );
+    }
+
     /* ================= Compra pública (#bc/) ================= */
 
     async function initCompra(pub) {
@@ -3568,11 +3898,20 @@
             return pantallaError(e.message);
         }
         const cfg = D.config;
+        const apariencia = leerFormulario(cfg.formulario);
+        /** Formulario con la apariencia del organizador; el fondo cubre toda la página. */
+        const pintado = (...kids) => {
+            const caja = el("div", { class: "bn-buy" }, ...kids);
+            aplicarFormulario(caja, apariencia);
+            document.body.classList.add("bn-form-pintado");
+            document.body.style.setProperty("--bn-form-fondo", apariencia.fondo);
+            return caja;
+        };
         const nombre = input("bn-c-nombre", "", { autocomplete: "name", placeholder: "Nombre y apellido" });
         const tel = input("bn-c-tel", "", { type: "tel", autocomplete: "tel", placeholder: "8888 8888" });
         const correo = input("bn-c-correo", "", { type: "email", autocomplete: "email", placeholder: "tucorreo@gmail.com" });
         const cantidad = input("bn-c-cantidad", "1", { type: "number", min: 1, max: 1000, inputmode: "numeric" });
-        const modalidad = cfg.modalidad === "Mixta" ? select("bn-c-modalidad", [["Virtual", "Juego en línea"], ["Presencial", "Llego al salón"]], "Virtual") : null;
+        const modalidad = cfg.modalidad === "Mixta" ? select("bn-c-modalidad", [["Presencial", "Presencial"], ["Virtual", "Virtual"]], "Virtual") : null;
         /* Un encargado por opción («sector:encargado»), para que la venta cuente para quien vendió. */
         const opcionesVendedor = D.sectores.flatMap((x) => ((x.encargados || []).length
             ? x.encargados.map((e) => [`${x.sector_id}:${e.id}`, `${e.nombre} (${x.nombre})`])
@@ -3611,22 +3950,18 @@
                 sector_id: sector ? sector.value.split(":")[0] : 0, encargado_id: sector ? sector.value.split(":")[1] : 0,
                 vendedor: vendedor ? vendedor.value : "", metodo: metodo.value, comprobante: dataUrl
             }, { timeoutMs: 90000 });
-            poner(app, el("div", { class: "bn-done" },
+            poner(app, pintado(el("div", { class: "bn-done" },
                 el("div", { class: "bn-balls-row", "aria-hidden": "true" }, C.LETRAS.map((l, i) => bolaEl(i * 15 + 7))),
                 el("h1", { class: "bn-title", text: "¡Recibimos tu compra!" }),
                 el("p", { text: `Compra #${r.entrada_id}: ${r.cantidad} ${r.cantidad === 1 ? "cartón" : "cartones"} por ${colones(r.monto)}.` }),
                 el("p", { text: "Cuando el organizador confirme tu pago, te llega por WhatsApp o correo el link con tus cartones para jugar en línea. Si ya habías comprado con este correo, los cartones nuevos se suman a tu mismo link." }),
                 cfg.whatsapp ? el("a", { class: "bn-btn", href: waUrl(cfg.whatsapp, `Hola, envié la compra #${r.entrada_id} para ${cfg.nombre}.`), target: "_blank", rel: "noopener", text: "Escribir al organizador" }) : null
-            ));
+            )));
         }, "Enviando…"));
 
         poner(app, 
-            el("div", { class: "bn-buy" },
-                el("header", { class: "bn-buy-head" },
-                    el("div", { class: "bn-balls-row", "aria-hidden": "true" }, C.LETRAS.map((l, i) => bolaEl([7, 22, 38, 51, 69][i]))),
-                    el("h1", { class: "bn-title", text: cfg.nombre }),
-                    el("p", { class: "bn-sub", text: cuando(cfg) })
-                ),
+            pintado(
+                cabeceraCompra(cfg, apariencia, cfg.logo_url),
                 el("section", { class: "bn-card" }, el("h2", { text: "1. Tus datos" }), el("div", { class: "bn-form-grid" },
                     campo("Nombre", nombre), campo("WhatsApp", tel, "Aquí te enviamos el link de tus cartones."),
                     campo("Correo", correo, "Es tu identificación: todas tus compras quedan en un solo link."), modalidad ? campo("¿Cómo vas a jugar?", modalidad) : null,
@@ -3679,6 +4014,9 @@
         }
         const gen = ++generacion;
         const ctx = (opts && opts.bingo) || { mode: "hub" };
+        /* El fondo personalizado es solo del formulario de compra. */
+        document.body.classList.remove("bn-form-pintado");
+        document.body.style.removeProperty("--bn-form-fondo");
         document.body.classList.toggle("cpm-bingo-standalone", ctx.mode !== "hub");
         if (!window.CPMBingoApi || !window.CPMBingoApi.gasUrl()) {
             return pantallaError("Falta configurar el Web App del Bingo (window.CPM_BINGO_GAS_URL en index.html).");

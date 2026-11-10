@@ -110,7 +110,7 @@ Al cantar, el script escribe el estado en `CacheService` y en la hoja pública �
 
 - Hub (`masterPin`): `super_list`, `super_create`, `super_update`, `super_delete`
 - Público: `get_compra`, `submit_compra`, `get_player`, `get_card`, `estado`, `get_arte` (arte y centro)
-- Organizador (`hash`): `resolve_admin`, `update_config`, `upload_arte`, `delete_arte`, `upload_centro`, `delete_centro`, `save_precios`, `save_sectores`, `list_entradas`, `get_comprobante`, `approve_entrada`, `reject_entrada`, `return_entrada`, `complete_entrada`, `reopen_entrada`, `mark_sent`, `send_email`, `vender_presencial`, `ampliar_lote`, `list_cartones`
+- Organizador (`hash`): `resolve_admin`, `update_config`, `upload_arte`, `delete_arte`, `upload_centro`, `delete_centro`, `upload_logo`, `delete_logo`, `save_precios`, `save_sectores`, `list_entradas`, `get_comprobante`, `approve_entrada`, `reject_entrada`, `return_entrada`, `complete_entrada`, `reopen_entrada`, `mark_sent`, `send_email`, `vender_presencial`, `ampliar_lote`, `list_cartones`
 - Sector o encargado (`hash`): `sector_resolve`, `sector_vender`, `sector_mark_sent`, `sector_comprobante`
 - Juego (`hash` del organizador o del cantador): `game_get`, `game_save_ronda`, `game_delete_ronda`, `game_mover_ronda`, `game_abrir`, `game_cantar`, `game_deshacer`, `game_ganador`, `game_quitar_ganador`, `game_cerrar`, `game_buscar`
 

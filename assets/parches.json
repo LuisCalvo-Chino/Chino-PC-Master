@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-09T12:58:00-06:00",
+    "actualizado": "2026-11-10T11:43:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -46,6 +46,58 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-10-avisos-rondas-formulario",
+            "fecha": "2026-11-10T11:43:00-06:00",
+            "producto": [
+                "sitio",
+                "bingo"
+            ],
+            "titulo": "Formulario de compra con tu logo y tus colores, avisos siempre visibles y rondas protegidas",
+            "resumen": "Cada bingo puede darle a su formulario de compra su propio logo, colores y tipo de letra. Los avisos de error, éxito o información quedan siempre a la vista y se cierran con una ✕, y la ventana de la ronda ya no se cierra con un toque accidental.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Nueva pestaña «Formulario» en el panel del organizador: elige el fondo de la página, el fondo de las secciones, el color de los botones, el color de la letra y el tipo de letra, con vista previa en vivo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Sube el logo de tu bingo (se guarda en la carpeta del bingo en Drive) y elige si va a la izquierda, centrado o a la derecha. Se muestra siempre a 96 px de alto en computadora y 64 px en celular; la medida recomendada es 900 × 300 px en PNG con fondo transparente, y hay una plantilla para descargar."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "bingo",
+                    "texto": "Si los colores elegidos hacen difícil leer la letra o distinguir los botones, el panel te avisa antes de guardar."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "sitio",
+                    "texto": "Los avisos (por ejemplo, al iniciar sesión) ya no quedan escondidos detrás de las ventanas: siempre aparecen encima de todo."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "sitio",
+                    "texto": "Cada aviso tiene una ✕ para cerrarlo cuando quieras, también en los links del Bingo y en Operaciones VIVE."
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "bingo",
+                    "texto": "En el juego (Cantador y Organizador), la ventana de «+ Nueva ronda» o «Editar ronda» ya no se cierra al tocar afuera."
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "bingo",
+                    "texto": "Si cierras la ventana de la ronda con la ✕ o «Cancelar» después de escribir algo, te pregunta antes, porque lo que no guardaste se pierde. Puedes elegir «Seguir editando»."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "bingo",
+                    "texto": "En el formulario de compra, la pregunta «¿Cómo va a jugar?» ahora ofrece solo dos opciones: «Presencial» y «Virtual»."
+                }
+            ]
+        },
         {
             "id": "2026-11-09-vive-operaciones",
             "fecha": "2026-11-09T12:58:00-06:00",
