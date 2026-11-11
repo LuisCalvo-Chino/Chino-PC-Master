@@ -1,0 +1,292 @@
+/* Renacer 40 · Un gesto sencillo — páginas ocultas (solo por QR) */
+:root {
+  --noche: #07060d;
+  --noche-2: #141024;
+  --vino: #2a0f17;
+  --oro: #d9b25c;
+  --oro-claro: #f6e3a6;
+  --oro-osc: #8a6527;
+  --pergamino: #efe2c2;
+  --tinta: #f3ead4;
+  --tinta-suave: rgba(243, 234, 212, .68);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--noche);
+  background-image:
+    radial-gradient(120% 70% at 50% 110%, rgba(120, 40, 30, .35), transparent 60%),
+    radial-gradient(90% 60% at 50% -10%, rgba(70, 55, 120, .35), transparent 65%),
+    linear-gradient(180deg, var(--noche-2), var(--noche) 70%);
+  color: var(--tinta);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  overflow-x: hidden;
+  min-height: 100svh;
+}
+
+/* ---------- Cielo: chispas y velas flotantes ---------- */
+.cielo { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+#chispas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.vela {
+  position: absolute;
+  width: calc(9px * var(--s, 1));
+  height: calc(46px * var(--s, 1));
+  border-radius: 2px 2px 1px 1px;
+  background: linear-gradient(90deg, #cbbd9c, #fbf3de 45%, #d8c9a6);
+  animation: flotar 8s ease-in-out infinite alternate;
+  filter: blur(calc((1.15 - var(--s, 1)) * 1.6px));
+}
+.vela::before { /* llama */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: calc(7px * var(--s, 1));
+  height: calc(15px * var(--s, 1));
+  transform: translateX(-50%);
+  border-radius: 50% 50% 45% 45% / 65% 65% 35% 35%;
+  background: radial-gradient(ellipse at 50% 75%, #fff 0 18%, #ffe08a 40%, #ff9a2e 75%, transparent 78%);
+  animation: titilar .18s ease-in-out infinite alternate;
+  transform-origin: 50% 100%;
+}
+.vela::after { /* halo */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  width: calc(70px * var(--s, 1));
+  height: calc(70px * var(--s, 1));
+  transform: translate(-50%, 35%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 110, .28), transparent 65%);
+}
+
+@keyframes flotar {
+  from { transform: translateY(-10px) rotate(-1deg); }
+  to   { transform: translateY(12px) rotate(1deg); }
+}
+@keyframes titilar {
+  from { transform: translateX(-50%) scale(1, 1) skewX(-2deg); opacity: .92; }
+  to   { transform: translateX(-50%) scale(.9, 1.08) skewX(3deg); opacity: 1; }
+}
+
+/* ---------- Pantalla de carga ---------- */
+.carga {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 28px;
+  padding: 24px 16px;
+  text-align: center;
+  transition: opacity 1.1s ease, transform 1.1s ease, filter 1.1s ease;
+}
+.carga.salir { opacity: 0; transform: scale(1.12); filter: blur(6px); pointer-events: none; }
+
+.sello {
+  position: relative;
+  width: min(64vw, 290px);
+  aspect-ratio: 900 / 1073;
+}
+.sello .halo {
+  position: absolute;
+  left: 50%; top: 33%;
+  width: 135%; aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(.6);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(246, 210, 120, .28), rgba(246, 210, 120, .06) 45%, transparent 68%);
+  opacity: 0;
+  transition: opacity 2.4s ease .4s, transform 2.4s ease .4s;
+}
+.carga.lumos .sello .halo { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+.logo-capa {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: url(logo-negro.png) center / contain no-repeat;
+          mask: url(logo-negro.png) center / contain no-repeat;
+}
+.logo-apagado { background: #3b2e17; opacity: .55; }
+.logo-luz {
+  background: linear-gradient(115deg, var(--oro-osc) 0%, var(--oro) 22%, var(--oro-claro) 40%, #fffaf0 48%, var(--oro-claro) 56%, var(--oro) 74%, var(--oro-osc) 100%);
+  background-size: 260% 100%;
+  animation: brillo 5s linear infinite;
+  clip-path: circle(0% at 84% 5%);
+  transition: clip-path 2.6s cubic-bezier(.55, .05, .3, 1) .35s;
+}
+.carga.lumos .logo-luz { clip-path: circle(160% at 84% 5%); }
+.sello-luz { position: absolute; inset: 0; filter: drop-shadow(0 0 10px rgba(240, 200, 110, .45)); }
+
+@keyframes brillo {
+  from { background-position: 130% 0; }
+  to   { background-position: -130% 0; }
+}
+
+/* Destello en la estrella de la varita */
+.destello {
+  position: absolute;
+  left: 83.8%;
+  top: 4.8%;
+  width: 34%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(.2);
+  opacity: 0;
+  background:
+    linear-gradient(90deg, transparent 0 49%, rgba(255, 248, 225, .95) 49.5% 50.5%, transparent 51%) center / 100% 6% no-repeat,
+    linear-gradient(0deg, transparent 0 49%, rgba(255, 248, 225, .95) 49.5% 50.5%, transparent 51%) center / 6% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 246, 215, .95) 0 5%, rgba(255, 215, 120, .45) 16%, transparent 42%);
+  animation: chispazo 1.4s ease-out .15s forwards, latido 2.6s ease-in-out 1.6s infinite;
+}
+@keyframes chispazo {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); }
+  45%  { opacity: 1; transform: translate(-50%, -50%) scale(1.25) rotate(45deg); }
+  100% { opacity: .85; transform: translate(-50%, -50%) scale(.8) rotate(90deg); }
+}
+@keyframes latido {
+  0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(.7) rotate(90deg); }
+  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(.95) rotate(90deg); }
+}
+
+.conjuro {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(18px, 4.6vw, 22px);
+  color: var(--tinta-suave);
+  min-height: 1.4em;
+  letter-spacing: .02em;
+  transition: opacity .5s ease;
+}
+.conjuro.cambia { opacity: 0; }
+
+.hilo {
+  width: min(56vw, 220px);
+  height: 1px;
+  background: rgba(217, 178, 92, .18);
+  position: relative;
+  overflow: hidden;
+}
+.hilo span {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, transparent, var(--oro-claro), var(--oro));
+  animation: hilo 4.4s cubic-bezier(.4, 0, .2, 1) .3s forwards;
+}
+@keyframes hilo { to { transform: scaleX(1); } }
+
+/* ---------- Escena del video ---------- */
+.escena {
+  position: relative;
+  z-index: 5;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px 16px 32px;
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(18px);
+  transition: opacity 1.2s ease .25s, transform 1.2s ease .25s, visibility 0s linear 1.45s;
+}
+.escena.visible { opacity: 1; visibility: visible; transform: none; transition-delay: .25s, .25s, 0s; }
+
+.encabezado { display: grid; justify-items: center; gap: 6px; }
+.mini-sello {
+  width: 54px;
+  aspect-ratio: 900 / 1073;
+  background: linear-gradient(115deg, var(--oro-osc), var(--oro) 30%, var(--oro-claro) 50%, var(--oro) 70%, var(--oro-osc));
+  background-size: 260% 100%;
+  animation: brillo 6s linear infinite;
+  -webkit-mask: url(logo-negro.png) center / contain no-repeat;
+          mask: url(logo-negro.png) center / contain no-repeat;
+  margin-bottom: 4px;
+}
+.sobre {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 11px;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+.encabezado h1 {
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(24px, 6.6vw, 38px);
+  letter-spacing: .06em;
+  line-height: 1.1;
+  background: linear-gradient(180deg, #fff6dc, var(--oro) 85%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  text-wrap: balance;
+}
+.para {
+  font-style: italic;
+  font-size: clamp(19px, 5vw, 24px);
+  color: var(--tinta-suave);
+}
+.para span { color: var(--oro-claro); font-weight: 600; font-style: normal; font-family: "Cinzel", Georgia, serif; letter-spacing: .04em; }
+
+/* Marco tipo retrato del castillo */
+.marco {
+  --alto: min(68svh, 640px);
+  width: min(86vw, calc(var(--alto) * 9 / 16 + 24px));
+  padding: 10px;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, #f3d891, #8a6527 22%, #e6c171 45%, #7a5820 70%, #f0d38a);
+  box-shadow:
+    0 0 0 1px rgba(255, 236, 180, .35),
+    0 18px 60px rgba(0, 0, 0, .65),
+    0 0 50px rgba(217, 178, 92, .18);
+  position: relative;
+}
+.marco::before, .marco::after { /* filigrana de esquinas */
+  content: "✦";
+  position: absolute;
+  font-size: 18px;
+  line-height: 1;
+  color: #fff3cf;
+  text-shadow: 0 0 8px rgba(255, 220, 140, .9);
+}
+.marco::before { top: -9px; left: 50%; transform: translateX(-50%); }
+.marco::after  { bottom: -9px; left: 50%; transform: translateX(-50%); }
+
+.marco-int {
+  border-radius: 7px;
+  padding: 3px;
+  background: #1a1309;
+  box-shadow: inset 0 0 0 1px rgba(255, 230, 160, .35);
+}
+.pantalla {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  width: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #000;
+}
+.pantalla iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.pie {
+  font-style: italic;
+  font-size: 16px;
+  color: var(--tinta-suave);
+}
+.pie a { color: var(--oro); text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vela, .vela::before, .logo-luz, .mini-sello, .destello { animation: none !important; }
+  .destello { opacity: .9; transform: translate(-50%, -50%) scale(.85); }
+  .logo-luz { transition-duration: .6s; }
+}
