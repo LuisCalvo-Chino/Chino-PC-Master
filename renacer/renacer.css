@@ -190,8 +190,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 28px 16px 32px;
+  gap: 14px;
+  padding: 20px 16px 24px;
   text-align: center;
   opacity: 0;
   visibility: hidden;
@@ -202,7 +202,7 @@ body {
 
 .encabezado { display: grid; justify-items: center; gap: 6px; }
 .mini-sello {
-  width: 54px;
+  width: 44px;
   aspect-ratio: 900 / 1073;
   background: linear-gradient(115deg, var(--oro-osc), var(--oro) 30%, var(--oro-claro) 50%, var(--oro) 70%, var(--oro-osc));
   background-size: 260% 100%;
@@ -237,10 +237,11 @@ body {
 }
 .para span { color: var(--oro-claro); font-weight: 600; font-style: normal; font-family: "Cinzel", Georgia, serif; letter-spacing: .04em; }
 
-/* Marco tipo retrato del castillo */
+/* Marco tipo retrato del castillo: siempre cabe completo en la pantalla del celular */
 .marco {
-  --alto: min(68svh, 640px);
-  width: min(86vw, calc(var(--alto) * 9 / 16 + 24px));
+  --alto: min(calc(100vh - 240px), 660px);
+  width: min(100%, 420px, calc(var(--alto) * 9 / 16 + 26px));
+  flex: none;
   padding: 10px;
   border-radius: 14px;
   background:
@@ -250,6 +251,9 @@ body {
     0 18px 60px rgba(0, 0, 0, .65),
     0 0 50px rgba(217, 178, 92, .18);
   position: relative;
+}
+@supports (height: 100dvh) {
+  .marco { --alto: min(calc(100dvh - 240px), 660px); }
 }
 .marco::before, .marco::after { /* filigrana de esquinas */
   content: "✦";
@@ -277,6 +281,78 @@ body {
   background: #000;
 }
 .pantalla iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.pantalla video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  cursor: pointer;
+}
+
+/* Botón de play dorado */
+.play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78px;
+  height: 78px;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #fff3c8, var(--oro) 45%, var(--oro-osc));
+  box-shadow: 0 0 0 2px rgba(255, 240, 200, .55), 0 0 0 9px rgba(20, 14, 6, .35), 0 0 34px rgba(246, 210, 120, .65);
+  transition: opacity .35s ease, transform .35s ease;
+  -webkit-tap-highlight-color: transparent;
+  animation: invitar 2.4s ease-in-out infinite;
+}
+.play svg { width: 34px; height: 34px; fill: #2a1d08; margin-left: 5px; }
+.play:focus-visible { outline: 2px solid var(--oro-claro); outline-offset: 6px; }
+.pantalla.sonando .play { opacity: 0; transform: translate(-50%, -50%) scale(.7); pointer-events: none; animation: none; }
+.pantalla.empezo .play { animation: none; }
+@keyframes invitar {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 240, 200, .55), 0 0 0 9px rgba(20, 14, 6, .35), 0 0 26px rgba(246, 210, 120, .5); }
+  50%      { box-shadow: 0 0 0 2px rgba(255, 240, 200, .75), 0 0 0 9px rgba(20, 14, 6, .35), 0 0 48px rgba(246, 210, 120, .9); }
+}
+
+/* Cargando (cuando el video hace pausa para descargar) */
+.pantalla.esperando.sonando::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 42px; height: 42px;
+  margin: -21px 0 0 -21px;
+  border-radius: 50%;
+  border: 2px solid rgba(246, 227, 166, .25);
+  border-top-color: var(--oro-claro);
+  animation: girar .9s linear infinite;
+  pointer-events: none;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Avance: hilo dorado al pie del video */
+.avance {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, .35);
+  opacity: 0;
+  transition: opacity .4s ease;
+  pointer-events: none;
+}
+.pantalla.empezo .avance { opacity: 1; }
+.avance span {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--oro-osc), var(--oro-claro));
+  box-shadow: 0 0 8px rgba(246, 210, 120, .8);
+}
 
 .pie {
   font-style: italic;
@@ -284,6 +360,7 @@ body {
   color: var(--tinta-suave);
 }
 .pie a { color: var(--oro); text-underline-offset: 3px; }
+.pie[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .vela, .vela::before, .logo-luz, .mini-sello, .destello { animation: none !important; }

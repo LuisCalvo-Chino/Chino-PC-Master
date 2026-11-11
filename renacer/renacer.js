@@ -73,14 +73,64 @@
     requestAnimationFrame(paso);
   }
 
-  /* ---- Reproductor de Drive (carga mientras corre la animación) ---- */
-  var marco = document.createElement('iframe');
-  marco.src = 'https://drive.google.com/file/d/' + id + '/preview';
-  marco.title = 'Un gesto sencillo' + (nombre ? ' para ' + nombre : '');
-  marco.allow = 'autoplay; fullscreen';
-  marco.setAttribute('allowfullscreen', '');
-  document.getElementById('pantalla').appendChild(marco);
+  /* ---- Reproductor nativo: el video llena el marco y solo lleva botón de play ---- */
+  var pantalla = document.getElementById('pantalla');
+  var titulo = 'Un gesto sencillo' + (nombre ? ' para ' + nombre : '');
   document.getElementById('enDrive').href = 'https://drive.google.com/file/d/' + id + '/view';
+
+  var video = document.createElement('video');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.preload = 'metadata';
+  video.poster = 'poster.jpg';
+  video.src = 'video.mp4';
+  video.setAttribute('aria-label', titulo);
+  pantalla.appendChild(video);
+
+  var boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'play';
+  boton.setAttribute('aria-label', 'Reproducir el video');
+  boton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+  pantalla.appendChild(boton);
+
+  var avance = document.createElement('div');
+  avance.className = 'avance';
+  avance.innerHTML = '<span></span>';
+  pantalla.appendChild(avance);
+  var barra = avance.firstChild;
+
+  var reproducir = function () {
+    var p = video.play();
+    if (p && p.catch) p.catch(function () { pantalla.classList.remove('sonando'); });
+  };
+  boton.addEventListener('click', reproducir);
+  video.addEventListener('click', function () { video.paused ? reproducir() : video.pause(); });
+  video.addEventListener('play', function () { pantalla.classList.add('sonando', 'empezo'); });
+  video.addEventListener('pause', function () { pantalla.classList.remove('sonando'); });
+  video.addEventListener('ended', function () { pantalla.classList.remove('sonando'); video.currentTime = 0; });
+  video.addEventListener('waiting', function () { pantalla.classList.add('esperando'); });
+  video.addEventListener('playing', function () { pantalla.classList.remove('esperando'); });
+  video.addEventListener('timeupdate', function () {
+    if (video.duration) barra.style.transform = 'scaleX(' + (video.currentTime / video.duration) + ')';
+  });
+
+  // Si el archivo del sitio falla, se usa el reproductor de Drive como respaldo
+  var respaldo = false;
+  video.addEventListener('error', function () {
+    if (respaldo) return;
+    respaldo = true;
+    pantalla.innerHTML = '';
+    pantalla.classList.add('respaldo');
+    var marco = document.createElement('iframe');
+    marco.src = 'https://drive.google.com/file/d/' + id + '/preview';
+    marco.title = titulo;
+    marco.allow = 'autoplay; fullscreen';
+    marco.setAttribute('allowfullscreen', '');
+    pantalla.appendChild(marco);
+    document.getElementById('aviso').hidden = false;
+    cargoVideo = true; terminar();
+  });
 
   /* ---- Frases del conjuro ---- */
   var frases = ['Lumos…', 'Encendiendo las velas del Gran Comedor…', 'Tu mensaje está por aparecer…'];
@@ -107,7 +157,8 @@
     escena.classList.add('visible');
     setTimeout(function () { carga.parentNode && carga.parentNode.removeChild(carga); }, 1300);
   };
-  marco.addEventListener('load', function () { cargoVideo = true; terminar(); });
+  // El video vive en el sitio: la escena aparece al terminar la animación
+  // (en iPhone el video no se descarga hasta tocar play, así que no se espera por él).
+  cargoVideo = true;
   setTimeout(function () { cumplioTiempo = true; terminar(); }, reducir ? 1200 : 5000);
-  setTimeout(function () { cargoVideo = true; terminar(); }, 12000); // por si Drive tarda
 })();
