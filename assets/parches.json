@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-10T15:17:00-06:00",
+    "actualizado": "2026-11-17T14:26:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -46,6 +46,23 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-17-sector-solo-presencial",
+            "fecha": "2026-11-17T14:26:00-06:00",
+            "producto": "bingo",
+            "titulo": "Sectores solo presenciales, ocultos en el formulario de compra",
+            "resumen": "Cada sector tiene ahora la opción de no aparecer en «¿Quién te vendió?» del formulario de compra. Así puedes tener un sector para vender cartones en persona sin que los compradores en línea lo vean.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "En la pestaña «Sectores», la casilla «Mostrar en el formulario de compra» decide si el sector sale en «¿Quién te vendió?». Si la desmarcas, el sector queda solo presencial y se marca con «Solo presencial: oculto en el formulario»."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "Un sector oculto sigue igual en todo lo demás: su bloque de cartones, su link general y los links de sus encargados funcionan para registrar las ventas presenciales. Las compras en línea nunca toman cartones de los bloques de los sectores. Los sectores que ya tenías siguen visibles en el formulario."
+                }
+            ]
+        },
         {
             "id": "2026-11-10-avisos-rondas-formulario",
             "fecha": "2026-11-10T15:17:00-06:00",

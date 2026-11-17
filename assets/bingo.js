@@ -2444,6 +2444,9 @@
                     const linkGeneral = s.hash ? links.sector(s.hash) : "";
                     const activo = el("input", { type: "checkbox", onchange: upd("activo") });
                     activo.checked = s.activo !== false;
+                    /* Apagado: el sector no sale en «¿Quién te vendió?» del formulario; sus links y su bloque siguen igual. */
+                    const enFormulario = el("input", { type: "checkbox", onchange: upd("en_formulario") });
+                    enFormulario.checked = s.en_formulario !== false;
                     const addEnc = el("button", { class: "bn-btn bn-btn--sm", text: "+ Agregar encargado" });
                     addEnc.addEventListener("click", () => { s.encargados.push({ id: 0, nombre: "", telefono: "", activo: true }); pintar(); });
                     return el("article", { class: "bn-sector" },
@@ -2451,7 +2454,8 @@
                             campo("Sector", el("input", { class: "bn-input", value: s.nombre || "", oninput: upd("nombre") })),
                             campo("Desde la serie", el("input", { class: "bn-input", type: "number", min: 1, max: 10000, value: s.desde || "", oninput: upd("desde") })),
                             campo("Hasta la serie", el("input", { class: "bn-input", type: "number", min: 1, max: 10000, value: s.hasta || "", oninput: upd("hasta") })),
-                            el("label", { class: "bn-check" }, activo, el("span", { text: "Sector activo (apaga todos sus links)" }))
+                            el("label", { class: "bn-check" }, activo, el("span", { text: "Sector activo (apaga todos sus links)" })),
+                            el("label", { class: "bn-check" }, enFormulario, el("span", { text: "Mostrar en el formulario de compra («¿Quién te vendió?»). Desmárcalo para un sector solo presencial." }))
                         ),
                         el("div", { class: "bn-enc-list" },
                             el("div", { class: "bn-card-head" }, el("h3", { text: `Encargados (${s.encargados.length})` }), addEnc),
@@ -2459,6 +2463,7 @@
                         ),
                         el("div", { class: "bn-btnrow" },
                             s.sector_id ? el("span", { class: "bn-chip", text: `${vendidos} vendidos en el sector` }) : el("span", { class: "bn-chip", text: "Nuevo: guarda para crear sus links" }),
+                            s.en_formulario === false ? el("span", { class: "bn-chip", text: "Solo presencial: oculto en el formulario" }) : null,
                             linkGeneral ? el("button", { class: "bn-btn bn-btn--sm", onclick: () => copiar(linkGeneral, "Link general del sector copiado."), text: "Copiar link general" }) : null,
                             !vendidos ? el("button", { class: "bn-btn bn-btn--sm bn-btn--danger", onclick: () => { filas.splice(i, 1); pintar(); }, text: "Quitar sector" }) : null
                         )
@@ -2469,7 +2474,7 @@
             const btnAgregar = el("button", { class: "bn-btn", text: "+ Agregar sector" });
             btnAgregar.addEventListener("click", () => {
                 const max = filas.reduce((m, s) => Math.max(m, Number(s.hasta) || 0), 0);
-                filas.push({ sector_id: 0, nombre: `Sector ${filas.length + 1}`, desde: max + 1, hasta: max + 100, activo: true, encargados: [{ id: 0, nombre: "", telefono: "", activo: true }] });
+                filas.push({ sector_id: 0, nombre: `Sector ${filas.length + 1}`, desde: max + 1, hasta: max + 100, activo: true, en_formulario: true, encargados: [{ id: 0, nombre: "", telefono: "", activo: true }] });
                 pintar();
             });
             const guardar = el("button", { class: "bn-btn bn-btn--primary", text: "Guardar sectores" });

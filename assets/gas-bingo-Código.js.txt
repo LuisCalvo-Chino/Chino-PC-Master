@@ -35,7 +35,7 @@ var SHEETS_ = {
   entradas: ["entrada_id", "fecha", "nombre", "telefono", "correo", "modalidad", "cantidad", "monto",
     "vendedor", "sector_id", "metodo", "comprobante_id", "estado", "cartones", "token", "nota",
     "email_enviado", "wa_enviado", "fecha_completada", "encargado_id"],
-  sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo", "encargados"],
+  sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo", "encargados", "en_formulario"],
   precios: ["cantidad", "precio"],
   rondas: ["ronda_id", "orden", "nombre", "figura", "premio", "estado", "bolas", "ganadores", "inicio", "fin",
     "tipo", "premios", "extra"]
@@ -658,7 +658,9 @@ function sectorObj_(s) {
   return {
     sector_id: Number(s.sector_id), nombre: String(s.nombre || ""), encargado: String(s.encargado || ""),
     telefono: String(s.telefono || ""), desde: Number(s.desde) || 0, hasta: Number(s.hasta) || 0,
-    hash: String(s.hash || ""), activo: bool_(s.activo), encargados: encargadosDe_(s.encargados)
+    hash: String(s.hash || ""), activo: bool_(s.activo), encargados: encargadosDe_(s.encargados),
+    /* Vacío (sectores de antes de esta opción): se muestra en el formulario. */
+    en_formulario: s.en_formulario === "" || s.en_formulario === undefined ? true : bool_(s.en_formulario)
   };
 }
 
@@ -1038,7 +1040,8 @@ function saveSectores_(b, lista) {
       encargado: encargados.map(function (x) { return x.nombre; }).join(", ") || String(s.encargado || "").trim(),
       telefono: String(s.telefono || "").trim(), desde: desde, hasta: hasta,
       hash: prev.hash || b.public_id + "." + randomHash_(16), activo: s.activo === undefined ? true : bool_(s.activo),
-      encargados: JSON.stringify(encargados)
+      encargados: JSON.stringify(encargados),
+      en_formulario: s.en_formulario === undefined ? true : bool_(s.en_formulario)
     };
   });
   for (var i = 0; i < limpios.length; i++) {
@@ -1113,7 +1116,7 @@ function getCompra_(b) {
     sinpe_numero: cfg.sinpe_numero, sinpe_nombre: cfg.sinpe_nombre, iban: cfg.iban,
     precio_unitario: Number(cfg.precio_unitario) || 0,
     precios: preciosObj_(b),
-    sectores: sectores_(b).filter(function (s) { return s.activo; }).map(function (s) {
+    sectores: sectores_(b).filter(function (s) { return s.activo && s.en_formulario; }).map(function (s) {
       return {
         sector_id: s.sector_id, nombre: s.nombre, encargado: s.encargado,
         encargados: s.encargados.filter(function (x) { return x.activo; }).map(function (x) { return { id: x.id, nombre: x.nombre }; })
@@ -1135,7 +1138,7 @@ function submitCompra_(b, data) {
   if (!data.comprobante) throw new Error("Adjunta el comprobante de pago.");
   var sectorId = Number(data.sector_id) || 0;
   var encargadoId = Number(data.encargado_id) || 0;
-  var sectorElegido = sectores_(b).filter(function (s) { return s.sector_id === sectorId && s.activo; })[0];
+  var sectorElegido = sectores_(b).filter(function (s) { return s.sector_id === sectorId && s.activo && s.en_formulario; })[0];
   if (!sectorElegido) sectorId = 0;
   var encElegido = sectorElegido ? sectorElegido.encargados.filter(function (x) { return x.id === encargadoId; })[0] : null;
   if (!encElegido) encargadoId = 0;
