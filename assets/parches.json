@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-24T14:43:00-06:00",
+    "actualizado": "2026-11-24T15:26:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -48,10 +48,10 @@
     "parches": [
         {
             "id": "2026-11-24-reenviar-desde-historial",
-            "fecha": "2026-11-24T14:43:00-06:00",
+            "fecha": "2026-11-24T15:26:00-06:00",
             "producto": "bingo",
             "titulo": "Ranking de ventas por encargado, reenvío desde Historial y sectores que se quedan ocultos",
-            "resumen": "El Resumen muestra primero las ventas de cada encargado, en orden por cartones o por monto recaudado y con medallas de oro, plata y bronce, y después las de cada sector. En Ventas › Historial ya puedes reenviar el WhatsApp o el correo de una compra y ves qué mensaje no salió. Además, la casilla «Mostrar en el formulario de compra» de un sector se queda desmarcada al guardar.",
+            "resumen": "El Resumen muestra primero las ventas de cada encargado, en orden por cartones o por monto recaudado y con medallas de oro, plata y bronce, y después las de cada sector; todo se puede descargar como imagen o PDF. En Ventas › Historial ya puedes reenviar el WhatsApp o el correo de una compra y ves qué mensaje no salió. Además, la casilla «Mostrar en el formulario de compra» de un sector se queda desmarcada al guardar.",
             "cambios": [
                 {
                     "tipo": "nuevo",
@@ -60,6 +60,10 @@
                 {
                     "tipo": "mejorado",
                     "texto": "Las ventas de cada sector quedan aparte, al final, con su barra del bloque vendido y lo que entró por el link general del sector."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Botones «Descargar imagen» y «Descargar PDF» en «Ventas por sector y encargado». El archivo trae todo el resumen con el mismo estilo del panel: las cifras generales, las ventas por encargado por monto recaudado, luego por cartones y al final las ventas por sector. El PDF es tamaño carta y no corta ninguna fila entre páginas."
                 },
                 {
                     "tipo": "corregido",

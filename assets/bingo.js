@@ -417,6 +417,193 @@
         return new Promise((resolve) => cv.toBlob(resolve, tipo || "image/png", calidad));
     }
 
+    /* ---------- Reporte de ventas (imagen PNG o PDF carta) con el estilo del panel ---------- */
+    const REP = { W: 1200, PAD: 56, bg: "#1b1d22", surface: "#24272e", line: "#3a3f4a", text: "#eceef3", muted: "#a3a8b5", accent: "#00e5ff", fuente: '"Inter", "Segoe UI", system-ui, sans-serif' };
+    const MEDALLA_COLORES = { 1: ["#fff3b0", "#f5c518", "#b8860b", "#2b1d00"], 2: ["#ffffff", "#c9ced6", "#8a929e", "#1f2329"], 3: ["#ffd2a8", "#cd7f32", "#8a4f1d", "#2a1404"] };
+
+    /** Recorta con «…» para que el texto quepa en el ancho dado. */
+    function textoQueCabe(ctx, t, ancho) {
+        t = String(t || "");
+        if (ctx.measureText(t).width <= ancho) return t;
+        while (t.length > 1 && ctx.measureText(t + "…").width > ancho) t = t.slice(0, -1);
+        return t + "…";
+    }
+
+    function rectRedondo(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+
+    /** «15 de nov de 2026 a las 14:43» a partir de un Date. */
+    function fechaDeDate(d) {
+        return fechaLarga(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, horaCorta(d));
+    }
+
+    /**
+     * Arma el reporte como una lista de bloques { h, dibujar(ctx, y) } para juntarlos
+     * en una sola imagen o repartirlos en páginas sin cortar filas.
+     * datos: { titulo, fecha, generado, tiles: [[valor, etiqueta, nota]], secciones: [{ tipo, titulo, nota, filas, vacio }] }
+     */
+    function bloquesReporte(datos) {
+        const { W, PAD } = REP;
+        const F = (peso, px) => `${peso} ${px}px ${REP.fuente}`;
+        const ancho = W - PAD * 2;
+        const bloques = [];
+        bloques.push({ h: 150, dibujar(ctx, y) {
+            ctx.fillStyle = REP.accent; ctx.font = F(800, 15); ctx.fillText("BINGO DIGITAL · RESUMEN DE VENTAS", PAD, y + 30);
+            ctx.fillStyle = REP.text; ctx.font = F(800, 40); ctx.fillText(textoQueCabe(ctx, datos.titulo, ancho), PAD, y + 80);
+            ctx.fillStyle = REP.muted; ctx.font = F(500, 19);
+            ctx.fillText(textoQueCabe(ctx, [datos.fecha ? `Bingo: ${datos.fecha}` : "", `Datos al ${datos.generado}`].filter(Boolean).join("   ·   "), ancho), PAD, y + 116);
+            ctx.fillStyle = REP.line; ctx.fillRect(PAD, y + 142, ancho, 2);
+        } });
+        /* Cifras generales en tarjetas, tres por fila. */
+        const porFila = 3, gap = 16, tw = (ancho - gap * (porFila - 1)) / porFila, th = 112;
+        for (let i = 0; i < datos.tiles.length; i += porFila) {
+            const fila = datos.tiles.slice(i, i + porFila);
+            bloques.push({ h: th + gap, dibujar(ctx, y) {
+                fila.forEach(([valor, etiqueta, nota], k) => {
+                    const x = PAD + k * (tw + gap);
+                    ctx.fillStyle = REP.surface; rectRedondo(ctx, x, y + 8, tw, th, 14); ctx.fill();
+                    ctx.strokeStyle = REP.line; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.fillStyle = REP.text; ctx.font = F(800, 30); ctx.fillText(textoQueCabe(ctx, valor, tw - 36), x + 18, y + 52);
+                    ctx.font = F(700, 16); ctx.fillText(textoQueCabe(ctx, etiqueta, tw - 36), x + 18, y + 80);
+                    ctx.fillStyle = REP.muted; ctx.font = F(500, 13.5); ctx.fillText(textoQueCabe(ctx, nota, tw - 36), x + 18, y + 102);
+                });
+            } });
+        }
+        datos.secciones.forEach((sec) => {
+            bloques.push({ h: 96, titulo: true, dibujar(ctx, y) {
+                ctx.fillStyle = REP.text; ctx.font = F(800, 27); ctx.fillText(textoQueCabe(ctx, sec.titulo, ancho), PAD, y + 52);
+                ctx.fillStyle = REP.muted; ctx.font = F(500, 16.5); ctx.fillText(textoQueCabe(ctx, sec.nota, ancho), PAD, y + 80);
+            } });
+            if (!sec.filas.length) {
+                bloques.push({ h: 50, dibujar(ctx, y) { ctx.fillStyle = REP.muted; ctx.font = F(500, 17); ctx.fillText(sec.vacio || "Sin datos.", PAD, y + 30); } });
+            }
+            sec.filas.forEach((f) => {
+                if (sec.tipo === "ranking") {
+                    bloques.push({ h: 84, seccion: sec.titulo, dibujar(ctx, y) {
+                        const cx = PAD + 20, cy = y + 24;
+                        const c = f.cartones > 0 && f.puesto <= 3 ? MEDALLA_COLORES[f.puesto] : null;
+                        ctx.textAlign = "center";
+                        if (c) {
+                            const g = ctx.createRadialGradient(cx - 6, cy - 7, 2, cx, cy, 21);
+                            g.addColorStop(0, c[0]); g.addColorStop(0.55, c[1]); g.addColorStop(1, c[2]);
+                            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 19, 0, Math.PI * 2); ctx.fill();
+                            ctx.fillStyle = c[3]; ctx.font = F(800, 17); ctx.fillText(String(f.puesto), cx, cy + 6);
+                        } else {
+                            ctx.fillStyle = REP.muted; ctx.font = F(700, 19); ctx.fillText(f.cartones ? `${f.puesto}.` : "–", cx, cy + 7);
+                        }
+                        ctx.textAlign = "left";
+                        const x = PAD + 58, w = ancho - 58;
+                        ctx.globalAlpha = f.cartones ? 1 : 0.6;
+                        ctx.font = F(500, 17);
+                        const dw = ctx.measureText(f.detalle).width;
+                        ctx.fillStyle = REP.muted; ctx.textAlign = "right"; ctx.fillText(f.detalle, x + w, y + 30); ctx.textAlign = "left";
+                        ctx.fillStyle = REP.text; ctx.font = F(800, 21); ctx.fillText(textoQueCabe(ctx, f.nombre, w - dw - 24), x, y + 30);
+                        ctx.fillStyle = REP.muted; ctx.font = F(500, 15.5); ctx.fillText(textoQueCabe(ctx, f.sub, w), x, y + 54);
+                        if (f.cartones) {
+                            ctx.fillStyle = REP.line; rectRedondo(ctx, x, y + 66, w, 6, 3); ctx.fill();
+                            ctx.fillStyle = REP.accent; rectRedondo(ctx, x, y + 66, Math.max(6, w * f.barra), 6, 3); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    } });
+                } else {
+                    const alto = 54 + (f.barra !== null ? 16 : 0) + (f.sub ? 26 : 0);
+                    bloques.push({ h: alto, seccion: sec.titulo, dibujar(ctx, y) {
+                        ctx.fillStyle = REP.line; ctx.fillRect(PAD, y + 2, ancho, 1.5);
+                        ctx.font = F(500, 17);
+                        const dw = ctx.measureText(f.detalle).width;
+                        ctx.fillStyle = REP.muted; ctx.textAlign = "right"; ctx.fillText(f.detalle, PAD + ancho, y + 36); ctx.textAlign = "left";
+                        ctx.fillStyle = REP.text; ctx.font = F(800, 20); ctx.fillText(textoQueCabe(ctx, f.nombre, ancho - dw - 24), PAD, y + 36);
+                        let yy = y + 50;
+                        if (f.barra !== null) {
+                            ctx.fillStyle = REP.line; rectRedondo(ctx, PAD, yy, ancho, 7, 3.5); ctx.fill();
+                            if (f.barra > 0) { ctx.fillStyle = REP.accent; rectRedondo(ctx, PAD, yy, Math.max(7, ancho * Math.min(1, f.barra)), 7, 3.5); ctx.fill(); }
+                            yy += 16;
+                        }
+                        if (f.sub) { ctx.fillStyle = REP.muted; ctx.font = F(500, 15.5); ctx.fillText(textoQueCabe(ctx, f.sub, ancho), PAD, yy + 18); }
+                    } });
+                }
+            });
+        });
+        return bloques;
+    }
+
+    function lienzoReporte(alto) {
+        const cv = document.createElement("canvas");
+        cv.width = REP.W;
+        cv.height = Math.ceil(alto);
+        const ctx = cv.getContext("2d");
+        ctx.fillStyle = REP.bg;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        return [cv, ctx];
+    }
+
+    function pieReporte(ctx, y, texto) {
+        ctx.fillStyle = REP.muted;
+        ctx.font = `500 14px ${REP.fuente}`;
+        ctx.fillText("chinopcmaster.com · Bingo Digital", REP.PAD, y);
+        ctx.textAlign = "right";
+        ctx.fillText(texto, REP.W - REP.PAD, y);
+        ctx.textAlign = "left";
+    }
+
+    /** Una sola imagen larga con todo el reporte. */
+    async function reporteImagen(datos) {
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        const bloques = bloquesReporte(datos);
+        const alto = REP.PAD + bloques.reduce((t, b) => t + b.h, 0) + 70;
+        const [cv, ctx] = lienzoReporte(alto);
+        let y = REP.PAD - 10;
+        bloques.forEach((b) => { b.dibujar(ctx, y); y += b.h; });
+        pieReporte(ctx, alto - 30, `Datos al ${datos.generado}`);
+        return canvasABlob(cv, "image/png");
+    }
+
+    /** PDF tamaño carta: los bloques se reparten en páginas; un título de sección nunca queda solo al final de una página. */
+    async function reportePdf(datos) {
+        await cargarScript(LIB_JSPDF);
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        const bloques = bloquesReporte(datos);
+        const altoPagina = Math.round(REP.W * 11 / 8.5);
+        const util = altoPagina - REP.PAD - 80;
+        const paginas = [[]];
+        let usado = 0;
+        bloques.forEach((b, i) => {
+            const siguiente = bloques[i + 1];
+            const necesita = b.titulo && siguiente ? b.h + siguiente.h : b.h;
+            if (usado && usado + necesita > util) {
+                paginas.push([]);
+                usado = 0;
+                /* Una sección que sigue en la página nueva repite su título. */
+                if (b.seccion) {
+                    const titulo = `${b.seccion} (continúa)`;
+                    paginas[paginas.length - 1].push({ h: 56, dibujar(ctx, y) {
+                        ctx.fillStyle = REP.muted; ctx.font = `800 20px ${REP.fuente}`; ctx.fillText(titulo, REP.PAD, y + 34);
+                    } });
+                    usado = 56;
+                }
+            }
+            paginas[paginas.length - 1].push(b);
+            usado += b.h;
+        });
+        const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "in", format: "letter", compress: true });
+        paginas.forEach((lista, n) => {
+            const [cv, ctx] = lienzoReporte(altoPagina);
+            let y = REP.PAD - 10;
+            lista.forEach((b) => { b.dibujar(ctx, y); y += b.h; });
+            pieReporte(ctx, altoPagina - 30, `Datos al ${datos.generado} · Página ${n + 1} de ${paginas.length}`);
+            if (n) pdf.addPage();
+            pdf.addImage(cv.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 8.5, 11);
+        });
+        return pdf.output("blob");
+    }
+
     function tituloCarton(cfg) {
         return {
             titulo: cfg.nombre || "BINGO",
@@ -1579,15 +1766,23 @@
             const cajaRanking = el("div", {});
             const botonesOrden = el("div", { class: "bn-tabs bn-rank-orden", role: "group", "aria-label": "Ordenar ventas por encargado" });
             const notaOrden = el("p", { class: "bn-note" });
-            function pintarRanking() {
-                const [k1, k2] = ORDENES[S.ordenRanking];
-                const ranking = Object.values(porNombre).sort((x, y) => y[k1] - x[k1] || y[k2] - x[k2] || x.nombre.localeCompare(y.nombre, "es"));
+            /* Filas ordenadas con su puesto (los empates comparten puesto) y su barra contra el primer lugar. */
+            function ordenarRanking(orden) {
+                const [k1, k2] = ORDENES[orden];
+                const lista = Object.values(porNombre).sort((x, y) => y[k1] - x[k1] || y[k2] - x[k2] || x.nombre.localeCompare(y.nombre, "es"));
+                const lider = lista.length ? Math.max(lista[0][k1], 1) : 1;
                 let puesto = 0;
-                const lider = ranking.length ? Math.max(ranking[0][k1], 1) : 1;
+                return lista.map((f, i) => {
+                    if (i === 0 || f[k1] !== lista[i - 1][k1] || f[k2] !== lista[i - 1][k2]) puesto = i + 1;
+                    return { ...f, puesto, barra: f[k1] / lider };
+                });
+            }
+            function pintarRanking() {
+                const ranking = ordenarRanking(S.ordenRanking);
                 notaOrden.textContent = `Ordenado por ${S.ordenRanking === "monto" ? "monto recaudado" : "cartones vendidos"}, del primer lugar al último. La barra compara cada venta con la del primer lugar.`;
                 [...botonesOrden.children].forEach((btn) => btn.classList.toggle("is-active", btn.dataset.orden === S.ordenRanking));
-                poner(cajaRanking, ranking.length ? el("ol", { class: "bn-rank" }, ranking.map((f, i) => {
-                    if (i === 0 || f[k1] !== ranking[i - 1][k1] || f[k2] !== ranking[i - 1][k2]) puesto = i + 1;
+                poner(cajaRanking, ranking.length ? el("ol", { class: "bn-rank" }, ranking.map((f) => {
+                    const puesto = f.puesto;
                     const medalla = f.cartones > 0 && puesto <= 3 ? MEDALLAS[puesto - 1] : null;
                     return el("li", { class: `bn-rank-row${f.cartones ? "" : " is-cero"}` },
                         medalla ? el("span", { class: `bn-medal bn-medal--${medalla[0]}`, title: medalla[1], "aria-label": medalla[1], text: String(puesto) })
@@ -1597,7 +1792,7 @@
                                 el("b", { text: f.nombre }),
                                 el("span", { class: "bn-dash-num", text: f.cartones ? `${cartonesTxt(f.cartones)} · ${colones(f.monto)} · ${ventasTxt(f.compras)}` : "sin ventas" })),
                             el("small", { class: "bn-note", text: f.sectores.join(" · ") }),
-                            f.cartones ? el("i", { class: "bn-meter bn-meter--rank", style: `--p:${(f[k1] / lider) * 100}%` }) : null
+                            f.cartones ? el("i", { class: "bn-meter bn-meter--rank", style: `--p:${f.barra * 100}%` }) : null
                         )
                     );
                 })) : el("p", { class: "bn-empty", text: "Sin encargados todavía. Agrégalos en la pestaña Sectores para ver quién vende cada cartón." }));
@@ -1622,6 +1817,54 @@
                     sinEnc && (s.encargados || []).length ? el("small", { class: "bn-note", text: `Con el link general del sector: ${cartonesTxt(sinEnc.cartones)} · ${colones(sinEnc.monto)}` }) : null
                 );
             }));
+
+            /* Descarga: todo el resumen de ventas, primero por monto recaudado, luego por cartones y al final por sector. */
+            function datosReporte() {
+                const filaRank = (f) => ({ ...f, sub: f.sectores.join(" · "), detalle: f.cartones ? `${cartonesTxt(f.cartones)} · ${colones(f.monto)} · ${ventasTxt(f.compras)}` : "sin ventas" });
+                const vacio = "Sin encargados todavía.";
+                return {
+                    titulo: cfg.nombre || b.nombre || "Bingo",
+                    fecha: fechaTxt,
+                    generado: fechaDeDate(S.cargado),
+                    tiles: [
+                        [r.cartones_vendidos.toLocaleString("es-CR"), "cartones vendidos", `de ${r.cartones_habilitados.toLocaleString("es-CR")} habilitados`],
+                        [colones(r.recaudado), "recaudado", "compras aprobadas y completadas"],
+                        [String(r.compradores || 0), "compradores", "cada jugador cuenta una vez"],
+                        [String(r.compras.Pendiente || 0), "compras por aprobar", colones(r.por_aprobar)],
+                        [String(r.compras.Aprobada || 0), "por enviar", "aprobadas sin completar"],
+                        [String(r.compras.Completada || 0), "en historial", "compras completadas"]
+                    ],
+                    secciones: [
+                        { tipo: "ranking", titulo: "Ventas por encargado · por monto recaudado", nota: "Del primer lugar al último por monto recaudado. La barra compara con el primer lugar.", filas: ordenarRanking("monto").map(filaRank), vacio },
+                        { tipo: "ranking", titulo: "Ventas por encargado · por cartones", nota: "Del primer lugar al último por cartones vendidos. La barra compara con el primer lugar.", filas: ordenarRanking("cartones").map(filaRank), vacio },
+                        { tipo: "sector", titulo: "Ventas por sector", nota: "La barra muestra cuánto del bloque de cada sector ya se vendió.", filas: sectores.map((s) => {
+                            const n = r.por_sector[s.sector_id] || 0;
+                            const total = s.desde && s.hasta ? s.hasta - s.desde + 1 : 0;
+                            const sinEnc = s.sector_id ? porEnc[`${s.sector_id}:0`] : null;
+                            return {
+                                nombre: s.nombre,
+                                detalle: `${total ? `${n} / ${total} cartones` : cartonesTxt(n)} · ${colones(montoSector[s.sector_id] || 0)}`,
+                                barra: total ? n / total : null,
+                                sub: sinEnc && (s.encargados || []).length ? `Con el link general del sector: ${cartonesTxt(sinEnc.cartones)} · ${colones(sinEnc.monto)}` : ""
+                            };
+                        }) }
+                    ]
+                };
+            }
+            const nombreArchivo = (ext) => {
+                const d = S.cargado;
+                const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                const nombre = String(cfg.nombre || b.nombre || "Bingo").replace(/[\\/:*?"<>|]+/g, " ").trim();
+                return `Resumen de ventas - ${nombre} - ${dia}.${ext}`;
+            };
+            const bajarImagen = el("button", { class: "bn-btn bn-btn--sm", text: "Descargar imagen" });
+            bajarImagen.addEventListener("click", () => conBoton(bajarImagen, async () => {
+                descargarBlob(await reporteImagen(datosReporte()), nombreArchivo("png"));
+            }, "Preparando…"));
+            const bajarPdf = el("button", { class: "bn-btn bn-btn--sm", text: "Descargar PDF" });
+            bajarPdf.addEventListener("click", () => conBoton(bajarPdf, async () => {
+                descargarBlob(await reportePdf(datosReporte()), nombreArchivo("pdf"));
+            }, "Preparando…"));
 
             const refrescar = el("button", { class: "bn-btn bn-btn--sm", text: "↻ Actualizar" });
             refrescar.addEventListener("click", () => conBoton(refrescar, async () => {
@@ -1665,7 +1908,8 @@
                 ),
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Ventas por sector y encargado" }),
-                    el("p", { class: "bn-note", text: "Cuenta las ventas aprobadas y completadas." }),
+                    el("p", { class: "bn-note", text: "Cuenta las ventas aprobadas y completadas. La descarga trae todo el resumen: primero por monto recaudado, luego por cartones y al final por sector." }),
+                    el("div", { class: "bn-btnrow" }, bajarImagen, bajarPdf),
                     el("div", { class: "bn-subcard" },
                         el("h3", { text: "Ventas por encargado" }),
                         botonesOrden,
