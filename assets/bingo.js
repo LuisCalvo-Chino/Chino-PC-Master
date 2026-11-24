@@ -1592,7 +1592,7 @@
                 el("div", { class: "bn-tiles" },
                     tile(r.cartones_vendidos.toLocaleString("es-CR"), "cartones vendidos", `de ${r.cartones_habilitados.toLocaleString("es-CR")} habilitados · máximo 10 000`),
                     tile(colones(r.recaudado), "recaudado", "compras aprobadas y completadas"),
-                    tile(String(r.compradores || 0), "compradores", "cada correo cuenta como un jugador"),
+                    tile(String(r.compradores || 0), "compradores", "cada jugador cuenta una vez, por su correo o su WhatsApp"),
                     tile(String(r.compras.Pendiente || 0), "compras por aprobar", colones(r.por_aprobar)),
                     tile(String(r.compras.Aprobada || 0), "por enviar", "aprobadas sin completar")
                 ),
@@ -1688,7 +1688,10 @@
                 const vars = varsMensaje(cfg, e, linkJ);
                 const acciones = el("div", { class: "bn-btnrow" });
                 const clave = String(e.correo || "").trim().toLowerCase();
-                const mismas = clave ? (S.entradas || []).filter((x) => x.entrada_id !== e.entrada_id && String(x.correo || "").trim().toLowerCase() === clave) : [];
+                /* Mismo jugador: mismo link (correo o teléfono) o, en compras viejas, mismo correo. */
+                const mismas = (S.entradas || []).filter((x) => x.entrada_id !== e.entrada_id && ((e.token && x.token === e.token) || (clave && String(x.correo || "").trim().toLowerCase() === clave)));
+                const aviso = avisoDe(e);
+                const avisoHistorial = (r) => { if (r && r.al_historial) showMessage(`Mensajes enviados: la compra de ${e.nombre} pasó a Historial.`, "success"); };
                 if (e.tiene_comprobante) {
                     const ver = el("button", { class: "bn-btn bn-btn--sm", text: "Ver comprobante" });
                     ver.addEventListener("click", () => conBoton(ver, async () => verComprobante(await llamar({ action: "get_comprobante", hash, entrada_id: e.entrada_id }, { timeoutMs: 60000 }), e), "Abriendo…"));
@@ -1729,12 +1732,21 @@
                     );
                 }
                 if (e.estado === "Aprobada") {
-                    const wa = el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(conModalidad(cfg.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "WhatsApp" });
-                    wa.addEventListener("click", () => { if (!e.wa_enviado) act(null, { action: "mark_sent", entrada_id: e.entrada_id, canal: "wa" }); });
-                    acciones.append(wa);
+                    /* El botón del medio que eligió el comprador va resaltado; el otro queda disponible por si acaso. */
+                    if (e.telefono) {
+                        const pideWa = aviso !== "correo";
+                        const wa = el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : pideWa ? " bn-btn--primary" : ""}`, href: waUrl(e.telefono, render(conModalidad(cfg.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "WhatsApp" });
+                        wa.addEventListener("click", () => { if (!e.wa_enviado) act(null, { action: "mark_sent", entrada_id: e.entrada_id, canal: "wa" }).then(avisoHistorial); });
+                        acciones.append(wa);
+                    }
                     if (e.correo) {
-                        const mail = el("button", { class: `bn-btn bn-btn--sm${e.email_enviado ? " is-done" : ""}`, text: e.email_enviado ? "Correo ✓" : "Enviar correo" });
-                        mail.addEventListener("click", () => act(mail, { action: "send_email", entrada_id: e.entrada_id }, "Enviando…").then((r) => r && showMessage("Correo enviado.", "success")));
+                        const pideCorreo = aviso !== "whatsapp";
+                        const mail = el("button", { class: `bn-btn bn-btn--sm${e.email_enviado ? " is-done" : pideCorreo ? " bn-btn--primary" : ""}`, text: e.email_enviado ? "Correo ✓" : "Enviar correo" });
+                        mail.addEventListener("click", () => act(mail, { action: "send_email", entrada_id: e.entrada_id }, "Enviando…").then((r) => {
+                            if (!r) return;
+                            if (r.al_historial) avisoHistorial(r);
+                            else showMessage("Correo enviado.", "success");
+                        }));
                         acciones.append(mail);
                     }
                     const listo = el("button", { class: "bn-btn bn-btn--sm", text: "Pasar a historial" });
@@ -1793,10 +1805,11 @@
                     el("dl", { class: "bn-dl" },
                         e.telefono ? [el("dt", { text: "WhatsApp" }), el("dd", { text: e.telefono })] : null,
                         e.correo ? [el("dt", { text: "Correo" }), el("dd", { text: e.correo })] : null,
+                        [el("dt", { text: "Recibe por" }), el("dd", { text: AVISO_TEXTO[aviso] })],
                         e.vendedor || sector ? [el("dt", { text: "Vendedor" }), el("dd", { text: [e.vendedor, sector ? sector.nombre : ""].filter(Boolean).join(" · ") })] : null,
                         e.metodo ? [el("dt", { text: "Pago" }), el("dd", { text: e.metodo })] : null,
                         e.cartones ? [el("dt", { text: "Cartones" }), el("dd", { class: "bn-mono", text: e.cartones.split(",").map((x) => C.serieTexto(x)).join(", ") })] : null,
-                        mismas.length ? [el("dt", { text: "Mismo jugador" }), el("dd", { text: `También compró en ${mismas.map((x) => "#" + x.entrada_id).join(", ")}: todos sus cartones están en un solo link.` })] : null,
+                        mismas.length ? [el("dt", { text: "Mismo jugador" }), el("dd", { text: `También compró en ${mismas.map((x) => "#" + x.entrada_id).join(", ")} (mismo correo o WhatsApp): todos sus cartones están en un solo link.` })] : null,
                         e.nota ? [el("dt", { text: "Nota" }), el("dd", { text: e.nota })] : null
                     ),
                     acciones
@@ -3605,6 +3618,51 @@
     }
 
     const correoValido = (t) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || "").trim());
+    /** Teléfono válido: 8 dígitos o más (el 506 de Costa Rica no cuenta). */
+    const telValido = (t) => {
+        let d = String(t || "").replace(/\D/g, "");
+        if (d.length === 11 && d.startsWith("506")) d = d.slice(3);
+        return d.length >= 8;
+    };
+
+    /* Por dónde recibe el comprador el link de sus cartones. */
+    const AVISOS = [["whatsapp", "WhatsApp"], ["correo", "Correo electrónico"], ["ambos", "WhatsApp y correo"]];
+    const AVISO_TEXTO = { whatsapp: "WhatsApp", correo: "Correo", ambos: "WhatsApp y correo" };
+    /** Igual que en el Apps Script: compras de antes de esta opción reciben por ambos si dejaron correo. */
+    const avisoDe = (e) => (AVISO_TEXTO[e.aviso] ? e.aviso : correoValido(e.correo) ? "ambos" : "whatsapp");
+
+    /** Revisa que vengan los datos que pide el medio elegido (mismos mensajes que el Apps Script). */
+    function validarAviso(aviso, correo, tel, vendedor) {
+        if (correo && !correoValido(correo)) throw new Error(vendedor ? "Revisa el correo del comprador: no es válido." : "Revisa tu correo: no es válido.");
+        if (aviso !== "whatsapp" && !correo) throw new Error(vendedor ? "Escribe el correo del comprador para enviarle los cartones por correo." : "Escribe tu correo para enviarte los cartones por correo.");
+        if (aviso !== "correo" && !telValido(tel)) throw new Error(vendedor ? "Escribe el WhatsApp del comprador (8 dígitos)." : "Escribe tu número de WhatsApp (8 dígitos).");
+    }
+
+    /**
+     * Campo «¿Cómo recibe sus cartones?» que ajusta las notas del correo y del WhatsApp.
+     * Devuelve { select, campoCorreo, campoTel }.
+     */
+    function camposAviso(correo, tel, vendedor) {
+        const aviso = select(null, AVISOS, "whatsapp");
+        const campoCorreo = campo("Correo", correo, "");
+        const campoTel = campo("WhatsApp", tel, "");
+        const notaCorreo = campoCorreo.querySelector(".bn-note") || campoCorreo.appendChild(el("small", { class: "bn-note" }));
+        const notaTel = campoTel.querySelector(".bn-note") || campoTel.appendChild(el("small", { class: "bn-note" }));
+        function pintar() {
+            const a = aviso.value;
+            campoCorreo.querySelector(".bn-label").textContent = a === "whatsapp" ? "Correo (opcional)" : "Correo";
+            campoTel.querySelector(".bn-label").textContent = a === "correo" ? "WhatsApp (opcional)" : "WhatsApp";
+            notaCorreo.textContent = a === "whatsapp"
+                ? (vendedor ? "Si lo deja, también identifica al jugador." : "Si lo dejas, también te identifica.")
+                : (vendedor ? "Aquí le llega el link de sus cartones." : "Aquí te llega el link de tus cartones.");
+            notaTel.textContent = a === "correo"
+                ? (vendedor ? "Si lo deja, también identifica al jugador." : "Si lo dejas, también te identifica.")
+                : (vendedor ? "Aquí le llega el link de sus cartones." : "Aquí te enviamos el link de tus cartones.");
+        }
+        aviso.addEventListener("change", pintar);
+        pintar();
+        return { select: aviso, campoCorreo, campoTel };
+    }
 
     /**
      * Formulario de venta de un vendedor (organizador o encargado de sector).
@@ -3633,6 +3691,7 @@
         const campoSeries = campo("Series entregadas", series, bloque && bloque[0] ? `Tu bloque: ${bloque[0]}–${bloque[1]}. Separa con comas; usa guion para rangos.` : "Separa con comas; usa guion para rangos.");
         const campoCantidad = campo("Cantidad de cartones", cantidad);
         const campoEnc = encargado ? campo("Encargado que vendió", encargado) : null;
+        const avisoCampos = camposAviso(correo, tel, true);
 
         function pintarEncargados() {
             if (!sector) return;
@@ -3663,12 +3722,12 @@
         ok.addEventListener("click", async () => {
             const r = await conBoton(ok, async () => {
                 if (!nombre.value.trim()) throw new Error("Escribe el nombre del comprador.");
-                if (!correoValido(correo.value)) throw new Error("Escribe el correo del comprador: con él se juntan todos sus cartones en un solo link.");
+                validarAviso(avisoCampos.select.value, correo.value.trim(), tel.value, true);
                 const file = comprobante.files && comprobante.files[0];
                 if (metodo.value !== "Efectivo" && !file) throw new Error("Adjunta el comprobante del pago.");
                 if (file && file.size > 12 * 1024 * 1024) throw new Error("El comprobante pesa más de 12 MB.");
                 const datos = {
-                    nombre: nombre.value, correo: correo.value.trim(), telefono: tel.value, modalidad: modalidad.value,
+                    nombre: nombre.value, correo: correo.value.trim(), telefono: tel.value, aviso: avisoCampos.select.value, modalidad: modalidad.value,
                     series: entrega.value === "series" ? series.value : "", cantidad: entrega.value === "series" ? "" : cantidad.value,
                     monto: monto.value, metodo: metodo.value, comprobante: file ? await archivoADataUrl(file, 1600) : "",
                     sector_id: sector ? sector.value : 0, encargado_id: encargado ? encargado.value : 0
@@ -3691,7 +3750,8 @@
         return {
             el: el("div", { class: "bn-stack bn-sale-form" },
                 el("div", { class: "bn-form-grid" },
-                    campo("Comprador", nombre), campo("Correo", correo, "Identifica al jugador: todas sus compras quedan en un solo link."), campo("WhatsApp", tel), campo("¿Cómo va a jugar?", modalidad)),
+                    campo("Comprador", nombre), campo("¿Cómo recibe sus cartones?", avisoCampos.select, "Con el WhatsApp o el correo se juntan todas sus compras en un solo link."),
+                    avisoCampos.campoTel, avisoCampos.campoCorreo, campo("¿Cómo va a jugar?", modalidad)),
                 el("div", { class: "bn-form-grid" }, campo("Cartones", entrega), campoSeries, campoCantidad),
                 resumen,
                 el("div", { class: "bn-form-grid" },
@@ -3753,13 +3813,15 @@
                 const linkJ = e.token ? links.jugador(e.token) : "";
                 const vars = varsMensaje(cfg, e, linkJ);
                 const wa = e.telefono && linkJ ? el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : " bn-btn--primary"}`, href: waUrl(e.telefono, render(conModalidad(D.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "Enviar por WhatsApp" }) : null;
-                if (wa) wa.addEventListener("click", () => { if (!e.wa_enviado) llamar({ action: "sector_mark_sent", hash, entrada_id: e.entrada_id, canal: "wa" }).then(() => { e.wa_enviado = true; pintar(); }).catch(() => {}); });
+                if (wa) wa.addEventListener("click", () => { if (!e.wa_enviado) llamar({ action: "sector_mark_sent", hash, entrada_id: e.entrada_id, canal: "wa" }).then((r) => { Object.assign(e, (r && r.entrada) || { wa_enviado: true }); pintar(); }).catch(() => {}); });
                 const ver = e.tiene_comprobante ? el("button", { class: "bn-btn bn-btn--sm", text: "Ver comprobante" }) : null;
                 if (ver) ver.addEventListener("click", () => conBoton(ver, async () => verComprobante(await llamar({ action: "sector_comprobante", hash, entrada_id: e.entrada_id }, { timeoutMs: 60000 }), e), "Abriendo…"));
                 return el("article", { class: "bn-entry" },
                     el("header", {}, el("div", {}, el("b", { text: e.nombre }), el("small", { class: "bn-note bn-block", text: `${fechaHoraTexto(e.fecha)} · ${e.estado}${!D.encargado && e.vendedor ? " · " + e.vendedor : ""}` })), el("div", { class: "bn-entry-amount" }, el("b", { text: colones(e.monto) }), el("small", { text: `${e.cantidad} ${e.cantidad === 1 ? "cartón" : "cartones"} · ${e.metodo}` }))),
                     el("dl", { class: "bn-dl" },
+                        e.telefono ? [el("dt", { text: "WhatsApp" }), el("dd", { text: e.telefono })] : null,
                         e.correo ? [el("dt", { text: "Correo" }), el("dd", { text: e.correo })] : null,
+                        [el("dt", { text: "Recibe por" }), el("dd", { text: AVISO_TEXTO[avisoDe(e)] })],
                         e.cartones ? [el("dt", { text: "Cartones" }), el("dd", { class: "bn-mono", text: e.cartones.split(",").map((x) => C.serieTexto(x)).join(", ") })] : null),
                     el("div", { class: "bn-btnrow" }, linkJ ? el("button", { class: "bn-btn bn-btn--sm", onclick: () => copiar(linkJ, "Link copiado."), text: "Copiar link" }) : null, wa, ver)
                 );
@@ -3915,6 +3977,8 @@
         const nombre = input("bn-c-nombre", "", { autocomplete: "name", placeholder: "Nombre y apellido" });
         const tel = input("bn-c-tel", "", { type: "tel", autocomplete: "tel", placeholder: "8888 8888" });
         const correo = input("bn-c-correo", "", { type: "email", autocomplete: "email", placeholder: "tucorreo@gmail.com" });
+        const avisoCampos = camposAviso(correo, tel, false);
+        avisoCampos.select.id = "bn-c-aviso";
         const cantidad = input("bn-c-cantidad", "1", { type: "number", min: 1, max: 1000, inputmode: "numeric" });
         const modalidad = cfg.modalidad === "Mixta" ? select("bn-c-modalidad", [["Presencial", "Presencial"], ["Virtual", "Virtual"]], "Virtual") : null;
         /* Un encargado por opción («sector:encargado»), para que la venta cuente para quien vendió. */
@@ -3954,13 +4018,14 @@
 
         const enviar = el("button", { class: "bn-btn bn-btn--primary bn-btn--xl", text: "Enviar compra" });
         enviar.addEventListener("click", () => conBoton(enviar, async () => {
-            if (!correoValido(correo.value)) throw new Error("Escribe tu correo: con él se juntan todos tus cartones en un solo link.");
+            if (!nombre.value.trim()) throw new Error("Escribe tu nombre.");
+            validarAviso(avisoCampos.select.value, correo.value.trim(), tel.value, false);
             const f = comprobante.files && comprobante.files[0];
             if (!f) throw new Error("Adjunta la foto o PDF del comprobante de pago.");
             if (f.size > 12 * 1024 * 1024) throw new Error("El comprobante pesa más de 12 MB.");
             const dataUrl = await archivoADataUrl(f, 1600);
             const r = await llamar({
-                action: "submit_compra", pub, nombre: nombre.value, telefono: tel.value, correo: correo.value.trim(), cantidad: cantidad.value,
+                action: "submit_compra", pub, nombre: nombre.value, telefono: tel.value, correo: correo.value.trim(), aviso: avisoCampos.select.value, cantidad: cantidad.value,
                 modalidad: modalidad ? modalidad.value : cfg.modalidad === "Presencial" ? "Presencial" : "Virtual",
                 sector_id: sector ? sector.value.split(":")[0] : 0, encargado_id: sector ? sector.value.split(":")[1] : 0,
                 vendedor: vendedor ? vendedor.value : "", metodo: metodo.value, comprobante: dataUrl
@@ -3969,7 +4034,7 @@
                 el("div", { class: "bn-balls-row", "aria-hidden": "true" }, C.LETRAS.map((l, i) => bolaEl(i * 15 + 7))),
                 el("h1", { class: "bn-title", text: "¡Recibimos tu compra!" }),
                 el("p", { text: `Compra #${r.entrada_id}: ${r.cantidad} ${r.cantidad === 1 ? "cartón" : "cartones"} por ${colones(r.monto)}.` }),
-                el("p", { text: "Cuando el organizador confirme tu pago, te llega por WhatsApp o correo el link con tus cartones para jugar en línea. Si ya habías comprado con este correo, los cartones nuevos se suman a tu mismo link." }),
+                el("p", { text: `Cuando el organizador confirme tu pago, te llega por ${{ whatsapp: "WhatsApp", correo: "correo", ambos: "WhatsApp y correo" }[avisoCampos.select.value]} el link con tus cartones para jugar en línea. Si ya habías comprado con este mismo correo o número, los cartones nuevos se suman a tu mismo link.` }),
                 cfg.whatsapp ? el("a", { class: "bn-btn", href: waUrl(cfg.whatsapp, `Hola, envié la compra #${r.entrada_id} para ${cfg.nombre}.`), target: "_blank", rel: "noopener", text: "Escribir al organizador" }) : null
             )));
         }, "Enviando…"));
@@ -3978,8 +4043,8 @@
             pintado(
                 cabeceraCompra(cfg, apariencia, cfg.logo_url),
                 el("section", { class: "bn-card" }, el("h2", { text: "1. Tus datos" }), el("div", { class: "bn-form-grid" },
-                    campo("Nombre", nombre), campo("WhatsApp", tel, "Aquí te enviamos el link de tus cartones."),
-                    campo("Correo", correo, "Es tu identificación: todas tus compras quedan en un solo link."), modalidad ? campo("¿Cómo vas a jugar?", modalidad) : null,
+                    campo("Nombre", nombre), campo("¿Cómo quieres recibir tus cartones?", avisoCampos.select, "Con tu WhatsApp o tu correo se juntan todas tus compras en un solo link."),
+                    avisoCampos.campoTel, avisoCampos.campoCorreo, modalidad ? campo("¿Cómo vas a jugar?", modalidad) : null,
                     sector ? campo("¿Quién te vendió?", sector) : campo("¿Quién te vendió?", vendedor))),
                 el("section", { class: "bn-card" }, el("h2", { text: "2. Cartones" }),
                     combos.length ? el("div", { class: "bn-combo-chips" }, combos.map((x) => el("span", { class: "bn-chip", text: `${x.cantidad} por ${colones(x.precio)}` }))) : null,

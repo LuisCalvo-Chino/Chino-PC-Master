@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-17T14:26:00-06:00",
+    "actualizado": "2026-11-17T15:33:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -47,19 +47,39 @@
     ],
     "parches": [
         {
-            "id": "2026-11-17-sector-solo-presencial",
-            "fecha": "2026-11-17T14:26:00-06:00",
+            "id": "2026-11-17-avisos-whatsapp-correo",
+            "fecha": "2026-11-17T15:33:00-06:00",
             "producto": "bingo",
-            "titulo": "Sectores solo presenciales, ocultos en el formulario de compra",
-            "resumen": "Cada sector tiene ahora la opción de no aparecer en «¿Quién te vendió?» del formulario de compra. Así puedes tener un sector para vender cartones en persona sin que los compradores en línea lo vean.",
+            "titulo": "Recibe tus cartones por WhatsApp, correo o ambos; historial automático y sectores solo presenciales",
+            "resumen": "Quien compra elige por dónde recibe el enlace de sus cartones, y el correo ya no es obligatorio para quien prefiere WhatsApp. Las compras de una misma persona se juntan por su correo o por su WhatsApp, pasan solas al historial cuando ya salieron sus mensajes, y los correos salen desde bingo@chinopcmaster.com. Además, un sector puede quedar solo para ventas presenciales.",
             "cambios": [
                 {
                     "tipo": "nuevo",
-                    "texto": "En la pestaña «Sectores», la casilla «Mostrar en el formulario de compra» decide si el sector sale en «¿Quién te vendió?». Si la desmarcas, el sector queda solo presencial y se marca con «Solo presencial: oculto en el formulario»."
+                    "texto": "En el formulario de compra, «¿Cómo quieres recibir tus cartones?» ofrece WhatsApp, correo electrónico o WhatsApp y correo. Con WhatsApp el correo es opcional, y con correo el WhatsApp es opcional."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Las compras de una misma persona quedan en un solo enlace por su correo o por su número de WhatsApp (8888 8888 y +506 8888 8888 cuentan como el mismo). Dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En Ventas, cada compra muestra «Recibe por» y resalta el botón del medio que eligió el comprador. Cuando ya salieron todos esos mensajes, la compra pasa sola de «Por enviar» a «Historial». Las compras que ya tenían todo enviado pasan al historial la primera vez que se abre Ventas."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "La venta presencial, en el panel y en los enlaces de los encargados, pregunta cómo recibe sus cartones el comprador y pide el WhatsApp, el correo o los dos según esa respuesta."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Los correos con los cartones salen desde bingo@chinopcmaster.com, con el nombre del bingo como remitente."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En la pestaña «Sectores», la casilla «Mostrar en el formulario de compra» decide si el sector sale en «¿Quién te vendió?». Si la desmarcas, el sector queda solo presencial: su bloque de cartones, su enlace general y los de sus encargados siguen funcionando para registrar ventas en persona."
                 },
                 {
                     "tipo": "nota",
-                    "texto": "Un sector oculto sigue igual en todo lo demás: su bloque de cartones, su link general y los links de sus encargados funcionan para registrar las ventas presenciales. Las compras en línea nunca toman cartones de los bloques de los sectores. Los sectores que ya tenías siguen visibles en el formulario."
+                    "texto": "En Resumen, la cifra de compradores cuenta a cada jugador una vez, por su correo o su WhatsApp. La guía de Bingo Digital ya explica estos cambios."
                 }
             ]
         },

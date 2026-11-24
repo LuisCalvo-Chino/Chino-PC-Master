@@ -19,7 +19,12 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 6;
+var API_VERSION_ = 7;
+/**
+ * Remitente de los correos del bingo. Si la cuenta que ejecuta el script lo tiene en Gmail
+ * («Configuración → Cuentas → Enviar correo como»), los correos salen desde aquí; si no, desde la cuenta del script.
+ */
+var REMITENTE_BINGO_ = "bingo@chinopcmaster.com";
 var MAX_CARTONES_ = 10000;
 var LOTE_DEFAULT_ = 100;
 var MAX_POR_COMPRA_ = 1000;
@@ -34,7 +39,7 @@ var SHEETS_ = {
   cartones: ["serie", "estado", "entrada_id", "sector_id", "comprador", "fecha"],
   entradas: ["entrada_id", "fecha", "nombre", "telefono", "correo", "modalidad", "cantidad", "monto",
     "vendedor", "sector_id", "metodo", "comprobante_id", "estado", "cartones", "token", "nota",
-    "email_enviado", "wa_enviado", "fecha_completada", "encargado_id"],
+    "email_enviado", "wa_enviado", "fecha_completada", "encargado_id", "aviso"],
   sectores: ["sector_id", "nombre", "encargado", "telefono", "desde", "hasta", "hash", "activo", "encargados", "en_formulario"],
   precios: ["cantidad", "precio"],
   rondas: ["ronda_id", "orden", "nombre", "figura", "premio", "estado", "bolas", "ganadores", "inicio", "fin",
@@ -136,7 +141,7 @@ function doPost(e) {
     if (action === "delete_logo") return ok_(conLock_(function () { return deleteLogo_(b); }));
     if (action === "save_precios") return ok_(conLock_(function () { return savePrecios_(b, data.precios || []); }));
     if (action === "save_sectores") return ok_(conLock_(function () { return saveSectores_(b, data.sectores || []); }));
-    if (action === "list_entradas") return ok_(listEntradas_(b));
+    if (action === "list_entradas") return ok_(conLock_(function () { return listEntradas_(b); }));
     if (action === "get_comprobante") return ok_(getComprobante_(b, data.entrada_id));
     if (action === "approve_entrada") return ok_(conLock_(function () { return approveEntrada_(b, data); }));
     if (action === "reject_entrada") return ok_(conLock_(function () { return setEstadoEntrada_(b, data.entrada_id, "Rechazada", data.nota, true); }));
@@ -243,6 +248,52 @@ function sinEmojis_(t) {
 
 function correoClave_(c) { return String(c || "").trim().toLowerCase(); }
 function correoValido_(c) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(c || "").trim()); }
+
+/** Teléfono para comparar: solo dígitos y sin el 506 de Costa Rica (8888 8888 = +506 8888-8888). */
+function telClave_(t) {
+  var d = String(t || "").replace(/\D/g, "");
+  if (d.length === 11 && d.indexOf("506") === 0) d = d.slice(3);
+  return d.length >= 8 ? d : "";
+}
+
+/**
+ * Por dónde quiere el comprador recibir sus cartones: «whatsapp», «correo» o «ambos».
+ * Compras de antes de esta opción: ambos si dejaron correo; si no, WhatsApp.
+ */
+function avisoDe_(e) {
+  var a = String(e.aviso || "").trim().toLowerCase();
+  if (a === "whatsapp" || a === "correo" || a === "ambos") return a;
+  return correoValido_(e.correo) ? "ambos" : "whatsapp";
+}
+
+/** Revisa el medio de aviso elegido y que vengan los datos que ese medio requiere. */
+function leerAviso_(valor, correo, telefono, vendedor) {
+  var a = String(valor || "").trim().toLowerCase();
+  if (a !== "whatsapp" && a !== "correo" && a !== "ambos") a = correo ? "ambos" : "whatsapp";
+  if (correo && !correoValido_(correo)) throw new Error(vendedor ? "Revisa el correo del comprador: no es válido." : "Revisa tu correo: no es válido.");
+  if (a !== "whatsapp" && !correo) throw new Error(vendedor ? "Escribe el correo del comprador para enviarle los cartones por correo." : "Escribe tu correo para enviarte los cartones por correo.");
+  if (a !== "correo" && !telClave_(telefono)) throw new Error(vendedor ? "Escribe el WhatsApp del comprador (8 dígitos)." : "Escribe tu número de WhatsApp (8 dígitos).");
+  if (vendedor && !correo && !telClave_(telefono)) throw new Error("Escribe el WhatsApp o el correo del comprador: con eso se juntan sus cartones en un solo link.");
+  return a;
+}
+
+/** true cuando ya salieron todos los mensajes que pidió el comprador. */
+function avisosCompletos_(e) {
+  var a = avisoDe_(e);
+  var faltaWa = a !== "correo" && !e.wa_enviado;
+  var faltaCorreo = a !== "whatsapp" && correoValido_(e.correo) && !e.email_enviado;
+  return !faltaWa && !faltaCorreo;
+}
+
+/** Una compra «Por enviar» pasa sola al historial cuando ya se enviaron todos sus mensajes. */
+function alHistorialSiCompleta_(e) {
+  if (e.estado === "Aprobada" && avisosCompletos_(e)) {
+    e.estado = "Completada";
+    e.fecha_completada = ahora_();
+    return true;
+  }
+  return false;
+}
 
 function bool_(v) {
   if (v === true) return true;
@@ -1075,7 +1126,8 @@ function entradaObj_(r) {
     tiene_comprobante: Boolean(r.comprobante_id), comprobante_id: String(r.comprobante_id || ""),
     estado: String(r.estado || ""), cartones: String(r.cartones || ""), token: String(r.token || ""),
     nota: String(r.nota || ""), email_enviado: bool_(r.email_enviado), wa_enviado: bool_(r.wa_enviado),
-    fecha_completada: String(r.fecha_completada || ""), encargado_id: Number(r.encargado_id) || 0, _row: r._row
+    fecha_completada: String(r.fecha_completada || ""), encargado_id: Number(r.encargado_id) || 0,
+    aviso: String(r.aviso || ""), _row: r._row
   };
 }
 
@@ -1092,15 +1144,25 @@ function guardarEntrada_(b, e) {
 }
 
 /**
- * El correo identifica al jugador: todas sus compras comparten el mismo link (token),
+ * El correo o el teléfono identifican al jugador: todas sus compras comparten el mismo link (token),
  * así juega todos sus cartones en una sola pantalla aunque los comprara en varias compras.
+ * 1) Mismo correo → mismo link.
+ * 2) Si no, mismo teléfono → mismo link, siempre que una de las dos compras no tenga correo
+ *    (dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte).
  */
-function tokenPara_(b, correo) {
+function tokenPara_(b, correo, telefono) {
   var lista = entradas_(b);
   var clave = correoClave_(correo);
+  var tel = telClave_(telefono);
   if (clave) {
     var previa = lista.filter(function (e) { return e.token && correoClave_(e.correo) === clave; })[0];
     if (previa) return previa.token;
+  }
+  if (tel) {
+    var porTel = lista.filter(function (e) {
+      return e.token && telClave_(e.telefono) === tel && (!clave || !correoClave_(e.correo));
+    })[0];
+    if (porTel) return porTel.token;
   }
   var usados = {};
   lista.forEach(function (e) { usados[e.token] = 1; });
@@ -1132,8 +1194,7 @@ function submitCompra_(b, data) {
   var correo = String(data.correo || "").trim();
   var cantidad = Math.floor(Number(data.cantidad) || 0);
   if (!nombre) throw new Error("Escribe tu nombre.");
-  if (telefono.length < 8) throw new Error("Escribe un número de WhatsApp válido.");
-  if (!correoValido_(correo)) throw new Error("Escribe un correo válido: con él se juntan todos tus cartones en un solo link.");
+  var aviso = leerAviso_(data.aviso, correo, telefono, false);
   if (cantidad < 1 || cantidad > MAX_POR_COMPRA_) throw new Error("La cantidad debe ser de 1 a " + MAX_POR_COMPRA_ + " cartones.");
   if (!data.comprobante) throw new Error("Adjunta el comprobante de pago.");
   var sectorId = Number(data.sector_id) || 0;
@@ -1152,15 +1213,22 @@ function submitCompra_(b, data) {
     modalidad: data.modalidad === "Presencial" ? "Presencial" : "Virtual", cantidad: cantidad,
     monto: precioPara_(b, cfg, cantidad), vendedor: encElegido ? encElegido.nombre : String(data.vendedor || "").trim(), sector_id: sectorId,
     metodo: String(data.metodo || "SINPE").trim(), comprobante_id: file.getId(), estado: "Pendiente",
-    cartones: "", token: "", nota: "", email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargadoId
+    cartones: "", token: "", nota: "", email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargadoId,
+    aviso: aviso
   };
   guardarEntrada_(b, e);
   return { entrada_id: e.entrada_id, monto: e.monto, cantidad: cantidad };
 }
 
 function listEntradas_(b) {
+  var lista = entradas_(b);
+  /* Una sola vez por bingo: las compras «Por enviar» que ya tenían todos sus mensajes enviados pasan al historial. */
+  if (String(readConfig_(b).envios_al_historial || "") !== "1") {
+    lista.forEach(function (e) { if (alHistorialSiCompleta_(e)) guardarEntrada_(b, e); });
+    setConfigValue_(b, "envios_al_historial", "1");
+  }
   return {
-    entradas: entradas_(b).map(function (e) { delete e._row; delete e.comprobante_id; return e; }).reverse()
+    entradas: lista.map(function (e) { delete e._row; delete e.comprobante_id; return e; }).reverse()
   };
 }
 
@@ -1178,7 +1246,7 @@ function approveEntrada_(b, data) {
   }
   asignarCartones_(b, series, e, e.sector_id);
   e.cartones = series.join(",");
-  e.token = e.token || tokenPara_(b, e.correo);
+  e.token = e.token || tokenPara_(b, e.correo, e.telefono);
   e.estado = "Aprobada";
   e.nota = "";
   guardarEntrada_(b, e);
@@ -1218,9 +1286,11 @@ function markSent_(b, data, sector) {
   if (sector && e.sector_id !== sector.sector_id) throw new Error("Esta compra no es de tu sector.");
   if (data.canal === "email") e.email_enviado = true;
   else e.wa_enviado = true;
+  var alHistorial = alHistorialSiCompleta_(e);
   guardarEntrada_(b, e);
   delete e._row;
-  return { entrada: e };
+  delete e.comprobante_id;
+  return { entrada: e, al_historial: alHistorial };
 }
 
 function linkJugador_(cfg, token) {
@@ -1241,14 +1311,38 @@ function sendEmail_(b, id) {
     cartones: e.cartones.split(",").map(function (x) { return serieTxt_(cfg, x); }).join(", "), link: linkJugador_(cfg, e.token),
     modalidad: modalidadTxt_(e.modalidad)
   };
-  MailApp.sendEmail({
-    to: e.correo, subject: sinEmojis_(render_(cfg.plantilla_email_asunto, vars)), htmlBody: sinEmojis_(render_(conModalidad_(cfg.plantilla_email, true), vars)),
-    name: cfg.nombre || "Bingo"
-  });
+  enviarCorreoBingo_(e.correo, sinEmojis_(render_(cfg.plantilla_email_asunto, vars)),
+    sinEmojis_(render_(conModalidad_(cfg.plantilla_email, true), vars)), cfg.nombre || "Bingo");
   e.email_enviado = true;
+  var alHistorial = alHistorialSiCompleta_(e);
   guardarEntrada_(b, e);
   delete e._row;
-  return { entrada: e };
+  delete e.comprobante_id;
+  return { entrada: e, al_historial: alHistorial };
+}
+
+var ALIAS_BINGO_ = null;
+/** true si la cuenta del script tiene REMITENTE_BINGO_ en «Enviar correo como» de Gmail. */
+function tieneAliasBingo_() {
+  if (ALIAS_BINGO_ === null) {
+    try {
+      var buscado = REMITENTE_BINGO_.toLowerCase();
+      ALIAS_BINGO_ = GmailApp.getAliases().some(function (a) { return String(a).toLowerCase() === buscado; });
+    } catch (err) {
+      ALIAS_BINGO_ = false;
+    }
+  }
+  return ALIAS_BINGO_;
+}
+
+/** Envía desde bingo@chinopcmaster.com cuando el alias existe; si no, como siempre desde la cuenta del script. */
+function enviarCorreoBingo_(para, asunto, html, nombre) {
+  if (tieneAliasBingo_()) {
+    var texto = String(html).replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+    GmailApp.sendEmail(para, asunto, texto, { htmlBody: html, name: nombre, from: REMITENTE_BINGO_, replyTo: REMITENTE_BINGO_ });
+  } else {
+    MailApp.sendEmail({ to: para, subject: asunto, htmlBody: html, name: nombre });
+  }
 }
 
 /**
@@ -1299,8 +1393,9 @@ function cambiarModalidad_(b, data) {
 function venderPresencial_(b, data, sector, encargado) {
   var nombre = String(data.nombre || "").trim();
   var correo = String(data.correo || "").trim();
+  var telefono = String(data.telefono || "").replace(/[^\d+]/g, "");
   if (!nombre) throw new Error("Escribe el nombre del comprador.");
-  if (!correoValido_(correo)) throw new Error("Escribe el correo del comprador: con él se juntan todos sus cartones en un solo link.");
+  var aviso = leerAviso_(data.aviso, correo, telefono, true);
   var metodo = String(data.metodo || "Efectivo").trim();
   if (metodo !== "Efectivo" && !data.comprobante) throw new Error("Adjunta el comprobante del " + metodo + ".");
   var cfg = readConfig_(b);
@@ -1325,15 +1420,16 @@ function venderPresencial_(b, data, sector, encargado) {
   var lista = entradas_(b);
   var e = {
     entrada_id: nextId_(lista, "entrada_id"), fecha: ahora_(), nombre: nombre,
-    telefono: String(data.telefono || "").replace(/[^\d+]/g, ""), correo: correo,
+    telefono: telefono, correo: correo,
     modalidad: data.modalidad === "Virtual" ? "Virtual" : "Presencial", cantidad: series.length,
     monto: data.monto !== undefined && data.monto !== "" ? Number(data.monto) || 0 : precioPara_(b, cfg, series.length),
     vendedor: String(encargado ? encargado.nombre : data.vendedor || (sector ? sector.encargado || sector.nombre : "")).trim(),
     sector_id: sector ? sector.sector_id : 0, metodo: metodo,
     comprobante_id: comprobanteId, estado: "Aprobada", cartones: series.join(","), token: "", nota: "",
-    email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargado ? encargado.id : Number(data.encargado_id) || 0
+    email_enviado: false, wa_enviado: false, fecha_completada: "", encargado_id: encargado ? encargado.id : Number(data.encargado_id) || 0,
+    aviso: aviso
   };
-  e.token = tokenPara_(b, correo);
+  e.token = tokenPara_(b, correo, telefono);
   asignarCartones_(b, series, e, e.sector_id);
   guardarEntrada_(b, e);
   delete e._row;
@@ -1373,7 +1469,7 @@ function resumen_(entradas, vendidos, cfg) {
       x.cartones += e.cantidad;
       x.monto += e.monto;
       x.compras += 1;
-      compradores[correoClave_(e.correo) || "tel:" + e.telefono] = 1;
+      compradores[e.token || correoClave_(e.correo) || "tel:" + telClave_(e.telefono)] = 1;
     }
     if (e.estado === "Pendiente") pendienteMonto += e.monto;
   });
