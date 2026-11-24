@@ -1558,24 +1558,68 @@
             const porEnc = r.por_encargado || {};
             const montoSector = r.monto_sector || {};
 
-            /* Tablero por sector y encargado: cartones del bloque, monto y el desglose de cada encargado. */
+            const cartonesTxt = (n) => `${n} ${n === 1 ? "cartón" : "cartones"}`;
+            const ventasTxt = (n) => `${n} ${n === 1 ? "venta" : "ventas"}`;
+
+            /* Ventas por encargado: una fila por nombre (si un nombre está en varios sectores, se suma),
+               del primer lugar al último. Oro, plata y bronce para los tres primeros; los empates comparten puesto. */
+            const porNombre = {};
+            (S.data.sectores || []).forEach((s) => (s.encargados || []).forEach((x) => {
+                const clave = String(x.nombre || "").trim().toLowerCase();
+                if (!clave) return;
+                const fila = porNombre[clave] || (porNombre[clave] = { nombre: String(x.nombre).trim(), sectores: [], cartones: 0, monto: 0, compras: 0 });
+                if (!fila.sectores.includes(s.nombre)) fila.sectores.push(s.nombre);
+                const d = porEnc[`${s.sector_id}:${x.id}`];
+                if (d) { fila.cartones += d.cartones; fila.monto += d.monto; fila.compras += d.compras; }
+            }));
+            /* Orden elegido con los botones: por cartones vendidos o por monto recaudado (se recuerda al volver al Resumen). */
+            const ORDENES = { cartones: ["cartones", "monto"], monto: ["monto", "cartones"] };
+            if (!ORDENES[S.ordenRanking]) S.ordenRanking = "cartones";
+            const MEDALLAS = [["oro", "Oro: primer lugar"], ["plata", "Plata: segundo lugar"], ["bronce", "Bronce: tercer lugar"]];
+            const cajaRanking = el("div", {});
+            const botonesOrden = el("div", { class: "bn-tabs bn-rank-orden", role: "group", "aria-label": "Ordenar ventas por encargado" });
+            const notaOrden = el("p", { class: "bn-note" });
+            function pintarRanking() {
+                const [k1, k2] = ORDENES[S.ordenRanking];
+                const ranking = Object.values(porNombre).sort((x, y) => y[k1] - x[k1] || y[k2] - x[k2] || x.nombre.localeCompare(y.nombre, "es"));
+                let puesto = 0;
+                const lider = ranking.length ? Math.max(ranking[0][k1], 1) : 1;
+                notaOrden.textContent = `Ordenado por ${S.ordenRanking === "monto" ? "monto recaudado" : "cartones vendidos"}, del primer lugar al último. La barra compara cada venta con la del primer lugar.`;
+                [...botonesOrden.children].forEach((btn) => btn.classList.toggle("is-active", btn.dataset.orden === S.ordenRanking));
+                poner(cajaRanking, ranking.length ? el("ol", { class: "bn-rank" }, ranking.map((f, i) => {
+                    if (i === 0 || f[k1] !== ranking[i - 1][k1] || f[k2] !== ranking[i - 1][k2]) puesto = i + 1;
+                    const medalla = f.cartones > 0 && puesto <= 3 ? MEDALLAS[puesto - 1] : null;
+                    return el("li", { class: `bn-rank-row${f.cartones ? "" : " is-cero"}` },
+                        medalla ? el("span", { class: `bn-medal bn-medal--${medalla[0]}`, title: medalla[1], "aria-label": medalla[1], text: String(puesto) })
+                            : el("span", { class: "bn-rank-pos", text: f.cartones ? `${puesto}.` : "–" }),
+                        el("div", { class: "bn-rank-main" },
+                            el("div", { class: "bn-rank-head" },
+                                el("b", { text: f.nombre }),
+                                el("span", { class: "bn-dash-num", text: f.cartones ? `${cartonesTxt(f.cartones)} · ${colones(f.monto)} · ${ventasTxt(f.compras)}` : "sin ventas" })),
+                            el("small", { class: "bn-note", text: f.sectores.join(" · ") }),
+                            f.cartones ? el("i", { class: "bn-meter bn-meter--rank", style: `--p:${(f[k1] / lider) * 100}%` }) : null
+                        )
+                    );
+                })) : el("p", { class: "bn-empty", text: "Sin encargados todavía. Agrégalos en la pestaña Sectores para ver quién vende cada cartón." }));
+            }
+            [["cartones", "Por cartones"], ["monto", "Por monto recaudado"]].forEach(([orden, texto]) => {
+                botonesOrden.append(el("button", { type: "button", class: "bn-tab", dataset: { orden }, text: texto, onclick: () => { S.ordenRanking = orden; pintarRanking(); } }));
+            });
+            pintarRanking();
+
+            /* Ventas por sector, aparte: cartones del bloque, monto y lo vendido con el link general del sector. */
             const sectores = [{ sector_id: 0, nombre: "General (compras en línea y panel)", desde: 0, hasta: 0, encargados: [] }, ...(S.data.sectores || [])];
             const tablero = el("div", { class: "bn-dash" }, sectores.map((s) => {
                 const n = r.por_sector[s.sector_id] || 0;
                 const total = s.desde && s.hasta ? s.hasta - s.desde + 1 : 0;
-                const filasEnc = (s.encargados || []).map((x) => ({ nombre: x.nombre, d: porEnc[`${s.sector_id}:${x.id}`] }));
-                const sinEnc = porEnc[`${s.sector_id}:0`];
-                if (sinEnc && filasEnc.length) filasEnc.push({ nombre: "Link general del sector", d: sinEnc });
+                const sinEnc = s.sector_id ? porEnc[`${s.sector_id}:0`] : null;
                 return el("article", { class: "bn-dash-row" },
                     el("header", {},
                         el("b", { text: s.nombre }),
-                        el("span", { class: "bn-dash-num", text: `${total ? `${n} / ${total}` : n} ${n === 1 && !total ? "cartón" : "cartones"} · ${colones(montoSector[s.sector_id] || 0)}` })
+                        el("span", { class: "bn-dash-num", text: `${total ? `${n} / ${total} cartones` : cartonesTxt(n)} · ${colones(montoSector[s.sector_id] || 0)}` })
                     ),
                     total ? el("i", { class: "bn-meter", style: `--p:${Math.min(100, (n / total) * 100)}%` }) : null,
-                    filasEnc.length ? el("ul", { class: "bn-dash-sub" }, filasEnc.map((f) => el("li", {},
-                        el("span", { text: f.nombre }),
-                        el("span", { class: "bn-dash-num", text: f.d ? `${f.d.cartones} ${f.d.cartones === 1 ? "cartón" : "cartones"} · ${colones(f.d.monto)} · ${f.d.compras} ${f.d.compras === 1 ? "venta" : "ventas"}` : "sin ventas" })
-                    ))) : null
+                    sinEnc && (s.encargados || []).length ? el("small", { class: "bn-note", text: `Con el link general del sector: ${cartonesTxt(sinEnc.cartones)} · ${colones(sinEnc.monto)}` }) : null
                 );
             }));
 
@@ -1621,8 +1665,18 @@
                 ),
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Ventas por sector y encargado" }),
-                    el("p", { class: "bn-note", text: "Cuenta las ventas aprobadas y completadas. La barra muestra cuánto del bloque de cada sector ya se vendió." }),
-                    tablero
+                    el("p", { class: "bn-note", text: "Cuenta las ventas aprobadas y completadas." }),
+                    el("div", { class: "bn-subcard" },
+                        el("h3", { text: "Ventas por encargado" }),
+                        botonesOrden,
+                        notaOrden,
+                        cajaRanking
+                    ),
+                    el("div", { class: "bn-subcard" },
+                        el("h3", { text: "Ventas por sector" }),
+                        el("p", { class: "bn-note", text: "La barra muestra cuánto del bloque de cada sector ya se vendió." }),
+                        tablero
+                    )
                 )
             );
         }
@@ -1681,6 +1735,19 @@
                 poner(lista, ...items.map(tarjeta));
             }
 
+            /* «WhatsApp ✓ · Correo sin enviar»: lo que pidió el comprador y no ha salido va resaltado. */
+            function estadoMensajes(e, aviso) {
+                const partes = [];
+                if (e.telefono) partes.push(["WhatsApp", e.wa_enviado, aviso !== "correo"]);
+                if (e.correo) partes.push(["Correo", e.email_enviado, aviso !== "whatsapp"]);
+                if (!partes.length) return [el("span", { text: "Sin WhatsApp ni correo" })];
+                return partes.map(([medio, enviado, pedido], k) => el("span", {
+                    class: `bn-chip${enviado ? " bn-chip--enviado" : pedido ? " bn-chip--out" : ""}`,
+                    style: k ? "margin-left:6px" : "",
+                    text: enviado ? `${medio} enviado` : `${medio} sin enviar`
+                }));
+            }
+
             function tarjeta(e) {
                 const sector = (S.data.sectores || []).find((s) => s.sector_id === e.sector_id);
                 const cfg = S.data.config;
@@ -1731,24 +1798,30 @@
                         el("a", { class: "bn-btn bn-btn--sm", href: linkJ, target: "_blank", rel: "noopener", text: "Ver cartones" })
                     );
                 }
-                if (e.estado === "Aprobada") {
-                    /* El botón del medio que eligió el comprador va resaltado; el otro queda disponible por si acaso. */
+                if (e.estado === "Aprobada" || e.estado === "Completada") {
+                    /* El botón del medio que eligió el comprador va resaltado; el otro queda disponible por si acaso.
+                       Enviado (verde) se puede reenviar; en Historial, lo que pidió el comprador y no salió va en rojo. */
+                    const enHistorial = e.estado === "Completada";
+                    const claseEnvio = (enviado, pedido) => `bn-btn bn-btn--sm${enviado ? " is-done" : pedido ? (enHistorial ? " bn-btn--danger" : " bn-btn--primary") : ""}`;
                     if (e.telefono) {
                         const pideWa = aviso !== "correo";
-                        const wa = el("a", { class: `bn-btn bn-btn--sm${e.wa_enviado ? " is-done" : pideWa ? " bn-btn--primary" : ""}`, href: waUrl(e.telefono, render(conModalidad(cfg.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓" : "WhatsApp" });
+                        const wa = el("a", { class: claseEnvio(e.wa_enviado, pideWa), href: waUrl(e.telefono, render(conModalidad(cfg.plantilla_whatsapp), vars)), target: "_blank", rel: "noopener", text: e.wa_enviado ? "WhatsApp ✓ · Reenviar" : enHistorial && pideWa ? "WhatsApp sin enviar" : "WhatsApp" });
                         wa.addEventListener("click", () => { if (!e.wa_enviado) act(null, { action: "mark_sent", entrada_id: e.entrada_id, canal: "wa" }).then(avisoHistorial); });
                         acciones.append(wa);
                     }
                     if (e.correo) {
                         const pideCorreo = aviso !== "whatsapp";
-                        const mail = el("button", { class: `bn-btn bn-btn--sm${e.email_enviado ? " is-done" : pideCorreo ? " bn-btn--primary" : ""}`, text: e.email_enviado ? "Correo ✓" : "Enviar correo" });
+                        const yaEnviado = e.email_enviado;
+                        const mail = el("button", { class: claseEnvio(yaEnviado, pideCorreo), text: yaEnviado ? "Correo ✓ · Reenviar" : enHistorial && pideCorreo ? "Correo sin enviar" : "Enviar correo" });
                         mail.addEventListener("click", () => act(mail, { action: "send_email", entrada_id: e.entrada_id }, "Enviando…").then((r) => {
                             if (!r) return;
                             if (r.al_historial) avisoHistorial(r);
-                            else showMessage("Correo enviado.", "success");
+                            else showMessage(yaEnviado ? "Correo reenviado." : "Correo enviado.", "success");
                         }));
                         acciones.append(mail);
                     }
+                }
+                if (e.estado === "Aprobada") {
                     const listo = el("button", { class: "bn-btn bn-btn--sm", text: "Pasar a historial" });
                     listo.addEventListener("click", () => act(listo, { action: "complete_entrada", entrada_id: e.entrada_id }));
                     const devolver = el("button", { class: "bn-btn bn-btn--sm bn-btn--danger", text: "Devolver a pendientes" });
@@ -1806,6 +1879,7 @@
                         e.telefono ? [el("dt", { text: "WhatsApp" }), el("dd", { text: e.telefono })] : null,
                         e.correo ? [el("dt", { text: "Correo" }), el("dd", { text: e.correo })] : null,
                         [el("dt", { text: "Recibe por" }), el("dd", { text: AVISO_TEXTO[aviso] })],
+                        e.estado === "Aprobada" || e.estado === "Completada" ? [el("dt", { text: "Mensajes" }), el("dd", {}, ...estadoMensajes(e, aviso))] : null,
                         e.vendedor || sector ? [el("dt", { text: "Vendedor" }), el("dd", { text: [e.vendedor, sector ? sector.nombre : ""].filter(Boolean).join(" · ") })] : null,
                         e.metodo ? [el("dt", { text: "Pago" }), el("dd", { text: e.metodo })] : null,
                         e.cartones ? [el("dt", { text: "Cartones" }), el("dd", { class: "bn-mono", text: e.cartones.split(",").map((x) => C.serieTexto(x)).join(", ") })] : null,
@@ -2493,11 +2567,15 @@
             const guardar = el("button", { class: "bn-btn bn-btn--primary", text: "Guardar sectores" });
             guardar.addEventListener("click", () => conBoton(guardar, async () => {
                 const d = await llamar({ action: "save_sectores", hash, sectores: filas });
+                /* Un Apps Script anterior a «Mostrar en el formulario de compra» no guarda la casilla y la devuelve marcada. */
+                const ocultos = filas.filter((s) => s.en_formulario === false).map((s) => s.nombre);
+                const sinCasilla = ocultos.length && (d.sectores || []).some((s) => s.en_formulario === undefined);
                 S.data.sectores = d.sectores;
                 await recargar();
                 filas = copiarFilas(S.data.sectores);
                 pintar();
-                showMessage("Sectores guardados.", "success");
+                if (sinCasilla) showMessage(`El servidor no guardó «Mostrar en el formulario de compra» (${ocultos.join(", ")}): publica la versión nueva del Apps Script del bingo y vuelve a desmarcarla.`, "error");
+                else showMessage("Sectores guardados.", "success");
             }, "Guardando…"));
             agregar(root,
                 el("section", { class: "bn-card" },

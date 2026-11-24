@@ -331,6 +331,7 @@ body.bn-form-pintado #main-content { background: var(--bn-form-fondo) !important
 /* ===== Beta 2 ===== */
 .bn-sep { border: 0; border-top: 1px solid var(--bn-line); margin: 4px 0; width: 100%; }
 .bn-chip--out { color: var(--bn-danger); border-color: var(--bn-danger); }
+.bn-chip--enviado { color: var(--bn-ok); border-color: rgba(61, 220, 132, 0.5); }
 .bn-chip--presencial { color: var(--bn-warn); border-color: var(--bn-warn); margin-top: 4px; }
 .bn-chip--virtual { color: var(--bn-accent); border-color: var(--bn-accent); margin-top: 4px; }
 .bn-player-pdf { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -543,3 +544,21 @@ body.bn-screen-body .bn-app { max-width: none; padding: 0; }
     .bn-screen-board .bn-board-row span, .bn-screen-board .bn-board-letter { height: 5vw; font-size: 2.6vw; }
 }
 @media (prefers-reduced-motion: reduce) { .bn-screen-win { animation: none; } }
+
+/* Resumen: ventas por encargado (ranking con medallas) y por sector */
+.bn-subcard { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--bn-line); }
+.bn-subcard h3 { margin: 0 0 4px; font-size: 1.02rem; }
+.bn-subcard > .bn-note { margin: 0 0 12px; }
+.bn-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bn-rank-row { display: flex; align-items: flex-start; gap: 12px; }
+.bn-rank-row.is-cero { opacity: 0.6; }
+.bn-rank-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bn-rank-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bn-rank-pos { flex: none; width: 28px; text-align: center; color: var(--bn-muted); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 28px; }
+.bn-medal { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 800; color: #2b1d00; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.08); }
+.bn-medal--oro { background: radial-gradient(circle at 35% 30%, #fff3b0, #f5c518 55%, #b8860b); }
+.bn-medal--plata { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ced6 55%, #8a929e); color: #1f2329; }
+.bn-medal--bronce { background: radial-gradient(circle at 35% 30%, #ffd2a8, #cd7f32 55%, #8a4f1d); color: #2a1404; }
+.bn-meter--rank { height: 5px; margin-top: 2px; }
+.bn-rank-row > .bn-medal, .bn-rank-row > .bn-rank-pos { align-self: flex-start; }
+.bn-rank-orden { margin: 2px 0 8px; }

@@ -19,7 +19,7 @@
  * (Ejecutar como: Yo · Acceso: Cualquiera). La URL /exec va en index.html como window.CPM_BINGO_GAS_URL.
  */
 
-var API_VERSION_ = 7;
+var API_VERSION_ = 8;
 /**
  * Remitente de los correos del bingo. Si la cuenta que ejecuta el script lo tiene en Gmail
  * («Configuración → Cuentas → Enviar correo como»), los correos salen desde aquí; si no, desde la cuenta del script.
@@ -1107,10 +1107,19 @@ function saveSectores_(b, lista) {
   limpios.forEach(function (s) { maxHasta = Math.max(maxHasta, s.hasta); });
   var cfg = readConfig_(b);
   if (maxHasta > (Number(cfg.cartones_habilitados) || 0)) setConfigValue_(b, "cartones_habilitados", maxHasta);
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS_.sectores.length).clearContent();
+  /* Se escribe según los encabezados reales de la hoja: en bingos viejos las columnas nuevas quedaron al final
+     y pueden no seguir el orden de SHEETS_. Una casilla desmarcada se guarda como "no" (nunca vacía = visible). */
+  var ancho = Math.max(sh.getLastColumn(), SHEETS_.sectores.length);
+  var encabezados = sh.getRange(1, 1, 1, ancho).getValues()[0].map(function (h) { return String(h).trim(); });
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, ancho).clearContent();
   if (limpios.length) {
-    sh.getRange(2, 1, limpios.length, SHEETS_.sectores.length)
-      .setValues(limpios.map(function (s) { return SHEETS_.sectores.map(function (h) { return s[h]; }); }));
+    sh.getRange(2, 1, limpios.length, ancho).setValues(limpios.map(function (s) {
+      return encabezados.map(function (h) {
+        if (h === "en_formulario") return s.en_formulario ? "si" : "no";
+        if (h === "activo") return s.activo ? true : false;
+        return s[h] === undefined || s[h] === null || !h ? "" : s[h];
+      });
+    }));
   }
   return { sectores: sectores_(b) };
 }
