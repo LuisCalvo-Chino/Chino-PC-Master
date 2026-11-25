@@ -5236,6 +5236,42 @@ main {
     margin-top: 1rem;
 }
 
+/* Mantenimiento (panel organizador): aire entre el cuadro explicativo, los botones, los filtros y la tabla. */
+.angels-tab-panel[data-adpanel="maint"] > * + * {
+    margin-top: 1.25rem;
+}
+
+.angels-maint-about {
+    padding: 1rem 1.15rem;
+    border-radius: 10px;
+}
+
+.angels-maint-about h4 {
+    margin: 0 0 0.6rem;
+}
+
+.angels-maint-about p {
+    margin: 0;
+    line-height: 1.55;
+}
+
+.angels-maint-about p + p {
+    margin-top: 0.75rem;
+}
+
+.angels-tab-panel[data-adpanel="maint"] .angels-form-grid {
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+}
+
+.angels-tab-panel[data-adpanel="maint"] .angels-form-grid .angels-row {
+    gap: 0.75rem 1rem;
+}
+
+.angels-tab-panel[data-adpanel="maint"] .angels-table-wrap.angels-mt {
+    margin-top: 1.25rem;
+}
+
 .angels-accordion details {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;

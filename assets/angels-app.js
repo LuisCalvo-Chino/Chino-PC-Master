@@ -3182,11 +3182,11 @@
                     const st = String(r.status || "");
                     const btnDel = `<button type="button" class="angels-btn angels-btn--sm angels-btn--danger adm-delete-row" data-row="${r.row_index}">Eliminar</button>`;
                     const btnEmerg = admEmergAvailable
-                        ? `<button type="button" class="angels-btn angels-btn--sm adm-emerg-row" data-row="${r.row_index}" title="Reenviar desde angelessecretos@chinopcmaster.com">Emergencia</button>`
+                        ? `<button type="button" class="angels-btn angels-btn--sm adm-emerg-row" data-row="${r.row_index}" title="Envía este mensaje otra vez desde angelessecretos@chinopcmaster.com">Envío Alterno</button>`
                         : "";
                     const prev = emergSentFor(r);
                     const emergNote = prev
-                        ? `<br><small title="Reenviado desde angelessecretos@chinopcmaster.com">📮 Emergencia${
+                        ? `<br><small title="Enviado otra vez desde angelessecretos@chinopcmaster.com">📮 Envío Alterno hecho${
                               prev.sent_at ? ` · ${esc(formatTimestampLabel(prev.sent_at))}` : ""
                           }</small>`
                         : "";
@@ -3195,7 +3195,7 @@
                 .join("");
         }
 
-        /* Envío de emergencia: lo hace el Maestro (cuenta con el alias angelessecretos@), igual para todos los proyectos. */
+        /* Envío Alterno (desde angelessecretos@): lo hace el Maestro (cuenta con el alias angelessecretos@), igual para todos los proyectos. */
         let admEmergAvailable = true;
         let admEmergLog = [];
 
@@ -3221,9 +3221,11 @@
                 admEmergAvailable = true;
                 const hint = document.getElementById("adm-emerg-hint");
                 if (hint) hint.hidden = false;
-                if (hint && d.alias_ok === false) {
-                    hint.innerHTML =
-                        "<strong>Envío de emergencia:</strong> el Maestro todavía no tiene <code>angelessecretos@chinopcmaster.com</code> en «Enviar correo como»; los reenvíos fallarán hasta agregarlo.";
+                const warn = document.getElementById("adm-emerg-alias-warn");
+                if (warn) {
+                    warn.hidden = d.alias_ok !== false;
+                    warn.textContent =
+                        " Por ahora no está disponible: el Maestro todavía no tiene angelessecretos@chinopcmaster.com en «Enviar correo como».";
                 }
             } catch (e) {
                 admEmergLog = [];
@@ -3239,9 +3241,9 @@
             const angelado = String(row.angelado || "");
             const prev = emergSentFor(row);
             const ok = window.confirm(
-                `Reenviar desde angelessecretos@chinopcmaster.com\n\n` +
+                `Envío Alterno: se enviará otra vez desde angelessecretos@chinopcmaster.com\n\n` +
                     `Semana: ${weekDisplayLabel(row.week)}\nDe: ${angel}\nPara: ${angelado || "—"} (correo de la tabla Ángeles)` +
-                    (prev ? `\n\nOjo: este mensaje ya se reenvió de emergencia antes.` : "")
+                    (prev ? `\n\nOjo: este mensaje ya tuvo un Envío Alterno antes.` : "")
             );
             if (!ok) return;
             let d;
@@ -3263,15 +3265,15 @@
                 const unsure = api.isUnconfirmedError && api.isUnconfirmedError(e);
                 await showNoticeModal({
                     variant: "error",
-                    title: unsure ? "Envío sin confirmar" : "No se pudo reenviar",
+                    title: unsure ? "Envío Alterno sin confirmar" : "No se pudo hacer el Envío Alterno",
                     text: unsure
                         ? "No llegó la respuesta del Maestro; el correo pudo haberse enviado. Refresca la tabla antes de volver a intentarlo."
-                        : e.message || "Error al reenviar.",
+                        : e.message || "Error en el Envío Alterno.",
                     detail: e.detail || ""
                 });
                 return;
             }
-            showMessage(`Reenviado${d && d.to ? ` a ${d.to}` : ""} desde angelessecretos@chinopcmaster.com.`, "success", 9000);
+            showMessage(`Envío Alterno hecho${d && d.to ? `: ${d.to}` : ""} desde angelessecretos@chinopcmaster.com.`, "success", 9000);
         }
 
         async function loadPendientes() {

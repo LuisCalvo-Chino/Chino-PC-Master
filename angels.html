@@ -570,16 +570,25 @@
                     </div>
                 </div>
                 <div class="angels-tab-panel" data-adpanel="maint">
-                    <div class="angels-row angels-row--end angels-mb">
+                    <section class="angels-glass angels-maint-about" aria-label="Acerca de Mantenimiento">
+                        <h4 class="angels-design-section__title">Acerca de esta sección</h4>
+                        <p class="angels-hint">
+                            Aquí ves cada mensaje de la cola con su semana, Ángel, angelado y estado (pendiente, enviado o error).
+                            Usa los filtros para encontrar uno, <strong>Refrescar</strong> para ver el estado al día y
+                            <strong>Ejecutar cola ahora</strong> para mandar los pendientes sin esperar al miércoles.
+                        </p>
+                        <p class="angels-hint" id="adm-emerg-hint">
+                            <strong>Envío Alterno:</strong> si un mensaje no llegó (por ejemplo, rebotó con «El mensaje se bloqueó»),
+                            pulsa <strong>Envío Alterno</strong> en su fila. El mismo mensaje se envía otra vez desde
+                            <code>angelessecretos@chinopcmaster.com</code> al correo del angelado registrado en la tabla Ángeles.
+                            <span id="adm-emerg-alias-warn" hidden></span>
+                        </p>
+                    </section>
+                    <div class="angels-row angels-row--end">
                         <button type="button" class="angels-btn" id="adm-reload-pend">Refrescar</button>
                         <button type="button" class="angels-btn angels-btn--danger" id="adm-run-queue-now">Ejecutar cola ahora</button>
                     </div>
-                    <p class="angels-hint angels-mb" id="adm-emerg-hint">
-                        <strong>Envío de emergencia:</strong> si un mensaje rebotó (p. ej. «El mensaje se bloqueó»), pulsa
-                        <strong>Emergencia</strong> en su fila para reenviarlo desde <code>angelessecretos@chinopcmaster.com</code>
-                        al correo actual del angelado en la tabla Ángeles.
-                    </p>
-                    <div class="angels-form-grid angels-glass" style="padding: 0.75rem; border-radius: 10px;">
+                    <div class="angels-form-grid angels-glass">
                         <div class="angels-row">
                             <label>Semana <select id="adm-filter-week" class="angels-input"><option value="">Todas</option></select></label>
                             <label>Ángel <input type="text" id="adm-filter-angel" class="angels-input" placeholder="Buscar..." /></label>
