@@ -74,10 +74,18 @@
         carton: (p, seed, s) => `${baseUrl()}#bt/${p}-${s}-${C.codigo(seed, s)}`
     };
 
+    /* Celular o tableta: abre la app de WhatsApp; computadora: WhatsApp Web. */
+    const esMovil = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+
+    /**
+     * Enlace para abrir WhatsApp con el mensaje listo. Sin teléfono, deja elegir el chat.
+     * No usa wa.me: su redirección a api.whatsapp.com daña los emojis en computadora.
+     */
     function waUrl(telefono, texto) {
         let t = String(telefono || "").replace(/[^\d]/g, "");
         if (t.length === 8) t = "506" + t;
-        return `https://wa.me/${t}?text=${encodeURIComponent(texto)}`;
+        const base = esMovil() ? "https://api.whatsapp.com/send" : "https://web.whatsapp.com/send";
+        return `${base}?${t ? `phone=${t}&` : ""}text=${encodeURIComponent(String(texto || "").normalize("NFC"))}`;
     }
 
     async function copiar(texto, aviso) {
@@ -1471,7 +1479,7 @@
                 el("code", { class: "bn-code", text: link })
             ), (cerrar) => [
                 el("button", { class: "bn-btn", onclick: () => copiar(link, "Link copiado."), text: "Copiar link" }),
-                el("a", { class: "bn-btn bn-btn--primary", href: `https://wa.me/?text=${encodeURIComponent(texto)}`, target: "_blank", rel: "noopener", text: "Enviar por WhatsApp" }),
+                el("a", { class: "bn-btn bn-btn--primary", href: waUrl("", texto), target: "_blank", rel: "noopener", text: "Enviar por WhatsApp" }),
                 el("button", { class: "bn-btn", onclick: cerrar, text: "Listo" })
             ]);
         }
@@ -1889,7 +1897,7 @@
                         el("div", {}, el("b", { text: "Compra de cartones" }), el("small", { class: "bn-note bn-block", text: "Para tus compradores: eligen cantidad y suben su comprobante." })),
                         el("div", { class: "bn-btnrow" },
                             el("button", { class: "bn-btn bn-btn--sm", onclick: () => copiar(compraLink, "Link de compra copiado."), text: "Copiar" }),
-                            el("a", { class: "bn-btn bn-btn--sm bn-btn--primary", href: `https://wa.me/?text=${encodeURIComponent(textoCompra)}`, target: "_blank", rel: "noopener", text: "WhatsApp" }),
+                            el("a", { class: "bn-btn bn-btn--sm bn-btn--primary", href: waUrl("", textoCompra), target: "_blank", rel: "noopener", text: "WhatsApp" }),
                             el("a", { class: "bn-btn bn-btn--sm", href: compraLink, target: "_blank", rel: "noopener", text: "Abrir" })
                         )
                     ),
