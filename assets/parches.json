@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-24T15:26:00-06:00",
+    "actualizado": "2026-11-25T12:00:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -46,6 +46,27 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-25-elegir-como-recibir",
+            "fecha": "2026-11-25T12:00:00-06:00",
+            "producto": "bingo",
+            "titulo": "El comprador elige cómo recibir sus cartones y ve solo el campo que corresponde",
+            "resumen": "«¿Cómo quieres recibir tus cartones?» ya no viene marcada con WhatsApp: el comprador la elige antes de seguir, y el formulario muestra solo el WhatsApp, solo el correo o los dos, según su elección.",
+            "cambios": [
+                {
+                    "tipo": "mejorado",
+                    "texto": "Al abrir el formulario de compra se ven el nombre y la pregunta «¿Cómo quieres recibir tus cartones?», sin ninguna opción elegida y resaltada con el color de acento del formulario. Si se intenta enviar sin elegir, la página lo pide."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Con «WhatsApp» aparece solo el campo de WhatsApp; con «Correo electrónico», solo el del correo; con «WhatsApp y correo», los dos. Después de elegir aparecen también «¿Cómo vas a jugar?» y «¿Quién te vendió?»."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "La venta presencial y el enlace del encargado también piden elegir cómo recibe el comprador y muestran solo el campo de ese medio."
+                }
+            ]
+        },
         {
             "id": "2026-11-24-reenviar-desde-historial",
             "fecha": "2026-11-24T15:26:00-06:00",

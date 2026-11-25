@@ -3953,37 +3953,47 @@
     /** Igual que en el Apps Script: compras de antes de esta opción reciben por ambos si dejaron correo. */
     const avisoDe = (e) => (AVISO_TEXTO[e.aviso] ? e.aviso : correoValido(e.correo) ? "ambos" : "whatsapp");
 
-    /** Revisa que vengan los datos que pide el medio elegido (mismos mensajes que el Apps Script). */
+    /** Revisa que se eligió el medio y que vengan sus datos (mismos mensajes que el Apps Script). */
     function validarAviso(aviso, correo, tel, vendedor) {
-        if (correo && !correoValido(correo)) throw new Error(vendedor ? "Revisa el correo del comprador: no es válido." : "Revisa tu correo: no es válido.");
-        if (aviso !== "whatsapp" && !correo) throw new Error(vendedor ? "Escribe el correo del comprador para enviarle los cartones por correo." : "Escribe tu correo para enviarte los cartones por correo.");
+        if (!AVISO_TEXTO[aviso]) throw new Error(vendedor ? "Elige cómo recibe sus cartones el comprador." : "Elige cómo quieres recibir tus cartones.");
+        if (aviso !== "whatsapp") {
+            if (!correo) throw new Error(vendedor ? "Escribe el correo del comprador para enviarle los cartones por correo." : "Escribe tu correo para enviarte los cartones por correo.");
+            if (!correoValido(correo)) throw new Error(vendedor ? "Revisa el correo del comprador: no es válido." : "Revisa tu correo: no es válido.");
+        }
         if (aviso !== "correo" && !telValido(tel)) throw new Error(vendedor ? "Escribe el WhatsApp del comprador (8 dígitos)." : "Escribe tu número de WhatsApp (8 dígitos).");
     }
 
     /**
-     * Campo «¿Cómo recibe sus cartones?» que ajusta las notas del correo y del WhatsApp.
-     * Devuelve { select, campoCorreo, campoTel }.
+     * Campo «¿Cómo recibe sus cartones?»: empieza sin elegir y muestra solo el campo del medio elegido
+     * (WhatsApp, correo o los dos). Devuelve { select, campoCorreo, campoTel, datos(), reiniciar() };
+     * datos() trae el correo y el teléfono solo del medio elegido, para validar y enviar.
+     * Mientras no se elija, la pregunta va resaltada con el color de acento y `otros` (campos que siguen) quedan ocultos.
      */
-    function camposAviso(correo, tel, vendedor) {
-        const aviso = select(null, AVISOS, "whatsapp");
-        const campoCorreo = campo("Correo", correo, "");
-        const campoTel = campo("WhatsApp", tel, "");
-        const notaCorreo = campoCorreo.querySelector(".bn-note") || campoCorreo.appendChild(el("small", { class: "bn-note" }));
-        const notaTel = campoTel.querySelector(".bn-note") || campoTel.appendChild(el("small", { class: "bn-note" }));
+    function camposAviso(correo, tel, vendedor, otros) {
+        const aviso = select(null, [["", vendedor ? "Elija una opción" : "Elige una opción"], ...AVISOS], "");
+        aviso.options[0].disabled = true;
+        aviso.required = true;
+        const nota = vendedor ? "Aquí le llega el link de sus cartones." : "Aquí te llega el link de tus cartones.";
+        const campoCorreo = campo("Correo", correo, nota);
+        const campoTel = campo("WhatsApp", tel, nota);
         function pintar() {
             const a = aviso.value;
-            campoCorreo.querySelector(".bn-label").textContent = a === "whatsapp" ? "Correo (opcional)" : "Correo";
-            campoTel.querySelector(".bn-label").textContent = a === "correo" ? "WhatsApp (opcional)" : "WhatsApp";
-            notaCorreo.textContent = a === "whatsapp"
-                ? (vendedor ? "Si lo deja, también identifica al jugador." : "Si lo dejas, también te identifica.")
-                : (vendedor ? "Aquí le llega el link de sus cartones." : "Aquí te llega el link de tus cartones.");
-            notaTel.textContent = a === "correo"
-                ? (vendedor ? "Si lo deja, también identifica al jugador." : "Si lo dejas, también te identifica.")
-                : (vendedor ? "Aquí le llega el link de sus cartones." : "Aquí te enviamos el link de tus cartones.");
+            campoTel.hidden = a !== "whatsapp" && a !== "ambos";
+            campoCorreo.hidden = a !== "correo" && a !== "ambos";
+            aviso.classList.toggle("bn-aviso-pendiente", !a);
+            (otros || []).forEach((x) => { if (x) x.hidden = !a; });
         }
         aviso.addEventListener("change", pintar);
         pintar();
-        return { select: aviso, campoCorreo, campoTel };
+        return {
+            select: aviso, campoCorreo, campoTel,
+            datos: () => ({
+                aviso: aviso.value,
+                correo: aviso.value === "correo" || aviso.value === "ambos" ? correo.value.trim() : "",
+                telefono: aviso.value === "whatsapp" || aviso.value === "ambos" ? tel.value : ""
+            }),
+            reiniciar: () => { aviso.value = ""; pintar(); }
+        };
     }
 
     /**
@@ -4044,12 +4054,13 @@
         ok.addEventListener("click", async () => {
             const r = await conBoton(ok, async () => {
                 if (!nombre.value.trim()) throw new Error("Escribe el nombre del comprador.");
-                validarAviso(avisoCampos.select.value, correo.value.trim(), tel.value, true);
+                const contacto = avisoCampos.datos();
+                validarAviso(contacto.aviso, contacto.correo, contacto.telefono, true);
                 const file = comprobante.files && comprobante.files[0];
                 if (metodo.value !== "Efectivo" && !file) throw new Error("Adjunta el comprobante del pago.");
                 if (file && file.size > 12 * 1024 * 1024) throw new Error("El comprobante pesa más de 12 MB.");
                 const datos = {
-                    nombre: nombre.value, correo: correo.value.trim(), telefono: tel.value, aviso: avisoCampos.select.value, modalidad: modalidad.value,
+                    nombre: nombre.value, correo: contacto.correo, telefono: contacto.telefono, aviso: contacto.aviso, modalidad: modalidad.value,
                     series: entrega.value === "series" ? series.value : "", cantidad: entrega.value === "series" ? "" : cantidad.value,
                     monto: monto.value, metodo: metodo.value, comprobante: file ? await archivoADataUrl(file, 1600) : "",
                     sector_id: sector ? sector.value : 0, encargado_id: encargado ? encargado.value : 0
@@ -4066,6 +4077,7 @@
             [nombre, correo, tel, series, monto].forEach((x) => { x.value = ""; });
             cantidad.value = "1";
             comprobante.value = "";
+            avisoCampos.reiniciar();
             actualizar();
         }
 
@@ -4299,8 +4311,6 @@
         const nombre = input("bn-c-nombre", "", { autocomplete: "name", placeholder: "Nombre y apellido" });
         const tel = input("bn-c-tel", "", { type: "tel", autocomplete: "tel", placeholder: "8888 8888" });
         const correo = input("bn-c-correo", "", { type: "email", autocomplete: "email", placeholder: "tucorreo@gmail.com" });
-        const avisoCampos = camposAviso(correo, tel, false);
-        avisoCampos.select.id = "bn-c-aviso";
         const cantidad = input("bn-c-cantidad", "1", { type: "number", min: 1, max: 1000, inputmode: "numeric" });
         const modalidad = cfg.modalidad === "Mixta" ? select("bn-c-modalidad", [["Presencial", "Presencial"], ["Virtual", "Virtual"]], "Virtual") : null;
         /* Un encargado por opción («sector:encargado»), para que la venta cuente para quien vendió. */
@@ -4309,6 +4319,11 @@
             : [[`${x.sector_id}:0`, x.encargado ? `${x.encargado} (${x.nombre})` : x.nombre]]));
         const sector = D.sectores.length ? select("bn-c-sector", [["0:0", "Nadie en especial"], ...opcionesVendedor], "0:0") : null;
         const vendedor = D.sectores.length ? null : input("bn-c-vendedor", "", { placeholder: "Opcional" });
+        /* «¿Cómo vas a jugar?» y «¿Quién te vendió?» aparecen después de elegir cómo recibe los cartones. */
+        const campoModalidad = modalidad ? campo("¿Cómo vas a jugar?", modalidad) : null;
+        const campoVendedor = campo("¿Quién te vendió?", sector || vendedor);
+        const avisoCampos = camposAviso(correo, tel, false, [campoModalidad, campoVendedor]);
+        avisoCampos.select.id = "bn-c-aviso";
         const metodo = select("bn-c-metodo", [["SINPE", "SINPE Móvil"], ...(D.iban ? [["Transferencia", "Transferencia"]] : [])], "SINPE");
         const comprobante = el("input", { type: "file", id: "bn-c-comp", class: "bn-file", accept: "image/*,application/pdf" });
         /* Botón con la apariencia del formulario en lugar del «Choose file» del navegador. */
@@ -4341,13 +4356,14 @@
         const enviar = el("button", { class: "bn-btn bn-btn--primary bn-btn--xl", text: "Enviar compra" });
         enviar.addEventListener("click", () => conBoton(enviar, async () => {
             if (!nombre.value.trim()) throw new Error("Escribe tu nombre.");
-            validarAviso(avisoCampos.select.value, correo.value.trim(), tel.value, false);
+            const contacto = avisoCampos.datos();
+            validarAviso(contacto.aviso, contacto.correo, contacto.telefono, false);
             const f = comprobante.files && comprobante.files[0];
             if (!f) throw new Error("Adjunta la foto o PDF del comprobante de pago.");
             if (f.size > 12 * 1024 * 1024) throw new Error("El comprobante pesa más de 12 MB.");
             const dataUrl = await archivoADataUrl(f, 1600);
             const r = await llamar({
-                action: "submit_compra", pub, nombre: nombre.value, telefono: tel.value, correo: correo.value.trim(), aviso: avisoCampos.select.value, cantidad: cantidad.value,
+                action: "submit_compra", pub, nombre: nombre.value, telefono: contacto.telefono, correo: contacto.correo, aviso: contacto.aviso, cantidad: cantidad.value,
                 modalidad: modalidad ? modalidad.value : cfg.modalidad === "Presencial" ? "Presencial" : "Virtual",
                 sector_id: sector ? sector.value.split(":")[0] : 0, encargado_id: sector ? sector.value.split(":")[1] : 0,
                 vendedor: vendedor ? vendedor.value : "", metodo: metodo.value, comprobante: dataUrl
@@ -4356,7 +4372,7 @@
                 el("div", { class: "bn-balls-row", "aria-hidden": "true" }, C.LETRAS.map((l, i) => bolaEl(i * 15 + 7))),
                 el("h1", { class: "bn-title", text: "¡Recibimos tu compra!" }),
                 el("p", { text: `Compra #${r.entrada_id}: ${r.cantidad} ${r.cantidad === 1 ? "cartón" : "cartones"} por ${colones(r.monto)}.` }),
-                el("p", { text: `Cuando el organizador confirme tu pago, te llega por ${{ whatsapp: "WhatsApp", correo: "correo", ambos: "WhatsApp y correo" }[avisoCampos.select.value]} el link con tus cartones para jugar en línea. Si ya habías comprado con este mismo correo o número, los cartones nuevos se suman a tu mismo link.` }),
+                el("p", { text: `Cuando el organizador confirme tu pago, te llega por ${{ whatsapp: "WhatsApp", correo: "correo", ambos: "WhatsApp y correo" }[contacto.aviso]} el link con tus cartones para jugar en línea. Si ya habías comprado con este mismo ${{ whatsapp: "número", correo: "correo", ambos: "correo o número" }[contacto.aviso]}, los cartones nuevos se suman a tu mismo link.` }),
                 cfg.whatsapp ? el("a", { class: "bn-btn", href: waUrl(cfg.whatsapp, `Hola, envié la compra #${r.entrada_id} para ${cfg.nombre}.`), target: "_blank", rel: "noopener", text: "Escribir al organizador" }) : null
             )));
         }, "Enviando…"));
@@ -4366,8 +4382,7 @@
                 cabeceraCompra(cfg, apariencia, cfg.logo_url),
                 el("section", { class: "bn-card" }, el("h2", { text: "1. Tus datos" }), el("div", { class: "bn-form-grid" },
                     campo("Nombre", nombre), campo("¿Cómo quieres recibir tus cartones?", avisoCampos.select, "Con tu WhatsApp o tu correo se juntan todas tus compras en un solo link."),
-                    avisoCampos.campoTel, avisoCampos.campoCorreo, modalidad ? campo("¿Cómo vas a jugar?", modalidad) : null,
-                    sector ? campo("¿Quién te vendió?", sector) : campo("¿Quién te vendió?", vendedor))),
+                    avisoCampos.campoTel, avisoCampos.campoCorreo, campoModalidad, campoVendedor)),
                 el("section", { class: "bn-card" }, el("h2", { text: "2. Cartones" }),
                     combos.length ? el("div", { class: "bn-combo-chips" }, combos.map((x) => el("span", { class: "bn-chip", text: `${x.cantidad} por ${colones(x.precio)}` }))) : null,
                     el("div", { class: "bn-buy-qty" }, campo("Cantidad", cantidad), el("div", {}, el("span", { class: "bn-label", text: "Total a pagar" }), total, desglose))),

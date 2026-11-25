@@ -311,6 +311,12 @@ body.bn-form-pintado #main-content { background: var(--bn-form-fondo) !important
 .bn-buy--tema .bn-input { color-scheme: inherit; }
 .bn-buy--tema .bn-btn--primary:hover { background: var(--bn-accent); filter: brightness(1.08); }
 .bn-buy--tema .bn-total { color: var(--bn-accent); }
+/* «¿Cómo recibe sus cartones?» sin elegir: resaltada con el acento hasta que se elija. */
+.bn-input.bn-aviso-pendiente,
+.bn-buy--tema .bn-input.bn-aviso-pendiente { border: 2px solid var(--bn-accent); background: color-mix(in srgb, var(--bn-accent) 16%, var(--bn-field, var(--bn-surface-2))); color: var(--bn-text); font-weight: 600; animation: bn-aviso-pulso 1.8s ease-in-out infinite; }
+.bn-field:has(> .bn-aviso-pendiente) > .bn-label { color: var(--bn-accent); font-weight: 700; }
+@keyframes bn-aviso-pulso { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bn-accent) 55%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--bn-accent) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .bn-input.bn-aviso-pendiente { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bn-accent) 35%, transparent); } }
 .bn-buy-head--centro { align-items: center; text-align: center; }
 .bn-buy-head--derecha { align-items: flex-end; text-align: right; }
 /* Logo: siempre la misma altura (96 px en computadora, 64 px en celular); el ancho se ajusta solo. */
