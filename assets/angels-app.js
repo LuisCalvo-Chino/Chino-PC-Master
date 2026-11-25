@@ -3181,18 +3181,109 @@
                 .map((r) => {
                     const st = String(r.status || "");
                     const btnDel = `<button type="button" class="angels-btn angels-btn--sm angels-btn--danger adm-delete-row" data-row="${r.row_index}">Eliminar</button>`;
-                    return `<tr><td>${esc(weekDisplayLabel(r.week))}</td><td>${esc(r.angel)}</td><td>${esc(r.angelado)}</td><td>${esc(st)}</td><td><div style="display:flex;gap:8px;">${btnDel}</div></td></tr>`;
+                    const btnEmerg = admEmergAvailable
+                        ? `<button type="button" class="angels-btn angels-btn--sm adm-emerg-row" data-row="${r.row_index}" title="Reenviar desde angelessecretos@chinopcmaster.com">Emergencia</button>`
+                        : "";
+                    const prev = emergSentFor(r);
+                    const emergNote = prev
+                        ? `<br><small title="Reenviado desde angelessecretos@chinopcmaster.com">📮 Emergencia${
+                              prev.sent_at ? ` · ${esc(formatTimestampLabel(prev.sent_at))}` : ""
+                          }</small>`
+                        : "";
+                    return `<tr><td>${esc(weekDisplayLabel(r.week))}</td><td>${esc(r.angel)}</td><td>${esc(r.angelado)}</td><td>${esc(st)}${emergNote}</td><td><div style="display:flex;gap:8px;">${btnEmerg}${btnDel}</div></td></tr>`;
                 })
                 .join("");
         }
 
+        /* Envío de emergencia: lo hace el Maestro (cuenta con el alias angelessecretos@), igual para todos los proyectos. */
+        let admEmergAvailable = true;
+        let admEmergLog = [];
+
+        function emergSentFor(r) {
+            const hits = admEmergLog.filter(
+                (x) =>
+                    String(x.week) === String(r.week) &&
+                    String(x.angel) === String(r.angel) &&
+                    (!x.angelado || !r.angelado || String(x.angelado) === String(r.angelado))
+            );
+            return hits.length ? hits[hits.length - 1] : null;
+        }
+
+        async function loadEmergencyLog() {
+            try {
+                const res = await api.postMaster({
+                    action: "emergency_log",
+                    project_id: resolved.project_id,
+                    projectSecret: resolved.secret
+                });
+                const d = res.data || res;
+                admEmergLog = d.rows || [];
+                admEmergAvailable = true;
+                const hint = document.getElementById("adm-emerg-hint");
+                if (hint) hint.hidden = false;
+                if (hint && d.alias_ok === false) {
+                    hint.innerHTML =
+                        "<strong>Envío de emergencia:</strong> el Maestro todavía no tiene <code>angelessecretos@chinopcmaster.com</code> en «Enviar correo como»; los reenvíos fallarán hasta agregarlo.";
+                }
+            } catch (e) {
+                admEmergLog = [];
+                // Maestro sin la acción todavía: se ocultan los botones para no confundir al organizador.
+                admEmergAvailable = !/no reconocida/i.test(String(e && e.message ? e.message : e));
+                const hint = document.getElementById("adm-emerg-hint");
+                if (hint) hint.hidden = !admEmergAvailable;
+            }
+        }
+
+        async function sendEmergency(row) {
+            const angel = String(row.angel || "");
+            const angelado = String(row.angelado || "");
+            const prev = emergSentFor(row);
+            const ok = window.confirm(
+                `Reenviar desde angelessecretos@chinopcmaster.com\n\n` +
+                    `Semana: ${weekDisplayLabel(row.week)}\nDe: ${angel}\nPara: ${angelado || "—"} (correo de la tabla Ángeles)` +
+                    (prev ? `\n\nOjo: este mensaje ya se reenvió de emergencia antes.` : "")
+            );
+            if (!ok) return;
+            let d;
+            try {
+                // El Maestro toma el HTML, el asunto y el correo del Emisor del proyecto: aquí solo va qué mensaje.
+                const res = await api.postMaster(
+                    {
+                        action: "emergency_send",
+                        project_id: resolved.project_id,
+                        projectSecret: resolved.secret,
+                        week: row.week,
+                        angel,
+                        angelado
+                    },
+                    { noRetry: true, timeoutMs: 90000 }
+                );
+                d = res.data || res;
+            } catch (e) {
+                const unsure = api.isUnconfirmedError && api.isUnconfirmedError(e);
+                await showNoticeModal({
+                    variant: "error",
+                    title: unsure ? "Envío sin confirmar" : "No se pudo reenviar",
+                    text: unsure
+                        ? "No llegó la respuesta del Maestro; el correo pudo haberse enviado. Refresca la tabla antes de volver a intentarlo."
+                        : e.message || "Error al reenviar.",
+                    detail: e.detail || ""
+                });
+                return;
+            }
+            showMessage(`Reenviado${d && d.to ? ` a ${d.to}` : ""} desde angelessecretos@chinopcmaster.com.`, "success", 9000);
+        }
+
         async function loadPendientes() {
             if (!resolved) return;
-            const res = await api.postSender(resolved.sender_exec_url, resolved.secret, {
-                action: "list_pendientes"
-            });
+            const [res] = await Promise.all([
+                api.postSender(resolved.sender_exec_url, resolved.secret, {
+                    action: "list_pendientes"
+                }),
+                loadEmergencyLog()
+            ]);
             allPendRows = res.data?.rows || res.rows || [];
-            
+
             const selW = document.getElementById("adm-filter-week");
             if (selW && selW.options.length <= 1) {
                 const weeks = [...new Set(allPendRows.map((r) => r.week))].sort(
@@ -3220,7 +3311,25 @@
         
         document.querySelector("#adm-pend-table")?.addEventListener("click", async (e) => {
             if (!resolved) return;
-            
+
+            const btnEmerg = e.target.closest(".adm-emerg-row");
+            if (btnEmerg) {
+                const rowIx = String(btnEmerg.getAttribute("data-row"));
+                const row = allPendRows.find((r) => String(r.row_index) === rowIx);
+                if (!row) return;
+                const panel = document.querySelector('[data-adpanel="maint"]');
+                await withLocalPanelLoading(panel, async () => {
+                    try {
+                        await sendEmergency(row);
+                    } catch (err) {
+                        await showNoticeModal({ variant: "error", text: err.message || "Error", detail: err.detail || "" });
+                    }
+                    await loadEmergencyLog();
+                    renderPendientesTable();
+                });
+                return;
+            }
+
             const btnDel = e.target.closest(".adm-delete-row");
             if (btnDel) {
                 if (!window.confirm("¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.")) return;
