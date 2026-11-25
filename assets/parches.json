@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-25T12:00:00-06:00",
+    "actualizado": "2026-11-25T13:51:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -48,26 +48,50 @@
     "parches": [
         {
             "id": "2026-11-25-elegir-como-recibir",
-            "fecha": "2026-11-25T12:00:00-06:00",
+            "fecha": "2026-11-25T13:51:00-06:00",
             "producto": "bingo",
-            "titulo": "El comprador elige cómo recibir sus cartones y ve solo el campo que corresponde",
-            "resumen": "«¿Cómo quieres recibir tus cartones?» ya no viene marcada con WhatsApp: el comprador la elige antes de seguir, y el formulario muestra solo el WhatsApp, solo el correo o los dos, según su elección.",
+            "titulo": "Recibe tus cartones por WhatsApp, correo o ambos, con un solo enlace por tu número o tu correo",
+            "resumen": "Quien compra elige por dónde recibe el enlace de sus cartones y el formulario le pide solo ese dato: el correo ya no es obligatorio para quien prefiere WhatsApp. Las compras de una misma persona se juntan en un solo enlace por su correo o por su número, pasan solas al historial cuando ya salieron sus mensajes y los correos salen desde bingo@chinopcmaster.com. Al terminar, el comprador puede hacer otra compra con un toque.",
             "cambios": [
                 {
-                    "tipo": "mejorado",
-                    "texto": "Al abrir el formulario de compra se ven el nombre y la pregunta «¿Cómo quieres recibir tus cartones?», sin ninguna opción elegida y resaltada con el color de acento del formulario. Si se intenta enviar sin elegir, la página lo pide."
+                    "tipo": "nuevo",
+                    "texto": "En el formulario de compra, «¿Cómo quieres recibir tus cartones?» ofrece WhatsApp, correo electrónico o WhatsApp y correo. Es obligatoria: empieza sin ninguna opción elegida y resaltada con el color de acento del formulario, y si se intenta enviar sin elegir, la página lo pide."
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "Con «WhatsApp» aparece solo el campo de WhatsApp; con «Correo electrónico», solo el del correo; con «WhatsApp y correo», los dos. Después de elegir aparecen también «¿Cómo vas a jugar?» y «¿Quién te vendió?»."
+                    "texto": "Con «WhatsApp» aparece solo el campo de WhatsApp; con «Correo electrónico», solo el del correo; con «WhatsApp y correo», los dos. Después de elegir aparecen también «¿Cómo vas a jugar?» y «¿Quién te vendió?». Quien elige WhatsApp ya no tiene que dar un correo."
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "La venta presencial y el enlace del encargado también piden elegir cómo recibe el comprador y muestran solo el campo de ese medio."
+                    "texto": "Las compras de una misma persona quedan en un solo enlace por su correo o por su número de WhatsApp (8888 8888 y +506 8888 8888 cuentan como el mismo). Quien compra solo con WhatsApp recibe su mismo enlace de siempre si ya había comprado con ese número. Dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "En Ventas, cada compra muestra «Recibe por» y resalta el botón del medio que eligió el comprador. Cuando ya salieron todos esos mensajes, la compra pasa sola de «Por enviar» a «Historial». Las compras que ya tenían todo enviado pasan al historial la primera vez que se abre Ventas."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "La venta presencial, en el panel y en los enlaces de los encargados, también pide elegir cómo recibe sus cartones el comprador y muestra solo el WhatsApp, el correo o los dos según esa respuesta."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "Los correos con los cartones salen desde bingo@chinopcmaster.com, con el nombre del bingo como remitente."
                 },
                 {
                     "tipo": "nuevo",
                     "texto": "Al terminar una compra aparece el botón «Hacer otra compra», que abre el formulario en blanco para comprar más cartones o comprar para otra persona."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "La casilla «Mostrar en el formulario de compra» de cada sector ya se guarda en el servidor del bingo."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "En Resumen, la cifra de compradores cuenta a cada jugador una vez, por su correo o su WhatsApp. Los enlaces de cartones que ya se enviaron siguen funcionando igual."
+                },
+                {
+                    "tipo": "nota",
+                    "texto": "La guía de Bingo Digital tiene capturas nuevas del formulario de compra, la confirmación, la venta presencial, Ventas (Por enviar e Historial) y el Resumen, y sus novedades suman el ranking de vendedores, el reenvío desde Historial y el botón «Hacer otra compra»."
                 }
             ]
         },
@@ -108,36 +132,12 @@
             "id": "2026-11-17-avisos-whatsapp-correo",
             "fecha": "2026-11-17T15:33:00-06:00",
             "producto": "bingo",
-            "titulo": "Recibe tus cartones por WhatsApp, correo o ambos; historial automático y sectores solo presenciales",
-            "resumen": "Quien compra elige por dónde recibe el enlace de sus cartones, y el correo ya no es obligatorio para quien prefiere WhatsApp. Las compras de una misma persona se juntan por su correo o por su WhatsApp, pasan solas al historial cuando ya salieron sus mensajes, y los correos salen desde bingo@chinopcmaster.com. Además, un sector puede quedar solo para ventas presenciales.",
+            "titulo": "Sectores solo presenciales",
+            "resumen": "Un sector puede quedar fuera de «¿Quién te vendió?» en el formulario de compra y seguir vendiendo en persona con su bloque de cartones y sus enlaces.",
             "cambios": [
                 {
                     "tipo": "nuevo",
-                    "texto": "En el formulario de compra, «¿Cómo quieres recibir tus cartones?» ofrece WhatsApp, correo electrónico o WhatsApp y correo. Con WhatsApp el correo es opcional, y con correo el WhatsApp es opcional."
-                },
-                {
-                    "tipo": "mejorado",
-                    "texto": "Las compras de una misma persona quedan en un solo enlace por su correo o por su número de WhatsApp (8888 8888 y +506 8888 8888 cuentan como el mismo). Dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte."
-                },
-                {
-                    "tipo": "nuevo",
-                    "texto": "En Ventas, cada compra muestra «Recibe por» y resalta el botón del medio que eligió el comprador. Cuando ya salieron todos esos mensajes, la compra pasa sola de «Por enviar» a «Historial». Las compras que ya tenían todo enviado pasan al historial la primera vez que se abre Ventas."
-                },
-                {
-                    "tipo": "mejorado",
-                    "texto": "La venta presencial, en el panel y en los enlaces de los encargados, pregunta cómo recibe sus cartones el comprador y pide el WhatsApp, el correo o los dos según esa respuesta."
-                },
-                {
-                    "tipo": "mejorado",
-                    "texto": "Los correos con los cartones salen desde bingo@chinopcmaster.com, con el nombre del bingo como remitente."
-                },
-                {
-                    "tipo": "nuevo",
                     "texto": "En la pestaña «Sectores», la casilla «Mostrar en el formulario de compra» decide si el sector sale en «¿Quién te vendió?». Si la desmarcas, el sector queda solo presencial: su bloque de cartones, su enlace general y los de sus encargados siguen funcionando para registrar ventas en persona."
-                },
-                {
-                    "tipo": "nota",
-                    "texto": "En Resumen, la cifra de compradores cuenta a cada jugador una vez, por su correo o su WhatsApp. La guía de Bingo Digital ya explica estos cambios."
                 }
             ]
         },
