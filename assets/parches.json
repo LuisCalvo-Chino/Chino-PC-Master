@@ -64,6 +64,10 @@
                 {
                     "tipo": "mejorado",
                     "texto": "La venta presencial y el enlace del encargado también piden elegir cómo recibe el comprador y muestran solo el campo de ese medio."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "Al terminar una compra aparece el botón «Hacer otra compra», que abre el formulario en blanco para comprar más cartones o comprar para otra persona."
                 }
             ]
         },

@@ -4373,7 +4373,10 @@
                 el("h1", { class: "bn-title", text: "¡Recibimos tu compra!" }),
                 el("p", { text: `Compra #${r.entrada_id}: ${r.cantidad} ${r.cantidad === 1 ? "cartón" : "cartones"} por ${colones(r.monto)}.` }),
                 el("p", { text: `Cuando el organizador confirme tu pago, te llega por ${{ whatsapp: "WhatsApp", correo: "correo", ambos: "WhatsApp y correo" }[contacto.aviso]} el link con tus cartones para jugar en línea. Si ya habías comprado con este mismo ${{ whatsapp: "número", correo: "correo", ambos: "correo o número" }[contacto.aviso]}, los cartones nuevos se suman a tu mismo link.` }),
-                cfg.whatsapp ? el("a", { class: "bn-btn", href: waUrl(cfg.whatsapp, `Hola, envié la compra #${r.entrada_id} para ${cfg.nombre}.`), target: "_blank", rel: "noopener", text: "Escribir al organizador" }) : null
+                el("div", { class: "bn-toolbar" },
+                    /* Formulario limpio: la siguiente compra puede ser para otra persona. */
+                    el("button", { class: "bn-btn bn-btn--primary", onclick: () => { window.scrollTo(0, 0); initCompra(pub); }, text: "Hacer otra compra" }),
+                    cfg.whatsapp ? el("a", { class: "bn-btn", href: waUrl(cfg.whatsapp, `Hola, envié la compra #${r.entrada_id} para ${cfg.nombre}.`), target: "_blank", rel: "noopener", text: "Escribir al organizador" }) : null)
             )));
         }, "Enviando…"));
 
