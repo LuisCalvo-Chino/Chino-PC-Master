@@ -151,6 +151,9 @@ function doPost(e) {
     if (action === "mark_sent") return ok_(conLock_(function () { return markSent_(b, data, null); }));
     if (action === "send_email") return ok_(conLock_(function () { return sendEmail_(b, data.entrada_id); }));
     if (action === "cambiar_modalidad") return ok_(conLock_(function () { return cambiarModalidad_(b, data); }));
+    if (action === "presenciales_info") return ok_(presencialesInfo_(b));
+    if (action === "presenciales_marcar") return ok_(conLock_(function () { return presencialesMarcar_(b, data); }));
+    if (action === "presenciales_reiniciar") return ok_(conLock_(function () { return presencialesReiniciar_(b, data); }));
     if (action === "lote_presencial_info") return ok_(lotePresencialInfo_(b));
     if (action === "lote_presencial_crear") return ok_(conLock_(function () { return lotePresencialCrear_(b, data); }));
     if (action === "lote_presencial_agregar") return ok_(conLock_(function () { return lotePresencialAgregar_(b, data); }));
@@ -331,10 +334,36 @@ function readObjects_(sh) {
   return out;
 }
 
+/**
+ * Columnas que deben quedar como texto. Sin esto, Sheets lee «100,101» como el número 100101
+ * (y listas largas pierden dígitos), y el jugador ve un solo cartón con una serie inexistente.
+ */
+var COLUMNAS_TEXTO_ = ["cartones"];
+
+/** Formato de texto plano en las columnas de COLUMNAS_TEXTO_ (de la fila «desde» hasta el final de la hoja). */
+function columnasTexto_(sh, headers, desde) {
+  COLUMNAS_TEXTO_.forEach(function (h) {
+    var c = headers.indexOf(h);
+    if (c === -1) return;
+    var hasta = sh.getMaxRows();
+    if (hasta >= desde) sh.getRange(desde, c + 1, hasta - desde + 1, 1).setNumberFormat("@");
+  });
+}
+
 function writeObject_(sh, headers, obj, rowNumber) {
-  var row = headers.map(function (h) { return obj[h] === undefined || obj[h] === null ? "" : obj[h]; });
-  if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
-  else sh.appendRow(row);
+  var row = headers.map(function (h) {
+    var v = obj[h] === undefined || obj[h] === null ? "" : obj[h];
+    return COLUMNAS_TEXTO_.indexOf(h) !== -1 ? String(v) : v;
+  });
+  if (rowNumber) {
+    columnasTexto_(sh, headers, rowNumber);
+    sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+    return;
+  }
+  /* La fila nueva cae en una fila vacía que ya tiene el formato de texto (ver sheetDe_). */
+  if (sh.getMaxRows() <= sh.getLastRow()) sh.insertRowsAfter(sh.getMaxRows(), 50);
+  columnasTexto_(sh, headers, sh.getLastRow() + 1);
+  sh.appendRow(row);
 }
 
 function nextId_(items, key) {
@@ -651,8 +680,12 @@ function updateConfig_(b, changes) {
 function setConfigValue_(b, key, value) {
   var sh = sheetDe_(b, "config");
   var row = readObjects_(sh).filter(function (r) { return String(r.clave) === key; })[0];
-  if (row) sh.getRange(row._row, 2).setValue(String(value));
-  else sh.appendRow([key, String(value)]);
+  /* Como texto: listas como «23,84» (lote presencial) no deben volverse el número 2384. */
+  if (!row) {
+    sh.appendRow([key, ""]);
+    row = { _row: sh.getLastRow() };
+  }
+  sh.getRange(row._row, 2).setNumberFormat("@").setValue(String(value));
 }
 
 function arteUrl_(cfg) {
@@ -841,6 +874,95 @@ function loteActivo_(cfg) {
  * que cada sector imprime aparte). Con lote: vendidos y libres del lote, y las compras presenciales
  * que quedaron con cartones fuera del lote.
  */
+/* ======================= Cartones presenciales (impresión por sector) ======================= */
+
+/**
+ * Registro de lo ya impreso, en la config «presenciales_impresos» (JSON):
+ * impresos: { entrada_id: [series] } → se guarda la compra además de la serie, así un cartón que se libera
+ * y se vende a otra persona vuelve a contar como «por imprimir».
+ * fechas / veces: { sector_id: última extracción / cuántas extracciones }.
+ */
+function impresosLeer_(cfg) {
+  var o = {};
+  try { o = JSON.parse(String(cfg.presenciales_impresos || "") || "{}") || {}; } catch (err) { o = {}; }
+  return { impresos: o.impresos || {}, fechas: o.fechas || {}, veces: o.veces || {} };
+}
+
+function impresosGuardar_(b, reg) {
+  setConfigValue_(b, "presenciales_impresos", JSON.stringify(reg));
+}
+
+/** Cartones presenciales vendidos, agrupados por el sector de la compra (0 = sin sector). */
+function presencialesInfo_(b) {
+  var cfg = readConfig_(b);
+  var reg = impresosLeer_(cfg);
+  var ent = {};
+  entradas_(b).forEach(function (e) { ent[e.entrada_id] = e; });
+  var grupos = {};
+  var orden = [];
+  function grupo(id, s) {
+    if (!grupos[id]) {
+      grupos[id] = {
+        sector_id: id, nombre: s ? s.nombre : "Sin sector", desde: s ? s.desde : 0, hasta: s ? s.hasta : 0,
+        cartones: [], impresos: 0, fecha: String(reg.fechas[id] || ""), veces: Number(reg.veces[id]) || 0
+      };
+      orden.push(id);
+    }
+    return grupos[id];
+  }
+  sectores_(b).forEach(function (s) { if (s.activo) grupo(s.sector_id, s); });
+  var porId = {};
+  sectores_(b).forEach(function (s) { porId[s.sector_id] = s; });
+  cartonesVendidos_(b).forEach(function (c) {
+    var e = ent[c.entrada_id];
+    if (!e || e.modalidad !== "Presencial" || (e.estado !== "Aprobada" && e.estado !== "Completada")) return;
+    var g = grupo(e.sector_id || 0, porId[e.sector_id] || null);
+    var impreso = (reg.impresos[e.entrada_id] || []).indexOf(c.serie) !== -1;
+    if (impreso) g.impresos++;
+    g.cartones.push({ serie: c.serie, comprador: e.nombre, entrada_id: e.entrada_id, vendedor: e.vendedor, impreso: impreso });
+  });
+  var lista = orden.map(function (id) {
+    var g = grupos[id];
+    g.cartones.sort(function (a, z) { return a.serie - z.serie; });
+    return g;
+  }).filter(function (g) { return g.sector_id || g.cartones.length; });
+  var total = 0, impresos = 0;
+  lista.forEach(function (g) { total += g.cartones.length; impresos += g.impresos; });
+  return { grupos: lista, total: total, impresos: impresos };
+}
+
+/** Anota como impresas las series indicadas de un sector (después de descargar su PDF). */
+function presencialesMarcar_(b, data) {
+  var sectorId = Number(data.sector_id) || 0;
+  var series = (Array.isArray(data.series) ? data.series : []).map(Number).filter(Boolean);
+  var reg = impresosLeer_(readConfig_(b));
+  var info = presencialesInfo_(b);
+  var g = info.grupos.filter(function (x) { return x.sector_id === sectorId; })[0];
+  if (!g) throw new Error("Ese sector no tiene cartones presenciales.");
+  g.cartones.forEach(function (c) {
+    if (series.indexOf(c.serie) === -1) return;
+    var lista = reg.impresos[c.entrada_id] || (reg.impresos[c.entrada_id] = []);
+    if (lista.indexOf(c.serie) === -1) lista.push(c.serie);
+  });
+  reg.fechas[sectorId] = ahora_();
+  reg.veces[sectorId] = (Number(reg.veces[sectorId]) || 0) + 1;
+  impresosGuardar_(b, reg);
+  return presencialesInfo_(b);
+}
+
+/** Pone en cero el contador de impresos de un sector: todos sus presenciales vuelven a «por imprimir». */
+function presencialesReiniciar_(b, data) {
+  var sectorId = Number(data.sector_id) || 0;
+  var reg = impresosLeer_(readConfig_(b));
+  entradas_(b).forEach(function (e) {
+    if ((e.sector_id || 0) === sectorId) delete reg.impresos[e.entrada_id];
+  });
+  delete reg.fechas[sectorId];
+  delete reg.veces[sectorId];
+  impresosGuardar_(b, reg);
+  return presencialesInfo_(b);
+}
+
 function lotePresencialInfo_(b) {
   var cfg = readConfig_(b);
   var lote = loteActivo_(cfg);
@@ -1140,7 +1262,31 @@ function entradaObj_(r) {
   };
 }
 
-function entradas_(b) { return readObjects_(sheetDe_(b, "entradas")).map(entradaObj_); }
+/**
+ * Compras del bingo. Si la columna «cartones» quedó como número (Sheets convirtió «100,101» en 100101),
+ * la lista se rehace desde la hoja «cartones», que guarda una fila por serie, y se corrige en la hoja.
+ */
+function entradas_(b) {
+  var sh = sheetDe_(b, "entradas");
+  var crudas = readObjects_(sh);
+  var danadas = crudas.filter(function (r) { return typeof r.cartones === "number"; });
+  var lista = crudas.map(entradaObj_);
+  if (!danadas.length) return lista;
+  var porEntrada = {};
+  cartonesVendidos_(b).forEach(function (c) {
+    if (!c.entrada_id || !c.serie) return;
+    (porEntrada[c.entrada_id] = porEntrada[c.entrada_id] || []).push(c.serie);
+  });
+  var encabezados = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+  var colHoja = encabezados.indexOf("cartones") + 1;
+  lista.forEach(function (e, i) {
+    if (typeof crudas[i].cartones !== "number") return;
+    var series = (porEntrada[e.entrada_id] || []).sort(function (a, z) { return a - z; });
+    e.cartones = series.join(",");
+    if (colHoja > 0) sh.getRange(e._row, colHoja).setNumberFormat("@").setValue(e.cartones);
+  });
+  return lista;
+}
 
 function entradaPorId_(b, id) {
   var e = entradas_(b).filter(function (x) { return x.entrada_id === Number(id); })[0];

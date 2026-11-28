@@ -1,6 +1,6 @@
 {
     "_comentario": "Bitácora pública de Chino PC Master. Un parche por día: si ya existe el parche del día, se le agregan los cambios y se actualiza su hora a la más reciente; si no, se agrega un objeto al INICIO del arreglo «parches» (el más reciente arriba). Campos: fecha (ISO con zona -06:00), producto (id de la lista «productos», o un arreglo de ids si ese día se tocaron varias áreas), titulo, resumen y cambios[] con tipo nuevo | mejorado | corregido | nota; en un parche de varias áreas, cada cambio lleva también su «producto». Escribe en lenguaje de usuario: qué cambia para quien usa la herramienta.",
-    "actualizado": "2026-11-25T13:51:00-06:00",
+    "actualizado": "2026-11-28T08:25:00-06:00",
     "productos": [
         {
             "id": "angeles",
@@ -46,6 +46,35 @@
         }
     ],
     "parches": [
+        {
+            "id": "2026-11-28-cartones-presenciales",
+            "fecha": "2026-11-28T08:25:00-06:00",
+            "producto": "bingo",
+            "titulo": "Nueva sección «Cartones presenciales» para imprimir por sector, y cada jugador ve todos sus cartones",
+            "resumen": "En la pestaña Cartones, la sección «Cartones presenciales» muestra cuántos cartones se vendieron en presencial en cada sector, cuántos ya sacaste en PDF y cuántos faltan. Además, quien compró dos o más cartones vuelve a verlos todos en su enlace, con sus series correctas.",
+            "cambios": [
+                {
+                    "tipo": "nuevo",
+                    "texto": "«Cartones presenciales», en la pestaña Cartones: una tarjeta por sector (y otra para las ventas sin sector) con los cartones vendidos en presencial, los ya extraídos y los que faltan por extraer, más la fecha de la última extracción y cuántas veces se ha extraído."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "«PDF de los nuevos» descarga solo los cartones del sector que todavía no se han sacado y los anota como extraídos. «PDF de todos» vuelve a descargar el sector completo. «Lista (CSV)» trae serie, comprador, compra, vendedor y si ya se extrajo."
+                },
+                {
+                    "tipo": "nuevo",
+                    "texto": "«Reiniciar contador» deja un sector en cero: todos sus presenciales vuelven a quedar por extraer. Las compras y los cartones no cambian."
+                },
+                {
+                    "tipo": "mejorado",
+                    "texto": "La sección del lote para el evento ahora se llama «Lote presencial para el evento» y explica que cuenta solo los presenciales vendidos fuera de los bloques de los sectores."
+                },
+                {
+                    "tipo": "corregido",
+                    "texto": "En algunas compras de dos o más cartones, la hoja de Google guardaba la lista de series como un solo número (por ejemplo, 100 y 101 quedaban como 100101) y el enlace del jugador mostraba un solo cartón con una serie que no existe. Ahora la lista se rehace desde el registro de cartones, se corrige en la hoja y se guarda siempre como texto."
+                }
+            ]
+        },
         {
             "id": "2026-11-25-elegir-como-recibir",
             "fecha": "2026-11-25T13:51:00-06:00",

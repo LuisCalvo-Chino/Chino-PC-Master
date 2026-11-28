@@ -343,6 +343,12 @@ body.bn-form-pintado #main-content { background: var(--bn-form-fondo) !important
 .bn-player-pdf { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .bn-player-pdf-card { margin-top: 16px; }
 .bn-lote { display: flex; flex-direction: column; gap: 12px; }
+.bn-pres-sector { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--bn-line); border-radius: 12px; }
+.bn-pres-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bn-pres-head h3 { margin: 0; }
+.bn-pres-sector .bn-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bn-pres-sector .bn-tile { padding: 10px 8px; }
+.bn-pres-sector .bn-tile span { font-size: 0.78rem; }
 .bn-player-pdf .bn-input { width: auto; }
 .bn-banner--ok { border-color: rgba(61, 220, 132, 0.6); background: rgba(61, 220, 132, 0.1); }
 .bn-card--alert { border-color: rgba(61, 220, 132, 0.6); }

@@ -2447,8 +2447,116 @@
                     }
                 })();
                 return el("section", { class: "bn-card" },
+                    el("h2", { text: "Lote presencial para el evento" }),
+                    el("p", { class: "bn-note", text: "Aparte un lote de cartones para vender el día del evento: los presenciales ya vendidos fuera de los bloques de los sectores, más los que se imprimen para vender ahí. Lo virtual queda por aparte, sin cruzarse." }),
+                    caja);
+            }
+
+            /**
+             * Cartones presenciales por sector: cuántos hay, cuántos ya se extrajeron en PDF y cuántos faltan.
+             * «PDF de los nuevos» descarga solo los que faltan y los anota como extraídos; «PDF de todos» vuelve
+             * a descargar el sector completo; «Reiniciar contador» deja todos como «por extraer».
+             */
+            function panelImpresionPresencial() {
+                const caja = el("div", { class: "bn-lote" });
+                const porHoja = select("bn-pres-hoja", [["1", "1 por hoja"], ["2", "2 por hoja"], ["4", "4 por hoja"], ["6", "6 por hoja"]], "2");
+                const estado = el("p", { class: "bn-note", "aria-live": "polite" });
+                let info = null;
+                const cuantos = (n) => `${n.toLocaleString("es-CR")} ${n === 1 ? "cartón" : "cartones"}`;
+                const nombreArchivo = (g, sufijo) => `presenciales-${String(g.nombre || "sin-sector").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}-${sufijo}`;
+
+                async function pdfDe(series, base) {
+                    const imgs = await imagenes();
+                    for (let k = 0; k < series.length; k += PDF_POR_ARCHIVO) {
+                        const parte = series.slice(k, k + PDF_POR_ARCHIVO);
+                        const blob = await generarPdf({
+                            seed, pub, cfg, series: parte, porHoja: Number(porHoja.value), imagenes: imgs,
+                            progreso: (n, total) => { estado.textContent = `${base}: ${n} de ${total}…`; }
+                        });
+                        descargarBlob(blob, series.length > PDF_POR_ARCHIVO ? `${base}-${k / PDF_POR_ARCHIVO + 1}.pdf` : `${base}.pdf`);
+                    }
+                }
+
+                /** Descarga el PDF y, ya descargado, anota esas series como extraídas. */
+                async function extraer(g, lista, sufijo) {
+                    const series = lista.map((c) => c.serie);
+                    if (!series.length) return;
+                    await pdfDe(series, nombreArchivo(g, sufijo));
+                    info = await llamar({ action: "presenciales_marcar", hash, sector_id: g.sector_id, series }, { timeoutMs: 90000 });
+                    pintar();
+                    estado.textContent = `Listo: ${cuantos(series.length)} de ${g.nombre}. Revise sus descargas.`;
+                }
+
+                function csvDe(g) {
+                    const filas = [["Serie", "Comprador", "Compra", "Vendedor", "Ya extraído"],
+                        ...g.cartones.map((c) => [C.serieTexto(c.serie), c.comprador, `#${c.entrada_id}`, c.vendedor || "", c.impreso ? "Sí" : "No"])];
+                    const txt = "﻿" + filas.map((f) => f.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+                    descargarBlob(new Blob([txt], { type: "text/csv;charset=utf-8" }), `${nombreArchivo(g, "lista")}.csv`);
+                }
+
+                function tarjetaSector(g) {
+                    const nuevos = g.cartones.filter((c) => !c.impreso);
+                    const total = g.cartones.length;
+                    const btnNuevos = el("button", { class: "bn-btn bn-btn--primary", text: `PDF de los nuevos (${nuevos.length})` });
+                    btnNuevos.disabled = !nuevos.length;
+                    btnNuevos.addEventListener("click", () => conBoton(btnNuevos, () => extraer(g, nuevos, "nuevos"), "Generando…"));
+                    const btnTodos = el("button", { class: "bn-btn", text: `PDF de todos (${total})` });
+                    btnTodos.disabled = !total;
+                    btnTodos.addEventListener("click", () => conBoton(btnTodos, () => extraer(g, g.cartones, "todos"), "Generando…"));
+                    const btnCsv = el("button", { class: "bn-btn", onclick: () => csvDe(g), text: "Lista (CSV)" });
+                    btnCsv.disabled = !total;
+                    const btnReiniciar = el("button", { class: "bn-btn bn-btn--danger", text: "Reiniciar contador" });
+                    btnReiniciar.addEventListener("click", async () => {
+                        const ok = await confirmar("Reiniciar contador",
+                            `${total === 1 ? "El cartón presencial" : `Los ${cuantos(total)} presenciales`} de ${g.nombre} ${total === 1 ? "vuelve" : "vuelven"} a quedar «por extraer», y el próximo «PDF de los nuevos» ${total === 1 ? "lo trae" : "los trae todos"}. Los cartones y las compras no cambian.`,
+                            "Reiniciar", true);
+                        if (!ok) return;
+                        await conBoton(btnReiniciar, async () => {
+                            info = await llamar({ action: "presenciales_reiniciar", hash, sector_id: g.sector_id });
+                            pintar();
+                            showMessage(`Contador de ${g.nombre} en cero.`, "success");
+                        }, "Reiniciando…");
+                    });
+                    const ultima = g.veces
+                        ? `Última extracción: ${fechaHoraTexto(g.fecha)} · ${g.veces} ${g.veces === 1 ? "extracción" : "extracciones"} en total.`
+                        : "Todavía no se ha extraído ningún PDF de este sector.";
+                    return el("div", { class: "bn-pres-sector" },
+                        el("div", { class: "bn-pres-head" },
+                            el("h3", { text: g.nombre }),
+                            g.desde && g.hasta ? el("span", { class: "bn-chip", text: `Bloque ${C.serieTexto(g.desde)}–${C.serieTexto(g.hasta)}` }) : null),
+                        el("div", { class: "bn-tiles" },
+                            tile(String(total), "vendidos"),
+                            tile(String(g.impresos), "extraídos"),
+                            tile(String(nuevos.length), "por extraer")),
+                        el("p", { class: "bn-note", text: ultima }),
+                        el("div", { class: "bn-btnrow" }, btnNuevos, btnTodos, btnCsv, g.impresos || g.veces ? btnReiniciar : null));
+                }
+
+                function pintar() {
+                    if (!info.grupos.length) {
+                        poner(caja, el("p", { class: "bn-empty", text: "Todavía no hay cartones vendidos como presenciales." }));
+                        return;
+                    }
+                    poner(caja,
+                        el("p", {}, `Hay ${cuantos(info.total)} vendidos como presenciales: ${info.impresos.toLocaleString("es-CR")} ya extraídos y ${(info.total - info.impresos).toLocaleString("es-CR")} por extraer.`),
+                        el("div", { class: "bn-form-grid" }, campo("Cartones por hoja carta", porHoja)),
+                        ...info.grupos.map(tarjetaSector),
+                        estado);
+                }
+
+                (async () => {
+                    poner(caja, el("p", { class: "bn-note", text: "Cargando cartones presenciales…" }));
+                    try {
+                        info = await llamar({ action: "presenciales_info", hash });
+                        pintar();
+                    } catch (e) {
+                        const viejo = /no reconocida/i.test(e.message);
+                        poner(caja, el("p", { class: "bn-empty bn-empty--error", text: viejo ? "Falta publicar la nueva versión del Apps Script del bingo para ver esta sección." : e.message }));
+                    }
+                })();
+                return el("section", { class: "bn-card" },
                     el("h2", { text: "Cartones presenciales" }),
-                    el("p", { class: "bn-note", text: "Imprima aparte lo presencial: los cartones ya vendidos en presencial y un lote para vender el día del evento. Lo virtual queda por aparte, sin cruzarse." }),
+                    el("p", { class: "bn-note", text: "Imprima los cartones vendidos en presencial, sector por sector. «PDF de los nuevos» trae solo los que todavía no se han extraído y los anota; «PDF de todos» vuelve a sacar el sector completo. «Reiniciar contador» deja el sector como si nunca se hubiera extraído." }),
                     caja);
             }
 
@@ -2724,6 +2832,7 @@
                     el("p", { class: "bn-note", text: "El PDF se arma en este navegador; no se sube nada. Cada cartón lleva su QR al link en línea." }),
                     panelImprimir({ seed, pub, cfg, min: 1, max: 10000, obtenerArte: imagenes })
                 ),
+                cfg.modalidad !== "Virtual" ? panelImpresionPresencial() : null,
                 cfg.modalidad === "Mixta" ? panelPresenciales() : null,
                 el("section", { class: "bn-card" },
                     el("h2", { text: "Buscar un cartón" }),
