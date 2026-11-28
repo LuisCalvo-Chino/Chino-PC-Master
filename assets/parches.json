@@ -77,50 +77,78 @@
         },
         {
             "id": "2026-11-25-elegir-como-recibir",
-            "fecha": "2026-11-25T13:51:00-06:00",
-            "producto": "bingo",
-            "titulo": "Recibe tus cartones por WhatsApp, correo o ambos, con un solo enlace por tu número o tu correo",
-            "resumen": "Quien compra elige por dónde recibe el enlace de sus cartones y el formulario le pide solo ese dato: el correo ya no es obligatorio para quien prefiere WhatsApp. Las compras de una misma persona se juntan en un solo enlace por su correo o por su número, pasan solas al historial cuando ya salieron sus mensajes y los correos salen desde bingo@chinopcmaster.com. Al terminar, el comprador puede hacer otra compra con un toque.",
+            "fecha": "2026-11-25T16:07:00-06:00",
+            "producto": [
+                "bingo",
+                "angeles"
+            ],
+            "titulo": "Bingo: recibe tus cartones por WhatsApp, correo o ambos. Ángeles: Envío Alterno para los mensajes que no llegaron",
+            "resumen": "Quien compra elige por dónde recibe el enlace de sus cartones y el formulario le pide solo ese dato: el correo ya no es obligatorio para quien prefiere WhatsApp. Las compras de una misma persona se juntan en un solo enlace por su correo o por su número, pasan solas al historial cuando ya salieron sus mensajes y los correos salen desde bingo@chinopcmaster.com. Al terminar, el comprador puede hacer otra compra con un toque. En Ángeles Secretos, Mantenimiento permite reenviar desde angelessecretos@chinopcmaster.com un mensaje que no llegó.",
             "cambios": [
                 {
                     "tipo": "nuevo",
-                    "texto": "En el formulario de compra, «¿Cómo quieres recibir tus cartones?» ofrece WhatsApp, correo electrónico o WhatsApp y correo. Es obligatoria: empieza sin ninguna opción elegida y resaltada con el color de acento del formulario, y si se intenta enviar sin elegir, la página lo pide."
+                    "texto": "En el formulario de compra, «¿Cómo quieres recibir tus cartones?» ofrece WhatsApp, correo electrónico o WhatsApp y correo. Es obligatoria: empieza sin ninguna opción elegida y resaltada con el color de acento del formulario, y si se intenta enviar sin elegir, la página lo pide.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "Con «WhatsApp» aparece solo el campo de WhatsApp; con «Correo electrónico», solo el del correo; con «WhatsApp y correo», los dos. Después de elegir aparecen también «¿Cómo vas a jugar?» y «¿Quién te vendió?». Quien elige WhatsApp ya no tiene que dar un correo."
+                    "texto": "Con «WhatsApp» aparece solo el campo de WhatsApp; con «Correo electrónico», solo el del correo; con «WhatsApp y correo», los dos. Después de elegir aparecen también «¿Cómo vas a jugar?» y «¿Quién te vendió?». Quien elige WhatsApp ya no tiene que dar un correo.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "Las compras de una misma persona quedan en un solo enlace por su correo o por su número de WhatsApp (8888 8888 y +506 8888 8888 cuentan como el mismo). Quien compra solo con WhatsApp recibe su mismo enlace de siempre si ya había comprado con ese número. Dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte."
+                    "texto": "Las compras de una misma persona quedan en un solo enlace por su correo o por su número de WhatsApp (8888 8888 y +506 8888 8888 cuentan como el mismo). Quien compra solo con WhatsApp recibe su mismo enlace de siempre si ya había comprado con ese número. Dos correos distintos con un mismo teléfono, por ejemplo una familia, quedan como jugadores aparte.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "En Ventas, cada compra muestra «Recibe por» y resalta el botón del medio que eligió el comprador. Cuando ya salieron todos esos mensajes, la compra pasa sola de «Por enviar» a «Historial». Las compras que ya tenían todo enviado pasan al historial la primera vez que se abre Ventas."
+                    "texto": "En Ventas, cada compra muestra «Recibe por» y resalta el botón del medio que eligió el comprador. Cuando ya salieron todos esos mensajes, la compra pasa sola de «Por enviar» a «Historial». Las compras que ya tenían todo enviado pasan al historial la primera vez que se abre Ventas.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "La venta presencial, en el panel y en los enlaces de los encargados, también pide elegir cómo recibe sus cartones el comprador y muestra solo el WhatsApp, el correo o los dos según esa respuesta."
+                    "texto": "La venta presencial, en el panel y en los enlaces de los encargados, también pide elegir cómo recibe sus cartones el comprador y muestra solo el WhatsApp, el correo o los dos según esa respuesta.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "mejorado",
-                    "texto": "Los correos con los cartones salen desde bingo@chinopcmaster.com, con el nombre del bingo como remitente."
+                    "texto": "Los correos con los cartones salen desde bingo@chinopcmaster.com, con el nombre del bingo como remitente.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "nuevo",
-                    "texto": "Al terminar una compra aparece el botón «Hacer otra compra», que abre el formulario en blanco para comprar más cartones o comprar para otra persona."
+                    "texto": "Al terminar una compra aparece el botón «Hacer otra compra», que abre el formulario en blanco para comprar más cartones o comprar para otra persona.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "corregido",
-                    "texto": "La casilla «Mostrar en el formulario de compra» de cada sector ya se guarda en el servidor del bingo."
+                    "texto": "La casilla «Mostrar en el formulario de compra» de cada sector ya se guarda en el servidor del bingo.",
+                    "producto": "bingo"
+                },
+                {
+                    "tipo": "corregido",
+                    "producto": "bingo",
+                    "texto": "Los botones de WhatsApp del bingo ya no dañan los emojis del mensaje: en celular o tableta abren la app de WhatsApp y en computadora abren WhatsApp Web."
                 },
                 {
                     "tipo": "nota",
-                    "texto": "En Resumen, la cifra de compradores cuenta a cada jugador una vez, por su correo o su WhatsApp. Los enlaces de cartones que ya se enviaron siguen funcionando igual."
+                    "texto": "En Resumen, la cifra de compradores cuenta a cada jugador una vez, por su correo o su WhatsApp. Los enlaces de cartones que ya se enviaron siguen funcionando igual.",
+                    "producto": "bingo"
                 },
                 {
                     "tipo": "nota",
-                    "texto": "La guía de Bingo Digital tiene capturas nuevas del formulario de compra, la confirmación, la venta presencial, Ventas (Por enviar e Historial) y el Resumen, y sus novedades suman el ranking de vendedores, el reenvío desde Historial y el botón «Hacer otra compra»."
+                    "texto": "La guía de Bingo Digital tiene capturas nuevas del formulario de compra, la confirmación, la venta presencial, Ventas (Por enviar e Historial) y el Resumen, y sus novedades suman el ranking de vendedores, el reenvío desde Historial y el botón «Hacer otra compra».",
+                    "producto": "bingo"
+                },
+                {
+                    "tipo": "nuevo",
+                    "producto": "angeles",
+                    "texto": "En Mantenimiento, cada mensaje de la cola tiene el botón «Envío Alterno»: si un mensaje no llegó (por ejemplo, rebotó con «El mensaje se bloqueó»), lo envía otra vez desde angelessecretos@chinopcmaster.com al correo del angelado registrado. Las filas reenviadas quedan marcadas."
+                },
+                {
+                    "tipo": "mejorado",
+                    "producto": "angeles",
+                    "texto": "Mantenimiento tiene arriba un cuadro «Acerca de esta sección» que explica la cola, los filtros, «Refrescar», «Ejecutar cola ahora» y el Envío Alterno."
                 }
             ]
         },
